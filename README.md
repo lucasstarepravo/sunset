@@ -1,4 +1,4 @@
-# sunsets code
+# sunset code
 mesh free DNS for compressible reacting flows
 
 Solves the compressible Navier Stokes equations
