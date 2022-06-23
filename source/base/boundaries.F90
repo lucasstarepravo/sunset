@@ -1,0 +1,269 @@
+module boundaries
+  use kind_parameters
+  use common_parameter
+  use common_2d
+
+  implicit none
+  
+  !! node_type describes what sort of boundary condition to apply
+  !! 0 = wall
+  !! 1 = inflow
+  !! 2 = outflow
+  !! -1,-2,-3,-4 are fluid rows near boundary
+  !! 999 = regular fluid
+  !! 1000 = mirror/ghost 
+
+  public :: create_mirror_particles,reapply_mirror_bcs
+contains
+!! ------------------------------------------------------------------------------------------------  
+  subroutine create_mirror_particles
+     !! Subroutine loops over all nodes, and creates mirrors for those
+     !! near periodic or symmetric domain limits, for a square domain.
+     !! -- NB:
+     !! -----:  irelation(j)=i where i is the parent-node of node j
+     !! -----:  vrelation(j)=1 means that u(j) =  u(i), v(j) =  v(i)
+     !! -----:  vrelation(j)=2 means that u(j) = -u(i), v(j) =  v(i)
+     !! -----:  vrelation(j)=3 means that u(j) =  u(i), v(j) = -v(i)
+     !! -----:  vrelation(j)=4 means that u(j) = -u(i), v(j) = -v(i)
+    real(rkind),dimension(dims) :: rcorn
+    real(rkind) :: cdist
+    integer(ikind) :: i,j,imp,k,xbcond_noMPI,ybcond_noMPI
+    integer(ikind) :: nmirror,nmirror_esti
+      
+    nmirror_esti = 5*npfb  ! Estimate for max number of mirrors
+    allocate(irelation(npfb+1:npfb+nmirror_esti))      
+    allocate(vrelation(npfb+1:npfb+nmirror_esti))    
+    imp = 0     
+                      
+    !! In certain circumstances, periodic boundaries are built into MPI decomposition
+    !! rather than implemented here. This switch turns them off here if necessary.                      
+    xbcond_noMPI=xbcond
+    ybcond_noMPI=ybcond
+#ifdef mp
+    if(xbcond.eq.1.and.nprocsX.gt.1) xbcond_noMPI=0
+    if(ybcond.eq.1.and.nprocsY.gt.1) ybcond_noMPI=0    
+#endif
+  
+    !! Loop over all particles, and build boundaries as required               
+    do i=1,npfb
+       
+       !! LEFT AND RIGHT BOUNDARIES
+       if(rp(i,1).le.xmin+ss*h0)then ! Close to left bound
+          if(xbcond_noMPI.eq.1)then ! Periodic
+             imp = imp + 1
+             k = npfb + imp
+             irelation(k)=i;vrelation(k)=1
+             rp(k,1) = rp(i,1) + xmax - xmin;rp(k,2)=rp(i,2);rp(k,3)=rp(i,3)
+          else if(xbcond_noMPI.eq.2)then ! Symmetric
+             imp = imp + 1
+             k = npfb + imp
+             irelation(k)=i;vrelation(k)=2
+             rp(k,1) = two*xmin - rp(i,1);rp(k,2)=rp(i,2);rp(k,3)=rp(i,3)
+          end if
+       end if   
+       
+       if(rp(i,1).ge.xmax-ss*h0)then ! Close to right bound
+          if(xbcond_noMPI.eq.1)then ! Periodic
+             imp = imp + 1
+             k = npfb + imp
+             irelation(k)=i;vrelation(k)=1
+             rp(k,1) = rp(i,1) - xmax + xmin;rp(k,2)=rp(i,2);rp(k,3)=rp(i,3)
+          else if(xbcond_noMPI.eq.2)then ! Symmetric
+             imp = imp + 1
+             k = npfb + imp
+             irelation(k)=i;vrelation(k)=2
+             rp(k,1) = two*xmax - rp(i,1);rp(k,2)=rp(i,2);rp(k,3)=rp(i,3)
+          end if
+       end if 
+       
+       !! UPPER AND LOWER BOUNDARIES
+       if(rp(i,2).le.ymin+ss*h0)then ! Close to lower bound
+          if(ybcond_noMPI.eq.1)then ! Periodic
+             imp = imp + 1
+             k = npfb + imp
+             irelation(k)=i;vrelation(k)=1
+             rp(k,1) = rp(i,1);rp(k,2)=rp(i,2) + ymax - ymin;rp(k,3)=rp(i,3)
+          else if(ybcond_noMPI.eq.2)then ! Symmetric
+             imp = imp + 1
+             k = npfb + imp
+             irelation(k)=i;vrelation(k)=3
+             rp(k,1) = rp(i,1);rp(k,2)= two*ymin - rp(i,2);rp(k,3)=rp(i,3)
+          end if
+       end if   
+       
+       if(rp(i,2).ge.ymax-ss*h0)then ! Close to upper bound
+          if(ybcond_noMPI.eq.1)then ! Periodic
+             imp = imp + 1
+             k = npfb + imp
+             irelation(k)=i;vrelation(k)=1
+             rp(k,1) = rp(i,1);rp(k,2)=rp(i,2) - ymax + ymin;rp(k,3)=rp(i,3)
+          else if(ybcond_noMPI.eq.2)then ! Symmetric
+             imp = imp + 1
+             k = npfb + imp
+             irelation(k)=i;vrelation(k)=3
+             rp(k,1) = rp(i,1);rp(k,2)= two*ymax - rp(i,2);rp(k,3)=rp(i,3)
+          end if
+       end if                
+       !! CORNER BOUNDARIES
+       rcorn = (/xmin,ymin,zero/)
+       cdist = sqrt(dot_product(rcorn-rp(i,:),rcorn-rp(i,:)))
+       if(cdist.le.ss*h0)then  !! Close to lower left corner
+          if(xbcond_noMPI.ne.0.and.ybcond_noMPI.ne.0)then ! if a mirror node is required
+             imp = imp + 1
+             k = npfb + imp
+             irelation(k)=i
+             if(xbcond_noMPI.eq.1.and.ybcond_noMPI.eq.1)then
+                rp(k,1) = rp(i,1) + xmax - xmin;rp(k,2) = rp(i,2) + ymax - ymin;rp(k,3)=rp(i,3)
+                vrelation(k)=1
+             else if(xbcond_noMPI.eq.2.and.ybcond_noMPI.eq.1)then
+                rp(k,1) = two*xmin - rp(i,1);rp(k,2) = rp(i,2) + ymax - ymin;rp(k,3)=rp(i,3)
+                vrelation(k)=2          
+             else if(xbcond_noMPI.eq.1.and.ybcond_noMPI.eq.2)then
+                rp(k,1) = rp(i,1) + xmax - xmin;rp(k,2) = two*ymin - rp(i,2);rp(k,3)=rp(i,3)
+                vrelation(k)=3          
+             else if(xbcond_noMPI.eq.2.and.ybcond_noMPI.eq.2)then
+                rp(k,1) = two*xmin - rp(i,1);rp(k,2) = two*ymin - rp(i,2);rp(k,3)=rp(i,3)
+                vrelation(k)=4         
+             end if
+          end if
+       end if
+       
+       rcorn = (/xmax,ymin,zero/)
+       cdist = sqrt(dot_product(rcorn-rp(i,:),rcorn-rp(i,:)))
+       if(cdist.le.ss*h0)then  !! close to lower right corner
+          if(xbcond_noMPI.ne.0.and.ybcond_noMPI.ne.0)then ! if a mirror node is required
+             imp = imp + 1
+             k = npfb + imp
+             irelation(k)=i
+             if(xbcond_noMPI.eq.1.and.ybcond_noMPI.eq.1)then
+                rp(k,1) = rp(i,1) - xmax + xmin;rp(k,2) = rp(i,2) + ymax - ymin;rp(k,3)=rp(i,3)
+                vrelation(k)=1
+             else if(xbcond_noMPI.eq.2.and.ybcond_noMPI.eq.1)then
+                rp(k,1) = two*xmax - rp(i,1);rp(k,2) = rp(i,2) + ymax - ymin;rp(k,3)=rp(i,3)
+                vrelation(k)=2          
+             else if(xbcond_noMPI.eq.1.and.ybcond_noMPI.eq.2)then
+                rp(k,1) = rp(i,1) - xmax + xmin;rp(k,2) = two*ymin - rp(i,2);rp(k,3)=rp(i,3)
+                vrelation(k)=3          
+             else if(xbcond_noMPI.eq.2.and.ybcond_noMPI.eq.2)then
+                rp(k,1) = two*xmax - rp(i,1);rp(k,2) = two*ymin - rp(i,2);rp(k,3)=rp(i,3)
+                vrelation(k)=4         
+             end if
+          end if
+       end if
+       
+       rcorn = (/xmin,ymax,zero/)
+       cdist = sqrt(dot_product(rcorn-rp(i,:),rcorn-rp(i,:)))
+       if(cdist.le.ss*h0)then  !! close to upper left corner
+          if(xbcond_noMPI.ne.0.and.ybcond_noMPI.ne.0)then ! if a mirror node is required
+             imp = imp + 1
+             k = npfb + imp
+             irelation(k)=i
+             if(xbcond_noMPI.eq.1.and.ybcond_noMPI.eq.1)then
+                rp(k,1) = rp(i,1) + xmax - xmin;rp(k,2) = rp(i,2) - ymax + ymin;rp(k,3)=rp(i,3)
+                vrelation(k)=1
+             else if(xbcond_noMPI.eq.2.and.ybcond_noMPI.eq.1)then
+                rp(k,1) = two*xmin - rp(i,1);rp(k,2) = rp(i,2) - ymax + ymin;rp(k,3)=rp(i,3)
+                vrelation(k)=2          
+             else if(xbcond_noMPI.eq.1.and.ybcond_noMPI.eq.2)then
+                rp(k,1) = rp(i,1) + xmax - xmin;rp(k,2) = two*ymax - rp(i,2);rp(k,3)=rp(i,3)
+                vrelation(k)=3          
+             else if(xbcond_noMPI.eq.2.and.ybcond_noMPI.eq.2)then
+                rp(k,1) = two*xmin - rp(i,1);rp(k,2) = two*ymax - rp(i,2);rp(k,3)=rp(i,3)
+                vrelation(k)=4         
+             end if
+          end if
+       end if
+       
+       rcorn = (/xmax,ymax,zero/)
+       cdist = sqrt(dot_product(rcorn-rp(i,:),rcorn-rp(i,:)))
+       if(cdist.le.ss*h0)then  !! Close to upper right corner
+          if(xbcond_noMPI.ne.0.and.ybcond_noMPI.ne.0)then ! if a mirror node is required
+             imp = imp + 1
+             k = npfb + imp
+             irelation(k)=i
+             if(xbcond_noMPI.eq.1.and.ybcond_noMPI.eq.1)then
+                rp(k,1) = rp(i,1) - xmax + xmin;rp(k,2) = rp(i,2) - ymax + ymin;rp(k,3)=rp(i,3)
+                vrelation(k)=1
+             else if(xbcond_noMPI.eq.2.and.ybcond_noMPI.eq.1)then
+                rp(k,1) = two*xmax - rp(i,1);rp(k,2) = rp(i,2) - ymax + ymin;rp(k,3)=rp(i,3)
+                vrelation(k)=2          
+             else if(xbcond_noMPI.eq.1.and.ybcond_noMPI.eq.2)then
+                rp(k,1) = rp(i,1) - xmax + xmin;rp(k,2) = two*ymax - rp(i,2);rp(k,3)=rp(i,3)
+                vrelation(k)=3          
+             else if(xbcond_noMPI.eq.2.and.ybcond_noMPI.eq.2)then
+                rp(k,1) = two*xmax - rp(i,1);rp(k,2) = two*ymax - rp(i,2);rp(k,3)=rp(i,3)
+                vrelation(k)=4         
+             end if
+          end if
+       end if       
+    end do       
+              
+    nmirror = imp
+    np = npfb + nmirror   
+    do i=npfb+1,np
+       node_type(i) = node_type(irelation(i)) !! Copy the node type (we know it's ghost node because i>npfb
+       h(i) = h(irelation(i))  !! Copy the "smoothing length"
+#ifdef dim3
+       zlayer_index(i) = zlayer_index(irelation(i)) !! Copy the z-layer index
+#endif       
+    end do   
+
+#ifdef mp    
+    np_nohalo = np
+#endif    
+   
+    return
+  end subroutine create_mirror_particles
+!! ------------------------------------------------------------------------------------------------  
+  subroutine reapply_mirror_bcs
+     use omp_lib
+     integer(ikind) :: i,j
+     real(rkind) :: delta_roE
+     real(rkind),dimension(dims) :: rij
+     
+     segment_tstart = omp_get_wtime()
+     
+     !! Update properties in the boundary particles
+     !$OMP PARALLEL DO PRIVATE(i,rij,delta_roE)
+#ifdef mp
+     do j=npfb+1,np_nohalo
+#else
+     do j=npfb+1,np
+#endif
+        i = irelation(j)
+        lnro(j) = lnro(i)
+        if(vrelation(j).eq.1)then
+           u(j) = u(i)
+           v(j) = v(i) 
+        else if(vrelation(j).eq.2)then
+           u(j) = -u(i)
+           v(j) = v(i)        
+        else if(vrelation(j).eq.3)then
+           u(j) = u(i)
+           v(j) = -v(i) 
+        else if(vrelation(j).eq.4)then
+           u(j) = -u(i)
+           v(j) = -v(i) 
+        end if   
+#ifdef dim3
+        w(j) = w(i) !! Never reversed for periodic or symmetric BCs in X-Y plane
+#endif              
+        
+        !! Calculate hydrostatic energy gradient
+        rij = rp(j,:)-rp(i,:)
+        delta_roE = exp(lnro(i))*dot_product(grav,rij)/gammagasm1
+         
+        roE(j) = roE(i) + delta_roE
+#ifdef ms
+        Y0(j)=Y0(i)
+#endif        
+     end do
+     !$OMP END PARALLEL DO     
+
+     !! Profiling
+     segment_tend = omp_get_wtime()
+     segment_time_local(2) = segment_time_local(2) + segment_tend - segment_tstart
+     return
+  end subroutine reapply_mirror_bcs
+!! ------------------------------------------------------------------------------------------------  
+end module boundaries
