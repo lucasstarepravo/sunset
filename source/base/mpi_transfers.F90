@@ -4,12 +4,17 @@ module mpi_transfers
   !! 2D DOMAIN DECOMPOSITION in x-y. Each processor has up to 8 neighbour processors
   !!
   !!     SEND ORDER       RECEIVE ORDER
+  !!
   !!  ---------------   ---------------
-  !!    8  | 7 | 6        4  | 3 | 2
+  !!    11 |   | 9        5  |   | 3
+  !!  ---------------   ---------------  
+  !!    12 |10 | 8        6  | 4 | 2
   !!  ---------------   ---------------
-  !!    1  |   | 5        5  |   | 1 
+  !!    1  |   | 7        7  |   | 1 
   !!  ---------------   ---------------
-  !!    2  | 3 | 4        6  | 7 | 8  
+  !!    2  | 4 | 6        8  |10 | 12  
+  !!  ---------------   ---------------
+  !!    3  |   | 5        9  |   | 11
   !!  ---------------   ---------------
   !!
   !! Transfers are SEND-RECEIVE for ODD processors, and RECEIVE-SEND for EVEN processors in EACH

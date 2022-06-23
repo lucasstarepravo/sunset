@@ -76,14 +76,16 @@ module common_2d
   integer(ikind) :: nprocs,iproc,ierror  !! processes, this process id, error int
   integer(ikind) :: nprocsX,nprocsY,iprocX,iprocY     !! 2D decomposition grid sizes, and indices
   integer(ikind) :: np_nohalo !! nodes with no halos  
-  integer(ikind),dimension(8) :: iprocNS,iprocNR !! Neighbour lists for send and receive
-  integer(ikind),dimension(8) :: nhalo,inhalo  !! Outgoing and incoming halo sizes
-  integer(ikind),dimension(8) :: nrecstart !! Starting index for recieves
+  integer(ikind),dimension(12) :: iprocNS,iprocNR !! Neighbour lists for send and receive
+  integer(ikind),dimension(12) :: nhalo,inhalo  !! Outgoing and incoming halo sizes
+  integer(ikind),dimension(12) :: nrecstart !! Starting index for recieves
   integer(ikind),dimension(:,:),allocatable :: halo_lists !! List of indices of halo nodes
   integer(ikind),dimension(:),allocatable :: halo_listL,halo_listR    !! Halo_lists
   integer(ikind),dimension(:),allocatable :: halo_listD,halo_listU    !! Halo_lists  
   integer(ikind) :: nhaloL,nhaloR,nhaloU,nhaloD   !! Size of halos outgoing
   real(rkind) :: XL_thisproc,XR_thisproc,YU_thisproc,YD_thisproc
+  
+  integer(ikind),dimension(:),allocatable :: proc_neighbours_
 
           
 end module common_2d

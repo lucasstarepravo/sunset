@@ -1,15 +1,15 @@
 # Makefile for sunsets_code
 # OPTIONS:
-# thermo     Isothermal (0) or thermal (1) flow (default: 1)
-# react      Reacting (1) or inert (0) flow (default: 0)
-# restart    Start from initial conditions (0) or restart file (1) (default: 0)
-# hardinf    Non-reflecting inflow (0) or hard inflow (1) (default: 0)
-# multispec  Single (0) or multispecies (1) flow (default: 0)
-# mpi        Shared only (0) or distributed-shared (1) acceleration (default: 0)          
-# wisot      Adiabatic/prescribed heat flux (0) or isothermal (1) walls (default: 0)
-# dim3       Two (0) or three (1) dimensional simulation (default: 0)
-# pgrad      Drive the flow with a pressure gradient and P.I.D control (default: 0)
-# hsink      Enforce a constant mean internal energy via P.I.D. control (default: 0)
+# thermo     Isothermal (0) or thermal (1) flow                           (default: 1)
+# react      Reacting (1) or inert (0) flow                               (default: 0)
+# restart    Start from initial conditions (0) or restart file (1)        (default: 0)
+# hardinf    Non-reflecting inflow (0) or hard inflow (1)                 (default: 0)
+# multispec  Single (0) or multispecies (1) flow                          (default: 0)
+# mpi        Shared only (0) or distributed-shared (1) acceleration       (default: 0)          
+# wisot      Adiabatic/prescribed heat flux (0) or isothermal (1) walls   (default: 0)
+# dim3       Two (0) or three (1) dimensional simulation                  (default: 0)
+# pgrad      Drive the flow with a pressure gradient and P.I.D control    (default: 0)
+# hsink      Enforce a constant mean internal energy via P.I.D. control   (default: 0)
 #
 # EXAMPLE USAGE:
 # make thermo=0 react=0 mpi=1 etc...
