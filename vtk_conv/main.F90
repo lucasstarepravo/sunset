@@ -61,7 +61,7 @@ program main
       
      
   !! LOAD AND READ TIME,DT FROM FILE DT. 
-  open(unit=70,file='../data_out/time_out',status='old')
+  open(unit=70,file='../data_out/time.out',status='old')
   i_loop_finish = 0
   i_PART_counter = 0
   do while(i_loop_finish.eq.0)

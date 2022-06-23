@@ -53,7 +53,7 @@ contains
      t_run = zero;t_last_X=zero
 
      !! Open a files for outputting
-     open(unit=21,file='./data_out/time_out')
+     open(unit=21,file='./data_out/time.out')
      open(unit=191,file='data_out/statistics/cputime.out')
      open(unit=192,file='data_out/statistics/dt.out')
      open(unit=193,file='data_out/statistics/masscheck.out')
