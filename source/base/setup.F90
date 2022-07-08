@@ -119,7 +119,7 @@ contains
      nl_ini=nl_iniC;nl_end=nl_endC
 
      
-     write(6,*) "process",iproc,"start,end",nl_ini,nl_end             
+!     write(6,*) "process",iproc,"start,end",nl_ini,nl_end             
      call MPI_BARRIER( MPI_COMM_WORLD, ierror)
 #else
      !! No MPI, so ignore the decomposition schedule in IPART
@@ -175,8 +175,9 @@ contains
      !! Set the spatial limits of this processor block
      XL_thisproc = minval(rp(1:npfb,1))
      XR_thisproc = maxval(rp(1:npfb,1))    
-     YU_thisproc = maxval(rp(1:npfb,2))
-     YD_thisproc = minval(rp(1:npfb,2))  
+     YU_thisproc = maxval(rp(10+floor(0.5*npfb):npfb,2))  !! Adjustments for cyclical columns. 
+     YD_thisproc = minval(rp(1:floor(0.5*npfb)-10,2))       !! Should be oK given node ordering
+     
     
      write(6,*) "process",iproc,"npfb,nb",npfb,nb
      call MPI_BARRIER( MPI_COMM_WORLD, ierror)     
@@ -199,10 +200,11 @@ contains
      !! STEP 2: build mirrors, halos and neighbours
      !! =======================================================================
      call create_mirror_particles
-      
+
 #ifdef mp
      !! Initial halo build - much too big (based on kernel size x 1.2?)
      call build_halos
+
 #ifdef dim3
      !! Transfer information about z-layer
      call halo_exchange_int(zlayer_index)
@@ -234,6 +236,7 @@ contains
 
      !! Allocate arrays for properties
      allocate(u(np),v(np),w(np),lnro(np),roE(np),Y0(np))
+     u=zero;v=zero;w=zero;lnro=zero;roE=one;Y0=zero
 
 #ifdef mp
      call halo_exchanges_all
@@ -278,10 +281,7 @@ contains
      !! Initialise PID controller variables for <|u|>
      eflow_nm1 = one
      sum_eflow = zero   
-     
-     !! Initialise PID controller variables for <cv*T>
-     ehsink_nm1 = one
-     sum_ehsink = zero        
+       
            
 write(6,*) "sizes",iproc,npfb,np_nohalo,np                    
      return
@@ -302,11 +302,11 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      !$OMP PARALLEL DO PRIVATE(x,y,z,tmp)
      do i=1,npfb
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
-        u(i) = -cos(two*pi*x)*sin(two*pi*y)!*oosqrt2
-        v(i) = sin(two*pi*x)*cos(two*pi*y)!*cos(two*pi*z/dble(nz)/dz)    !!c c
+        u(i) = u_char!-cos(two*pi*x)*sin(two*pi*y)!*oosqrt2
+        v(i) = zero!sin(two*pi*x)*cos(two*pi*y)!*cos(two*pi*z/dble(nz)/dz)    !!c c
         w(i) = zero!u(i);u(i)=zero
         tmp = -half*half*(cos(4.0d0*pi*x) + cos(4.0d0*pi*y))/csq
-        lnro(i) = log(rho_char + tmp)!log(rho_char)       
+        lnro(i) = log(rho_char)!log(rho_char + tmp)!log(rho_char)       
         roE(i) = exp(lnro(i))*(T0*Rs0/gammagasm1 + half*u(i)*u(i) + half*v(i)*v(i) + half*w(i)*w(i))
         
 !        call evaluate_grf(x,y,z,tmp)
@@ -408,8 +408,6 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      
      !! Set the initial forcing to zero. It will only be changed if PID controller in velcheck is used.
      driving_force(:) = zero
-     !! Same with heat sink term
-     heat_sink_mag = zero
      
      return
   end subroutine initial_solution   

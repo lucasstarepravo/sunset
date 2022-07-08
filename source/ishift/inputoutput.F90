@@ -209,7 +209,6 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      
      do i=1,n
         write(212,*) x(i),y(i),nt(i),xn(i),yn(i),ds(i)
-!        write(30,*) x(i),y(i)
      end do
      
      deallocate(x,y,xn,yn,ds,nt)
@@ -250,6 +249,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
 !! ------------------------------------------------------------------------------------------------
   subroutine rearrange_nodes
      integer(ikind) :: kk,nband,nptmp,nl_ini,nl_end,ii,nblock,ll,nl_end_column
+     integer(ikind) :: nshift
    
      !! First sort nodes in X
      write(6,*) "About to quicksort"
@@ -291,9 +291,13 @@ write(6,*) "Shifting iteration",ll,"of ",kk
            write(6,*) "sorted in y for processor band ",kk   
            
            !! Shuffle the blocks to create cyclical structure in y
-           nblock = ceiling(dble(nband/nprocsY))                    
+           nblock = ceiling(dble(nband/nprocsY))      
+           nshift = floor(0.5*nblock) 
+           call shift_indices(nl_ini,nl_end,nshift)
+                       
                   
         
+           !! Calculate the block sizes
            nl_end_column = nl_end
            nl_end = nl_ini - 1
            do ll=1,nprocsY
@@ -326,6 +330,59 @@ write(6,*) "Shifting iteration",ll,"of ",kk
       
      return
   end subroutine rearrange_nodes
+!! ------------------------------------------------------------------------------------------------ 
+  subroutine shift_indices(istart,iend,nswap)
+     integer(ikind), intent(in) :: istart,iend,nswap 
+     real(rkind),dimension(:),allocatable :: x_tmp,y_tmp,xn_tmp,yn_tmp,ds_tmp
+     integer(ikind),dimension(:),allocatable :: nt_tmp
+     integer(ikind) :: band_size,shift_size,i_old,i_new,i
+     
+     !! Sizes
+     band_size = 1 + iend - istart
+     shift_size = band_size - nswap
+     write(6,*) "shift size,bandsize",shift_size,band_size
+     
+     !! Make some space
+     allocate(x_tmp(nswap),y_tmp(nswap),xn_tmp(nswap),yn_tmp(nswap))
+     allocate(ds_tmp(nswap),nt_tmp(nswap))
+     
+     write(6,*) "shift indices", istart,iend,nswap
+     !! Temporary store of the final nswap elements
+     x_tmp(1:nswap) = x(iend-nswap+1:iend)
+     y_tmp(1:nswap) = y(iend-nswap+1:iend)
+     xn_tmp(1:nswap) = xn(iend-nswap+1:iend)
+     yn_tmp(1:nswap) = yn(iend-nswap+1:iend)
+     ds_tmp(1:nswap) = ds(iend-nswap+1:iend)
+     nt_tmp(1:nswap) = nt(iend-nswap+1:iend)       
+     
+     
+     !! Shift
+     do i=1,shift_size
+        !! original index
+        i_old = iend - nswap + 1 - i
+        !! new index
+        i_new = i_old + nswap
+        
+        x(i_new) = x(i_old)
+        y(i_new) = y(i_old)
+        xn(i_new) = xn(i_old)
+        yn(i_new) = yn(i_old)
+        ds(i_new) = ds(i_old)
+        nt(i_new) = nt(i_old)                                                
+     end do
+     
+     !! Copy temp back to start of band
+     x(istart:istart+nswap-1) = x_tmp(1:nswap)
+     y(istart:istart+nswap-1) = y_tmp(1:nswap)
+     xn(istart:istart+nswap-1) = xn_tmp(1:nswap)
+     yn(istart:istart+nswap-1) = yn_tmp(1:nswap)
+     ds(istart:istart+nswap-1) = ds_tmp(1:nswap)
+     nt(istart:istart+nswap-1) = nt_tmp(1:nswap)                         
+     
+     deallocate(x_tmp,y_tmp,xn_tmp,yn_tmp,ds_tmp,nt_tmp)
+     
+     return
+  end subroutine shift_indices
 !! ------------------------------------------------------------------------------------------------ 
 !! ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 recursive subroutine quicksort(a, first, last)

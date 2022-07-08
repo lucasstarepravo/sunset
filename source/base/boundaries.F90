@@ -41,7 +41,7 @@ contains
     ybcond_noMPI=ybcond
 #ifdef mp
     if(xbcond.eq.1.and.nprocsX.gt.1) xbcond_noMPI=0
-    if(ybcond.eq.1.and.nprocsY.gt.1) ybcond_noMPI=0    
+!    if(ybcond.eq.1.and.nprocsY.gt.1) ybcond_noMPI=0    
 #endif
   
     !! Loop over all particles, and build boundaries as required               

@@ -3,23 +3,48 @@ module mpi_transfers
   !! ----------------------------------------------------------------------------------------------
   !! 2D DOMAIN DECOMPOSITION in x-y. Each processor has up to 8 neighbour processors
   !!
-  !!     SEND ORDER       RECEIVE ORDER
+  !!     SEND ORDER    
   !!
-  !!  ---------------   ---------------
-  !!    11 |   | 9        5  |   | 3
-  !!  ---------------   ---------------  
-  !!    12 |10 | 8        6  | 4 | 2
-  !!  ---------------   ---------------
-  !!    1  |   | 7        7  |   | 1 
-  !!  ---------------   ---------------
-  !!    2  | 4 | 6        8  |10 | 12  
-  !!  ---------------   ---------------
-  !!    3  |   | 5        9  |   | 11
-  !!  ---------------   ---------------
+  !!  ---------------------------   
+  !!    6         |   | 2+npy+1       
+  !!  --------------------------- 
+  !!    5         |   | 2+npy+1     
+  !!  ---------------------------  
+  !!    4         | 1 | 2+npy+1      
+  !!  ---------------------------   
+  !!    3         |   | 2+npy+1       
+  !!  ---------------------------   
+  !!    2+npy     | 2 | 2+2*npy       
+  !!  ---------------------------   
+  !!    2+npy-1   |   | 2+2*npy-1      
+  !!  ---------------------------   
+  !!    2+npy-2   |   | 2+2*npy-2       
+  !!  ---------------------------    
+  !!
+  !!   RECEIVE ORDER
+  !!
+  !!  ---------------------------   
+  !!    2+2*npy-3 |   | 2+npy-3       
+  !!  --------------------------- 
+  !!    2+2*npy-2 |   | 2+npy-2     
+  !!  ---------------------------  
+  !!    2+2*npy-1 | 2 | 2+npy-1      
+  !!  ---------------------------   
+  !!    2+2*npy   |   | 2+npy       
+  !!  ---------------------------   
+  !!    2+npy+1   | 1 | 3       
+  !!  ---------------------------   
+  !!    2+npy+2   |   | 4      
+  !!  ---------------------------   
+  !!    2+npy+3   |   | 5       
+  !!  ---------------------------      
+  !!
   !!
   !! Transfers are SEND-RECEIVE for ODD processors, and RECEIVE-SEND for EVEN processors in EACH
   !! direction. Hence, if any periodic boundaries are required, need either 1 or EVEN number of 
   !! processors in periodic direction.
+  !!
+  !! UP-DOWN transfers are ALWAYS cyclic (in new framework...)
   !!  
   !! ----------------------------------------------------------------------------------------------
   use kind_parameters
@@ -72,222 +97,230 @@ contains
 #ifdef mp
 !! ------------------------------------------------------------------------------------------------
   subroutine processor_mapping
-     integer(ikind) :: ii
+     integer(ikind) :: ii,i,j
+     integer(ikind),dimension(:),allocatable :: iproc_thiscolumn
   
      !! Number of processors in X and Y decomposition - check match with schedule     
      if(nprocsX*nprocsY.ne.nprocs) then
         write(6,*) "ERROR: nprocs doesn't match the decomposition schedule from ishift. STOPPING"
         call MPI_Abort(MPI_COMM_WORLD, ii, ierror)
      end if
+     
+     !! Allocate space for the send and recieve lists
+     allocate(iproc_S_LR(2*nprocsY),iproc_R_LR(2*nprocsY),iproc_S_UD(2),iproc_R_UD(2))
+     iproc_S_LR=-1;iproc_R_LR=-1       !! Send-leftright,receive-leftright
+     iproc_S_UD=-1;iproc_R_UD=-1       !! Send-updown, receive-updown
  
      !! Indices of this processor in X,Y grid 
      iprocX=iproc/nprocsY   
      iprocY=mod(iproc,nprocsY)
-         
-     !! Lists for 2 dimensional decomposition - SEND LIST
-     iprocNS = -1
-     if(nprocsY.ne.1)then
-        if(iprocY.ne.0) iprocNS(3) = iproc - 1 !D
-        if(iprocY.ne.nprocsY-1) iprocNS(7) = iproc + 1 !U
-     end if
-     !! Y-periodicity
-     if(ybcond.eq.1.and.nprocsY.gt.1) then
-        if(iprocY.eq.0) iprocNS(3) = iproc - 1 + nprocsY  !D
-        if(iprocY.eq.nprocsY-1) iprocNS(7) = iproc + 1 - nprocsY   !U
-     end if
-     if(iprocX.ne.0) then
-        iprocNS(1) = iproc-nprocsY !L
-        if(iprocNS(3).ne.-1) iprocNS(2) = iprocNS(3) - nprocsY  !LD
-        if(iprocNS(7).ne.-1) iprocNS(8) = iprocNS(7) - nprocsY  !LU
-     end if
-     if(iprocX.ne.nprocsX-1) then
-        iprocNS(5) = iproc+nprocsY !R
-        if(iprocNS(3).ne.-1) iprocNS(4) = iprocNS(3) + nprocsY  !RD
-        if(iprocNS(7).ne.-1) iprocNS(6) = iprocNS(7) + nprocsY  !RU
-     end if
-     !! X-periodicity
-     if(xbcond.eq.1.and.nprocsX.gt.1) then
-        if(iprocX.eq.0) then
-           iprocNS(1) = iproc + nprocs - nprocsY !L
-           if(iprocNS(3).ne.-1) iprocNS(2) = iprocNS(3) + nprocs - nprocsY !LD
-           if(iprocNS(7).ne.-1) iprocNS(8) = iprocNS(7) + nprocs - nprocsY !LU
-        end if
-        if(iprocX.eq.nprocsX-1) then
-           iprocNS(5) = iproc - nprocs + nprocsY
-           if(iprocNS(3).ne.-1) iprocNS(4) = iprocNS(3) - nprocs + nprocsY !RD
-           if(iprocNS(7).ne.-1) iprocNS(6) = iprocNS(7) - nprocs + nprocsY !RU
-        end if     
-     end if
-
-
-
-     !! Lists for 2 dimensional decomposition - RECEIVE LIST
-     iprocNR = -1
-     if(nprocsY.ne.1)then
-        if(iprocY.ne.0) iprocNR(7) = iproc - 1 !D
-        if(iprocY.ne.nprocsY-1) iprocNR(3) = iproc + 1 !U
-     end if
-     !! Y-periodicity
-     if(ybcond.eq.1.and.nprocsY.gt.1) then
-        if(iprocY.eq.0) iprocNR(7) = iproc - 1 + nprocsY    !D
-        if(iprocY.eq.nprocsY-1) iprocNR(3) = iproc + 1 - nprocsY         !U
-     end if         
-     if(iprocX.ne.0) then
-        iprocNR(5) = iproc-nprocsY
-        if(iprocNR(7).ne.-1) iprocNR(6) = iprocNR(7) - nprocsY  !LD
-        if(iprocNR(3).ne.-1) iprocNR(4) = iprocNR(3) - nprocsY  !LU
-     end if
-     if(iprocX.ne.nprocsX-1) then
-        iprocNR(1) = iproc+nprocsY
-        if(iprocNR(7).ne.-1) iprocNR(8) = iprocNR(7) + nprocsY  !RD
-        if(iprocNR(3).ne.-1) iprocNR(2) = iprocNR(3) + nprocsY  !RU
-     end if 
-     !! X-periodicity
-     if(xbcond.eq.1.and.nprocsX.gt.1) then
-        if(iprocX.eq.0) then
-           iprocNR(5) = iproc + nprocs - nprocsY !L
-           if(iprocNR(7).ne.-1) iprocNR(6) = iprocNR(7) + nprocs - nprocsY !LD
-           if(iprocNR(3).ne.-1) iprocNR(4) = iprocNR(3) + nprocs - nprocsY !LU
-        end if
-        if(iprocX.eq.nprocsX-1) then
-           iprocNR(1) = iproc - nprocs + nprocsY
-           if(iprocNR(7).ne.-1) iprocNR(8) = iprocNR(7) - nprocs + nprocsY !RD
-           if(iprocNR(3).ne.-1) iprocNR(2) = iprocNR(3) - nprocs + nprocsY !RU
-        end if     
+     
+     !! Build a list of the indices of the processors in this column
+     allocate(iproc_thiscolumn(nprocsY))
+     iproc_thiscolumn(1) = iproc
+     if(nprocsY.ne.1) then
+        j=1
+        do i=iprocY+1,nprocsY-1
+           j = j+1
+           iproc_thiscolumn(j) = iproc_thiscolumn(1) + j - 1
+        end do
+        do i=1,iprocY
+           j = j+1
+           iproc_thiscolumn(j) = iproc_thiscolumn(1) + j - 1 - nprocsY
+        end do
      end if
      
-     write(6,*) "process",iproc,"NS:",iprocNS(:)
-     write(6,*) "process",iproc,"NR:",iprocNR(:)     
+     !! UP-DOWN SEND LIST
+     if(nprocsY.ne.1) then
+        !! Up, cyclic
+        if(iprocY.ne.nprocsY-1) then
+           iproc_S_UD(1) = iproc + 1
+        else
+           iproc_S_UD(1) = iproc + 1 - nprocsY
+        end if
+        !! Down, cyclic
+        if(iprocY.ne.0)then
+           iproc_S_UD(2) = iproc - 1
+        else
+           iproc_S_UD(2) = iproc - 1 + nprocsY
+        end if
+     end if
+     
+     !! LEFT-RIGHT RECEIVE LIST
+     if(nprocsX.ne.1) then
+        !! Left
+        if(iprocX.ne.0) then
+           iproc_S_LR(1:nprocsY) = iproc_thiscolumn(:) - nprocsY
+        end if
+        !! Right
+        if(iprocX.ne.nprocsX-1) then
+           iproc_S_LR(nprocsY+1:2*nprocsY) = iproc_thiscolumn(:) + nprocsY
+        end if
+        !! Left & periodic
+        if(xbcond.eq.1.and.iprocX.eq.0) then
+           iproc_S_LR(1:nprocsY) = iproc_thiscolumn(:) - nprocsY + nprocsX*nprocsY           
+        end if              
+        !! Right & periodic
+        if(xbcond.eq.1.and.iprocX.eq.nprocsX-1)then
+           iproc_S_LR(nprocsY+1:2*nprocsY) = iproc_thiscolumn(:) + nprocsY - nprocsX*nprocsY
+        end if                         
+     end if
+     
+     
+     !! Rebuild thiscolumn list (reversed for RECEIVE)
+     iproc_thiscolumn(1) = iproc
+     if(nprocsY.ne.1) then
+        j=1
+        do i=1,iprocY
+           j = j+1
+           iproc_thiscolumn(j) = iproc_thiscolumn(1) - j + 1
+        end do
+        do i=iprocY+1,nprocsY-1
+           j = j+1
+           iproc_thiscolumn(j) = iproc_thiscolumn(1) - j + 1 + nprocsY
+        end do
+     end if   
+ 
+   
+     !! UP-DOWN RECEIVE LIST
+     if(nprocsY.ne.1) then
+        !! Down, cyclic
+        if(iprocY.ne.0) then
+           iproc_R_UD(1) = iproc - 1
+        else
+           iproc_R_UD(1) = iproc - 1 + nprocsY
+        end if
+        !! Up, cyclic
+        if(iprocY.ne.nprocsY-1)then
+           iproc_R_UD(2) = iproc + 1
+        else
+           iproc_R_UD(2) = iproc + 1 - nprocsY
+        end if
+     end if
+     
+     !! LEFT-RIGHT RECEIVE LIST
+     if(nprocsX.ne.1) then
+        !! Right
+        if(iprocX.ne.nprocsX-1) then
+           iproc_R_LR(1:nprocsY) = iproc_thiscolumn(:) + nprocsY
+        end if
+        !! Left
+        if(iprocX.ne.0) then
+           iproc_R_LR(nprocsY+1:2*nprocsY) = iproc_thiscolumn(:) - nprocsY
+        end if
+        !! right & periodic
+        if(xbcond.eq.1.and.iprocX.eq.nprocsX-1) then
+           iproc_R_LR(1:nprocsY) = iproc_thiscolumn(:) + nprocsY - nprocsX*nprocsY           
+        end if              
+        !! Left & periodic
+        if(xbcond.eq.1.and.iprocX.eq.0)then
+           iproc_R_LR(nprocsY+1:2*nprocsY) = iproc_thiscolumn(:) - nprocsY + nprocsX*nprocsY
+        end if                                      
+     end if   
 
+
+     write(6,*) "new lists-S-LR",iproc,iproc_S_LR(:)
+     call MPI_BARRIER( MPI_COMM_WORLD, ierror)          
+     write(6,*) "new lists-R-LR",iproc,iproc_R_LR(:)     
+     call MPI_BARRIER( MPI_COMM_WORLD, ierror)          
+     write(6,*) "new lists-S-UD",iproc,iproc_S_UD(:)
+     call MPI_BARRIER( MPI_COMM_WORLD, ierror)          
+     write(6,*) "new lists-R-UD",iproc,iproc_R_UD(:)     
+     call MPI_BARRIER( MPI_COMM_WORLD, ierror)     
+       
      
      return
   end subroutine processor_mapping
 !! ------------------------------------------------------------------------------------------------
   subroutine build_halos
      integer(ikind) :: i,nstart,nend,maxhalo,suminhalo,is,ie,k
+     integer(ikind) :: maxhalo_UD,maxhalo_LR
      real(rkind) :: x,y,ss_local,halo_fac
      integer(ikind),dimension(:,:),allocatable :: halo_lists_tmp
+     integer(ikind),dimension(:,:),allocatable :: halo_lists_tmp_LR,halo_lists_tmp_UD
      !! Routine builds a list of nodes which are to be exported as halos for adjacent processors
-          
+
      !! How much extra?
-     halo_fac = 6.0d0
-      
-     !! Allocate a temporary halo list
-     allocate(halo_lists_tmp(np,8))
-     nhalo=0
+     halo_fac = 2.0d0
+          
+     !! Space for halos in temporary arrays
+     allocate(halo_lists_tmp_LR(np,2*nprocsY),halo_lists_tmp_UD(np,2))
      
-     !! Build halo LEFT    
-     if(iprocNS(1).ge.0) then           
-        do i=1,np
-           x=rp(i,1);ss_local = halo_fac*ss*h(i)      
-           if(abs(x-XL_thisproc).le.ss_local) then     
-              nhalo(1) = nhalo(1) + 1
-              halo_lists_tmp(nhalo(1),1) = i
-           end if
-        end do
-     end if
-              
-     !! Build halo RIGHT
-     if(iprocNS(5).ge.0) then  
-        do i=1,np
-           x=rp(i,1);ss_local = halo_fac*ss*h(i)
-           if(abs(x-XR_thisproc).le.ss_local) then
-              nhalo(5) = nhalo(5) + 1
-              halo_lists_tmp(nhalo(5),5) = i              
-           end if
-        end do
-     end if
+     !! Prepare space for halo sizes
+     allocate(nhalo_LR(2*nprocsY),nhalo_UD(2));nhalo_LR=0;nhalo_UD=0
+     allocate(inhalo_LR(2*nprocsY),inhalo_UD(2));inhalo_LR=0;inhalo_UD=0
      
      !! Build halo UP
-     if(iprocNS(7).ge.0) then
+     if(iproc_S_UD(1).ge.0) then
         do i=1,np
            y=rp(i,2);ss_local = halo_fac*ss*h(i)      
            if(abs(y-YU_thisproc).le.ss_local) then     
-              nhalo(7) = nhalo(7) + 1
-              halo_lists_tmp(nhalo(7),7) = i              
+              nhalo_UD(1) = nhalo_UD(1) + 1
+              halo_lists_tmp_UD(nhalo_UD(1),1) = i              
            end if
         end do
      end if
 
      !! Build halo DOWN     
-     if(iprocNS(3).ge.0)then            
+     if(iproc_S_UD(2).ge.0)then            
         do i=1,np
            y=rp(i,2);ss_local = halo_fac*ss*h(i)
            if(abs(y-YD_thisproc).le.ss_local) then
-              nhalo(3) = nhalo(3) + 1
-              halo_lists_tmp(nhalo(3),3) = i              
+              nhalo_UD(2) = nhalo_UD(2) + 1
+              halo_lists_tmp_UD(nhalo_UD(2),2) = i              
            end if
         end do           
-     end if
-     
-     !! Build halo LEFT-DOWN 
-     if(iprocNS(2).ge.0) then           
-        do i=1,np
-           x=rp(i,1);y=rp(i,2);ss_local = halo_fac*ss*h(i)     
-!           if(abs(x-XL_thisproc).le.ss_local.and.abs(y-YD_thisproc).le.ss_local) then     
-           if(abs(x-XL_thisproc).le.ss_local)then
-              nhalo(2) = nhalo(2) + 1
-              halo_lists_tmp(nhalo(2),2) = i
-           end if
-        end do
      end if     
 
-     !! Build halo RIGHT-DOWN 
-     if(iprocNS(4).ge.0) then           
-        do i=1,np
-           x=rp(i,1);y=rp(i,2);ss_local = halo_fac*ss*h(i)      
-!           if(abs(x-XR_thisproc).le.ss_local.and.abs(y-YD_thisproc).le.ss_local) then     
-           if(abs(x-XR_thisproc).le.ss_local)then
-              nhalo(4) = nhalo(4) + 1
-              halo_lists_tmp(nhalo(4),4) = i
-           end if
-        end do
-     end if     
-     
-     !! Build halo RIGHT-UP
-     if(iprocNS(6).ge.0) then           
-        do i=1,np
-           x=rp(i,1);y=rp(i,2);ss_local = halo_fac*ss*h(i)    
-!           if(abs(x-XR_thisproc).le.ss_local.and.abs(y-YU_thisproc).le.ss_local) then     
-           if(abs(x-XR_thisproc).le.ss_local)then
-              nhalo(6) = nhalo(6) + 1
-              halo_lists_tmp(nhalo(6),6) = i
-           end if
-        end do
-     end if          
-     
-     !! Build halo LEFT-UP 
-     if(iprocNS(8).ge.0) then           
-        do i=1,np
-           x=rp(i,1);y=rp(i,2);ss_local = halo_fac*ss*h(i)     
-!           if(abs(x-XL_thisproc).le.ss_local.and.abs(y-YU_thisproc).le.ss_local) then     
-           if(abs(x-XL_thisproc).le.ss_local)then           
-              nhalo(8) = nhalo(8) + 1
-              halo_lists_tmp(nhalo(8),8) = i
-           end if
-        end do
-     end if          
-     
-     !! Store halos in final array
-     maxhalo = maxval(nhalo(1:8))
-     allocate(halo_lists(maxhalo,8));halo_lists=0
-    
-     do k=1,8
-        if(iprocNS(k).ne.-1)then
-           halo_lists(1:nhalo(k),k) = halo_lists_tmp(1:nhalo(k),k)
+     !! Build halos LEFT
+     do k=1,nprocsY
+        if(iproc_S_LR(k).ge.0) then           
+           do i=1,np
+              x=rp(i,1);ss_local = halo_fac*ss*h(i)      
+              if(abs(x-XL_thisproc).le.ss_local) then     
+                 nhalo_LR(k) = nhalo_LR(k) + 1
+                 halo_lists_tmp_LR(nhalo_LR(k),k) = i
+              end if
+           end do
         end if
      end do
-     
-     deallocate(halo_lists_tmp)
-      
-             
+
+     !! Build halos RIGHT
+     do k=nprocsY+1,2*nprocsY
+        if(iproc_S_LR(k).ge.0) then           
+           do i=1,np
+              x=rp(i,1);ss_local = halo_fac*ss*h(i)      
+              if(abs(x-XR_thisproc).le.ss_local) then     
+                 nhalo_LR(k) = nhalo_LR(k) + 1
+                 halo_lists_tmp_LR(nhalo_LR(k),k) = i
+              end if
+           end do
+        end if
+     end do
+
+     !! Store halos in final array
+     maxhalo_LR = maxval(nhalo_LR(1:2*nprocsY))
+     maxhalo_UD = maxval(nhalo_UD(1:2))
+     allocate(halo_lists_LR(maxhalo_LR,2*nprocsY),halo_lists_UD(maxhalo_UD,2))
+     halo_lists_LR=0;halo_lists_UD=0
+
+     do k=1,2
+        if(iproc_S_UD(k).ne.-1)then
+           halo_lists_UD(1:nhalo_UD(k),k) = halo_lists_tmp_UD(1:nhalo_UD(k),k)
+        end if
+     end do
+     do k=1,2*nprocsY
+        if(iproc_S_LR(k).ne.-1)then
+           halo_lists_LR(1:nhalo_LR(k),k) = halo_lists_tmp_LR(1:nhalo_LR(k),k)
+        end if
+     end do         
+     deallocate(halo_lists_tmp_UD,halo_lists_tmp_LR)
+
      !! Exchange halo sizes and node positions between processors   
      call send_halo_sizes_nodes
      
     
-
-     !! Update size and node-types
-     suminhalo = sum(inhalo(1:8))
+     suminhalo = sum(inhalo_LR(1:2*nprocsY)) + sum(inhalo_UD(1:2))         
      np = np_nohalo + suminhalo     
             
      return
@@ -308,148 +341,104 @@ contains
      if(mod(iprocY,2).eq.0) then
         yodd = .false.
      end if
-
-     !! Loop over each possible neighbour
-     do k =1,8
-
-        if(k.ne.3.and.k.ne.7) then !! Transfers to left and right plus diagonals (1,2,4,5,6,8)
      
-           !! XODD: 
-           if(xodd) then  !! SEND LEFT, RECEIVE FROM RIGHT   
-
-              if(iprocNS(k).ge.0)then !! Send neighbour exists
-                 allocate(halo_phi(nhalo(k)))
-                 do i=1,nhalo(k)
-                    j=halo_lists(i,k)
-                   halo_phi(i) = phi(j)
-                 end do
-
-                 !! Send the data
-                 tag = iproc + 100*k
-                 call MPI_SEND(halo_phi,nhalo(k),MPI_DOUBLE_PRECISION,iprocNS(k),tag,MPI_COMM_WORLD,ierror)
-                 deallocate(halo_phi) 
-              end if   
-              if(iprocNR(k).ge.0)then !! Receive neighbour exists
-                 !! Receive the data
-                 tag = iprocNR(k) + 100*k
-                 call MPI_RECV(phi(nrecstart(k):nrecstart(k)+inhalo(k)-1),inhalo(k),MPI_DOUBLE_PRECISION &
-                         ,iprocNR(k),tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
-              end if  
-    
-           !! XEVEN:
-           else     !! RECEIVE FROM RIGHT, SEND LEFT
-              if(iprocNR(k).ge.0)then !! Receive neighbour exists
-                 !! Receive the data
-                 tag = iprocNR(k) + 100*k
-                 call MPI_RECV(phi(nrecstart(k):nrecstart(k)+inhalo(k)-1),inhalo(k),MPI_DOUBLE_PRECISION &
-                         ,iprocNR(k),tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
-              end if  
-              if(iprocNS(k).ge.0)then !! Send neighbour exists
-                 allocate(halo_phi(nhalo(k)))
-                 do i=1,nhalo(k)
-                    j=halo_lists(i,k)
-                    halo_phi(i) = phi(j)
-                 end do
-
-                 !! Send the data
-                 tag = iproc + 100*k
-                 call MPI_SEND(halo_phi,nhalo(k),MPI_DOUBLE_PRECISION,iprocNS(k),tag,MPI_COMM_WORLD,ierror) 
-                 deallocate(halo_phi)            
-              end if               
+     
+     !! Up and down first
+     do k=1,2
+        if(yodd) then !! ODD Y: SEND FIRST, RECEIVE SECOND
+           if(iproc_S_UD(k).ge.0)then !! Send neighbour exists
+              !! Put data in an array for sending
+              allocate(halo_phi(nhalo_UD(k)))
+              do i=1,nhalo_UD(k)
+                 j=halo_lists_UD(i,k)
+                 halo_phi(i) = phi(j)
+              end do
+              
+              !! Send the data
+              tag = iproc + 100*k
+              call MPI_SEND(halo_phi,nhalo_UD(k),MPI_DOUBLE_PRECISION,iproc_S_UD(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_phi)
            end if
-        
-        else  !! Transfers up and down (3 and 7)
-           if(yodd) then !! SEND DOWN, RECEIVE FROM UP
-              if(iprocNS(k).ge.0)then !! Send neighbour exists
-                 allocate(halo_phi(nhalo(k)))
-                 do i=1,nhalo(k)
-                    j=halo_lists(i,k)
-                   halo_phi(i) = phi(j)
-                 end do
-
-                 !! Send the data
-                 tag = iproc + 100*k
-                 call MPI_SEND(halo_phi,nhalo(k),MPI_DOUBLE_PRECISION,iprocNS(k),tag,MPI_COMM_WORLD,ierror)
-                 deallocate(halo_phi) 
-              end if   
-              if(iprocNR(k).ge.0)then !! Receive neighbour exists
-                 !! Receive the data
-                 tag = iprocNR(k) + 100*k
-                 call MPI_RECV(phi(nrecstart(k):nrecstart(k)+inhalo(k)-1),inhalo(k),MPI_DOUBLE_PRECISION &
-                         ,iprocNR(k),tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
-              end if           
-                     
-           else          !! RECEIVE FROM UP, SEND DOWN
-              if(iprocNR(k).ge.0)then !! Receive neighbour exists
-                 !! Receive the data
-                 tag = iprocNR(k) + 100*k
-                 call MPI_RECV(phi(nrecstart(k):nrecstart(k)+inhalo(k)-1),inhalo(k),MPI_DOUBLE_PRECISION &
-                         ,iprocNR(k),tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
-              end if  
-              if(iprocNS(k).ge.0)then !! Send neighbour exists
-                 allocate(halo_phi(nhalo(k)))
-                 do i=1,nhalo(k)
-                    j=halo_lists(i,k)
-                    halo_phi(i) = phi(j)
-                 end do
-
-                 !! Send the data
-                 tag = iproc + 100*k
-                 call MPI_SEND(halo_phi,nhalo(k),MPI_DOUBLE_PRECISION,iprocNS(k),tag,MPI_COMM_WORLD,ierror) 
-                 deallocate(halo_phi)            
-              end if                                 
+           if(iproc_R_UD(k).ge.0) then !! Receive neighbour exists
+              tag = iproc_R_UD(k) + 100*k
+              call MPI_RECV(phi(nrecstart_UDLR(k):nrecstart_UDLR(k)+inhalo_UD(k)-1),&
+                            inhalo_UD(k),MPI_DOUBLE_PRECISION,iproc_R_UD(k),tag,MPI_COMM_WORLD, &
+                            MPI_STATUS_IGNORE,ierror)
+           end if
+        else !! EVEN Y: RECEIVE FIRST, SEND SECOND
+           if(iproc_R_UD(k).ge.0)then !! Receive neighbour exists
+              !! Receive the data
+              tag = iproc_R_UD(k) + 100*k
+              call MPI_RECV(phi(nrecstart_UDLR(k):nrecstart_UDLR(k)+inhalo_UD(k)-1), &
+                            inhalo_UD(k),MPI_DOUBLE_PRECISION,iproc_R_UD(k),tag,MPI_COMM_WORLD, &
+                            MPI_STATUS_IGNORE,ierror)
+           end if
+           if(iproc_S_UD(k).ge.0)then !! Send neighbour exists
+              allocate(halo_phi(nhalo_UD(k)))
+              do i=1,nhalo_UD(k)
+                 j=halo_lists_UD(i,k)
+                 halo_phi(i)=phi(j)
+              end do
+              
+              !! Send the data
+              tag = iproc + 100*k
+              call MPI_SEND(halo_phi,nhalo_UD(k),MPI_DOUBLE_PRECISION,iproc_S_UD(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_phi)
            end if
         end if
      end do
-   
+     
+     !! All left and right
+     do k=1,2*nprocsY
+        if(xodd) then !! ODD X: SEND FIRST, RECEIVE SECOND
+           if(iproc_S_LR(k).ge.0)then !! Send neighbour exists
+              !! Put data in an array for sending
+              allocate(halo_phi(nhalo_LR(k)))
+              do i=1,nhalo_LR(k)
+                 j=halo_lists_LR(i,k)
+                 halo_phi(i) = phi(j)
+              end do
+              
+              !! Send the data
+              tag = iproc + 100*k
+              call MPI_SEND(halo_phi,nhalo_LR(k),MPI_DOUBLE_PRECISION,iproc_S_LR(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_phi)
+           end if
+           if(iproc_R_LR(k).ge.0) then !! Receive neighbour exists
+              tag = iproc_R_LR(k) + 100*k
+              call MPI_RECV(phi(nrecstart_UDLR(2+k):nrecstart_UDLR(2+k)+inhalo_LR(k)-1),&
+                            inhalo_LR(k),MPI_DOUBLE_PRECISION,iproc_R_LR(k),tag,MPI_COMM_WORLD, &
+                            MPI_STATUS_IGNORE,ierror)
+           end if
+        else !! EVEN X: RECEIVE FIRST, SEND SECOND
+           if(iproc_R_LR(k).ge.0)then !! Receive neighbour exists
+              !! Receive the data
+              tag = iproc_R_LR(k) + 100*k
+              call MPI_RECV(phi(nrecstart_UDLR(2+k):nrecstart_UDLR(2+k)+inhalo_LR(k)-1), &
+                            inhalo_LR(k),MPI_DOUBLE_PRECISION,iproc_R_LR(k),tag,MPI_COMM_WORLD, &
+                            MPI_STATUS_IGNORE,ierror)
+           end if
+           if(iproc_S_LR(k).ge.0)then !! Send neighbour exists
+              allocate(halo_phi(nhalo_LR(k)))
+              do i=1,nhalo_LR(k)
+                 j=halo_lists_LR(i,k)
+                 halo_phi(i)=phi(j)
+              end do
+              
+              !! Send the data
+              tag = iproc + 100*k
+              call MPI_SEND(halo_phi,nhalo_LR(k),MPI_DOUBLE_PRECISION,iproc_S_LR(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_phi)
+           end if
+        end if
+     end do                                    
+     
      return
   end subroutine halo_exchange
-!! ------------------------------------------------------------------------------------------------  
-  subroutine halo_exchange_backup(phi)    
-     !! This routine does halo exchanges for phi= u,v,lnro,E,Y0
-     real(rkind),dimension(:),intent(inout) :: phi     
-     real(rkind),dimension(:),allocatable :: halo_phi
-     integer(ikind) :: i,j,nrec_start,nrec_end,k,tag
-
-     !! Loop over each possible neighbour processor
-     do k=1,8
-    
-        !! If the k-th send neighbour exists
-        if(iprocNS(k).ge.0) then  
-
-           !! Allocate space
-           allocate(halo_phi(nhalo(k)))
-!           !$omp parallel do private(j)
-           do i=1,nhalo(k)
-              j=halo_lists(i,k)
-              halo_phi(i) = phi(j)
-           end do
-!           !$omp end parallel do
-
-           !! Send the data
-           tag = iproc + 100*k
-           call MPI_SEND(halo_phi,nhalo(k),MPI_DOUBLE_PRECISION,iprocNS(k),tag,MPI_COMM_WORLD,ierror)
-           
-           !! Clear space
-           deallocate(halo_phi)
-        end if
-
-        
-        !! if the k-th receive neighbour exists
-        if(iprocNR(k).ge.0)then
-                
-           !! Receive the data
-           tag = iprocNR(k) + 100*k
-           call MPI_RECV(phi(nrecstart(k):nrecstart(k)+inhalo(k)-1),inhalo(k),MPI_DOUBLE_PRECISION &
-                         ,iprocNR(k),tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
-                
-        end if
-                        
-     end do
-     
-
-     return
-  end subroutine halo_exchange_backup 
 !! ------------------------------------------------------------------------------------------------  
   subroutine halo_exchange_int(phi) 
      !! This routine does halo exchanges for integers (only used at startup)   
@@ -467,98 +456,100 @@ contains
         yodd = .false.
      end if
 
-     !! Loop over each possible neighbour
-     do k =1,8
-
-        if(k.ne.3.and.k.ne.7) then !! Transfers to left and right plus diagonals (1,2,4,5,6,8)
-     
-           !! XODD: 
-           if(xodd) then  !! SEND LEFT, RECEIVE FROM RIGHT   
-
-              if(iprocNS(k).ge.0)then !! Send neighbour exists
-                 allocate(halo_phi(nhalo(k)))
-                 do i=1,nhalo(k)
-                    j=halo_lists(i,k)
-                   halo_phi(i) = phi(j)
-                 end do
-
-                 !! Send the data
-                 tag = iproc + 100*k
-                 call MPI_SEND(halo_phi,nhalo(k),MPI_INT,iprocNS(k),tag,MPI_COMM_WORLD,ierror)
-                 deallocate(halo_phi) 
-              end if   
-              if(iprocNR(k).ge.0)then !! Receive neighbour exists
-                 !! Receive the data
-                 tag = iprocNR(k) + 100*k
-                 call MPI_RECV(phi(nrecstart(k):nrecstart(k)+inhalo(k)-1),inhalo(k),MPI_INT &
-                         ,iprocNR(k),tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
-              end if  
-    
-           !! XEVEN:
-           else     !! RECEIVE FROM RIGHT, SEND LEFT
-              if(iprocNR(k).ge.0)then !! Receive neighbour exists
-                 !! Receive the data
-                 tag = iprocNR(k) + 100*k
-                 call MPI_RECV(phi(nrecstart(k):nrecstart(k)+inhalo(k)-1),inhalo(k),MPI_INT &
-                         ,iprocNR(k),tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
-              end if  
-              if(iprocNS(k).ge.0)then !! Send neighbour exists
-                 allocate(halo_phi(nhalo(k)))
-                 do i=1,nhalo(k)
-                    j=halo_lists(i,k)
-                    halo_phi(i) = phi(j)
-                 end do
-
-                 !! Send the data
-                 tag = iproc + 100*k
-                 call MPI_SEND(halo_phi,nhalo(k),MPI_INT,iprocNS(k),tag,MPI_COMM_WORLD,ierror) 
-                 deallocate(halo_phi)            
-              end if               
+     !! Up and down first
+     do k=1,2
+        if(yodd) then !! ODD Y: SEND FIRST, RECEIVE SECOND
+           if(iproc_S_UD(k).ge.0)then !! Send neighbour exists
+              !! Put data in an array for sending
+              allocate(halo_phi(nhalo_UD(k)))
+              do i=1,nhalo_UD(k)
+                 j=halo_lists_UD(i,k)
+                 halo_phi(i) = phi(j)
+              end do
+              
+              !! Send the data
+              tag = iproc + 100*k
+              call MPI_SEND(halo_phi,nhalo_UD(k),MPI_INT,iproc_S_UD(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_phi)
            end if
-        
-        else  !! Transfers up and down (3 and 7)
-           if(yodd) then !! SEND DOWN, RECEIVE FROM UP
-              if(iprocNS(k).ge.0)then !! Send neighbour exists
-                 allocate(halo_phi(nhalo(k)))
-                 do i=1,nhalo(k)
-                    j=halo_lists(i,k)
-                   halo_phi(i) = phi(j)
-                 end do
-
-                 !! Send the data
-                 tag = iproc + 100*k
-                 call MPI_SEND(halo_phi,nhalo(k),MPI_INT,iprocNS(k),tag,MPI_COMM_WORLD,ierror)
-                 deallocate(halo_phi) 
-              end if   
-              if(iprocNR(k).ge.0)then !! Receive neighbour exists
-                 !! Receive the data
-                 tag = iprocNR(k) + 100*k
-                 call MPI_RECV(phi(nrecstart(k):nrecstart(k)+inhalo(k)-1),inhalo(k),MPI_INT &
-                         ,iprocNR(k),tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
-              end if           
-                     
-           else          !! RECEIVE FROM UP, SEND DOWN
-              if(iprocNR(k).ge.0)then !! Receive neighbour exists
-                 !! Receive the data
-                 tag = iprocNR(k) + 100*k
-                 call MPI_RECV(phi(nrecstart(k):nrecstart(k)+inhalo(k)-1),inhalo(k),MPI_INT &
-                         ,iprocNR(k),tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
-              end if  
-              if(iprocNS(k).ge.0)then !! Send neighbour exists
-                 allocate(halo_phi(nhalo(k)))
-                 do i=1,nhalo(k)
-                    j=halo_lists(i,k)
-                    halo_phi(i) = phi(j)
-                 end do
-
-                 !! Send the data
-                 tag = iproc + 100*k
-                 call MPI_SEND(halo_phi,nhalo(k),MPI_INT,iprocNS(k),tag,MPI_COMM_WORLD,ierror) 
-                 deallocate(halo_phi)            
-              end if                                 
+           if(iproc_R_UD(k).ge.0) then !! Receive neighbour exists
+              tag = iproc_R_UD(k) + 100*k
+              call MPI_RECV(phi(nrecstart_UDLR(k):nrecstart_UDLR(k)+inhalo_UD(k)-1),&
+                            inhalo_UD(k),MPI_INT,iproc_R_UD(k),tag,MPI_COMM_WORLD, &
+                            MPI_STATUS_IGNORE,ierror)
+           end if
+        else !! EVEN Y: RECEIVE FIRST, SEND SECOND
+           if(iproc_R_UD(k).ge.0)then !! Receive neighbour exists
+              !! Receive the data
+              tag = iproc_R_UD(k) + 100*k
+              call MPI_RECV(phi(nrecstart_UDLR(k):nrecstart_UDLR(k)+inhalo_UD(k)-1), &
+                            inhalo_UD(k),MPI_INT,iproc_R_UD(k),tag,MPI_COMM_WORLD, &
+                            MPI_STATUS_IGNORE,ierror)
+           end if
+           if(iproc_S_UD(k).ge.0)then !! Send neighbour exists
+              allocate(halo_phi(nhalo_UD(k)))
+              do i=1,nhalo_UD(k)
+                 j=halo_lists_UD(i,k)
+                 halo_phi(i)=phi(j)
+              end do
+              
+              !! Send the data
+              tag = iproc + 100*k
+              call MPI_SEND(halo_phi,nhalo_UD(k),MPI_INT,iproc_S_UD(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_phi)
            end if
         end if
-     end do         
+     end do
+     
+     !! All left and right
+     do k=1,2*nprocsY
+        if(xodd) then !! ODD X: SEND FIRST, RECEIVE SECOND
+           if(iproc_S_LR(k).ge.0)then !! Send neighbour exists
+              !! Put data in an array for sending
+              allocate(halo_phi(nhalo_LR(k)))
+              do i=1,nhalo_LR(k)
+                 j=halo_lists_LR(i,k)
+                 halo_phi(i) = phi(j)
+              end do
+              
+              !! Send the data
+              tag = iproc + 100*k
+              call MPI_SEND(halo_phi,nhalo_LR(k),MPI_INT,iproc_S_LR(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_phi)
+           end if
+           if(iproc_R_LR(k).ge.0) then !! Receive neighbour exists
+              tag = iproc_R_LR(k) + 100*k
+              call MPI_RECV(phi(nrecstart_UDLR(2+k):nrecstart_UDLR(2+k)+inhalo_LR(k)-1),&
+                            inhalo_LR(k),MPI_INT,iproc_R_LR(k),tag,MPI_COMM_WORLD, &
+                            MPI_STATUS_IGNORE,ierror)
+           end if
+        else !! EVEN X: RECEIVE FIRST, SEND SECOND
+           if(iproc_R_LR(k).ge.0)then !! Receive neighbour exists
+              !! Receive the data
+              tag = iproc_R_LR(k) + 100*k
+              call MPI_RECV(phi(nrecstart_UDLR(2+k):nrecstart_UDLR(2+k)+inhalo_LR(k)-1), &
+                            inhalo_LR(k),MPI_INT,iproc_R_LR(k),tag,MPI_COMM_WORLD, &
+                            MPI_STATUS_IGNORE,ierror)
+           end if
+           if(iproc_S_LR(k).ge.0)then !! Send neighbour exists
+              allocate(halo_phi(nhalo_LR(k)))
+              do i=1,nhalo_LR(k)
+                 j=halo_lists_LR(i,k)
+                 halo_phi(i)=phi(j)
+              end do
+              
+              !! Send the data
+              tag = iproc + 100*k
+              call MPI_SEND(halo_phi,nhalo_LR(k),MPI_INT,iproc_S_LR(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_phi)
+           end if
+        end if
+     end do     
+                       
      return
   end subroutine halo_exchange_int
 !! ------------------------------------------------------------------------------------------------  
@@ -595,11 +586,11 @@ contains
      !! Assumes that find_neighbours has already been called...
      integer(ikind),dimension(:),allocatable :: halo_essential_all
      integer(ikind),dimension(:),allocatable :: halo_essential_from,halo_essential,halo_list_tmp
-     integer(ikind) i,j,k,jstart,jend,maxhalo,suminhalo,nhalo_new
+     integer(ikind) i,j,k,jstart,maxhalo,suminhalo,nhalo_new,tag
      logical :: xodd,yodd
 
      !! Identify required halo nodes
-     allocate(halo_essential_all(np));halo_essential_all =0
+     allocate(halo_essential_all(np));halo_essential_all = 0
      !$omp parallel do private(j,k)
      do i=1,npfb
         do k=1,ij_count(i)
@@ -616,180 +607,188 @@ contains
      yodd = .true.     
      if(mod(iprocY,2).eq.0) then
         yodd = .false.
-     end if
+     end if          
+     
+     !! Up and down first
+     do k=1,2
+        if(yodd) then !! ODD Y: SEND FIRST, RECEIVE SECOND
+           if(iproc_R_UD(k).ge.0)then !! This neighbour sent something
+              !! Build halo_essential_from ready for transfer
+              allocate(halo_essential_from(inhalo_UD(k)))
+              halo_essential_from = halo_essential_all(nrecstart_UDLR(k):nrecstart_UDLR(k)+inhalo_UD(k)-1)
 
-     jend=np_nohalo
-     !! Loop over all RECEIVE neighbours
-     do k=1,8     
-        if(k.ne.3.and.k.ne.7) then
-           if(xodd) then !! SEND LEFT, RECEIVE FROM RIGHT        
-              !! Check whether this receive neighbour sent anything
-              if(iprocNR(k).ge.0)then        
-                 !! Build halo_essential_from ready for transfer
-                 allocate(halo_essential_from(inhalo(k)))
-                 halo_essential_from = halo_essential_all(nrecstart(k):nrecstart(k)+inhalo(k)-1)
-                 !! Send back to originator processor
-                 call MPI_SEND(halo_essential_from,inhalo(k),MPI_INT,iprocNR(k),100*k,MPI_COMM_WORLD,ierror)          
-                 deallocate(halo_essential_from)
-              end if        
-              !! Check whether this was an originator processor 
-              if(iprocNS(k).ge.0)then
+              !! Send the data back to originator processor
+              tag = 100*k+iproc
+              call MPI_SEND(halo_essential_from,inhalo_UD(k),MPI_INT,iproc_R_UD(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_essential_from)
+           end if
+           if(iproc_S_UD(k).ge.0) then !! Receive neighbour exists
+              allocate(halo_essential(nhalo_UD(k)))
+              tag = 100*k+iproc_S_UD(k)
+              call MPI_RECV(halo_essential,nhalo_UD(k),MPI_INT,iproc_S_UD(k),tag,MPI_COMM_WORLD, &
+                            MPI_STATUS_IGNORE,ierror)
+                            
+              !! Count the new halo size
+              nhalo_new = 0
+              do i=1,nhalo_UD(k)
+                 if(halo_essential(i).eq.1) nhalo_new = nhalo_new + 1
+              end do
+              write(6,*) iproc,"Reduced halo_UD",k," from",nhalo_UD(k),"to",nhalo_new              
+              
+              !! Build the new halo lists...
+              allocate(halo_list_tmp(nhalo_new))
+              j=0
+              do i=1,nhalo_UD(k)
+                 if(halo_essential(i).eq.1)then
+                    j=j+1
+                    halo_list_tmp(j) = halo_lists_UD(i,k)
+                 end if
+              end do
+              
+              !! Move new halo list to old halo list
+              halo_lists_UD(:,k)=0;halo_lists_UD(1:nhalo_new,k) = halo_list_tmp;nhalo_UD(k) = nhalo_new
+              deallocate(halo_list_tmp)
+              deallocate(halo_essential)                                         
+           end if
+        else !! EVEN Y: RECEIVE FIRST, SEND SECOND
+           if(iproc_S_UD(k).ge.0) then !! Receive neighbour exists
+              allocate(halo_essential(nhalo_UD(k)))
+              tag = 100*k+iproc_S_UD(k)
+              call MPI_RECV(halo_essential,nhalo_UD(k),MPI_INT,iproc_S_UD(k),tag,MPI_COMM_WORLD, &
+                            MPI_STATUS_IGNORE,ierror)
 
-                 !! Receive the essential list
-                 allocate(halo_essential(nhalo(k)))
-                 call MPI_RECV(halo_essential,nhalo(k),MPI_INT,iprocNS(k),100*k,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
+              !! Count the new halo size
+              nhalo_new = 0
+              do i=1,nhalo_UD(k)
+                 if(halo_essential(i).eq.1) nhalo_new = nhalo_new + 1
+              end do
+              write(6,*) iproc,"Reduced halo_UD",k," from",nhalo_UD(k),"to",nhalo_new              
+              
+              !! Build the new halo lists...
+              allocate(halo_list_tmp(nhalo_new))
+              j=0
+              do i=1,nhalo_UD(k)
+                 if(halo_essential(i).eq.1)then
+                    j=j+1
+                    halo_list_tmp(j) = halo_lists_UD(i,k)
+                 end if
+              end do
+              
+              !! Move new halo list to old halo list
+              halo_lists_UD(:,k)=0;halo_lists_UD(1:nhalo_new,k) = halo_list_tmp;nhalo_UD(k) = nhalo_new
+              deallocate(halo_list_tmp)
+              deallocate(halo_essential)                                         
+           end if
+           if(iproc_R_UD(k).ge.0)then !! This neighbour sent something
+              !! Build halo_essential_from ready for transfer
+              allocate(halo_essential_from(inhalo_UD(k)))
+              halo_essential_from = halo_essential_all(nrecstart_UDLR(k):nrecstart_UDLR(k)+inhalo_UD(k)-1)
 
-                 !! Count the new halo size
-                 nhalo_new = 0
-                 do i=1,nhalo(k)
-                    if(halo_essential(i).eq.1) nhalo_new = nhalo_new + 1
-                 end do
-           
-                 write(6,*) iproc,"Reduced halo",k," from",nhalo(k),"to",nhalo_new
-                 !! Build the new halo lists...
-                 allocate(halo_list_tmp(nhalo_new))
-                 j=0
-                 do i=1,nhalo(k)
-                    if(halo_essential(i).eq.1)then
-                       j=j+1
-                       halo_list_tmp(j) = halo_lists(i,k)
-                    end if
-                 end do
-           
-                 !! Move new halo list to old halo list
-                 halo_lists(:,k)=0;halo_lists(1:nhalo_new,k) = halo_list_tmp;nhalo(k) = nhalo_new           
-                 deallocate(halo_list_tmp,halo_essential)                   
-              end if
-          else  !! RECEIVE FROM RIGHT, SEND LEFT
-              !! Check whether this was an originator processor 
-              if(iprocNS(k).ge.0)then
-
-                 !! Receive the essential list
-                 allocate(halo_essential(nhalo(k)))
-                 call MPI_RECV(halo_essential,nhalo(k),MPI_INT,iprocNS(k),100*k,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
-
-                 !! Count the new halo size
-                 nhalo_new = 0
-                 do i=1,nhalo(k)
-                    if(halo_essential(i).eq.1) nhalo_new = nhalo_new + 1
-                 end do
-           
-                 write(6,*) iproc,"Reduced halo",k," from",nhalo(k),"to",nhalo_new
-                 !! Build the new halo lists...
-                 allocate(halo_list_tmp(nhalo_new))
-                 j=0
-                 do i=1,nhalo(k)
-                    if(halo_essential(i).eq.1)then
-                       j=j+1
-                       halo_list_tmp(j) = halo_lists(i,k)
-                    end if
-                 end do
-           
-                 !! Move new halo list to old halo list
-                 halo_lists(:,k)=0;halo_lists(1:nhalo_new,k) = halo_list_tmp;nhalo(k) = nhalo_new           
-                 deallocate(halo_list_tmp,halo_essential)                   
-              end if          
-              !! Check whether this receive neighbour sent anything
-              if(iprocNR(k).ge.0)then        
-                 !! Build halo_essential_from ready for transfer
-                 allocate(halo_essential_from(inhalo(k)))
-                 halo_essential_from = halo_essential_all(nrecstart(k):nrecstart(k)+inhalo(k)-1)
-                 !! Send back to originator processor
-                 call MPI_SEND(halo_essential_from,inhalo(k),MPI_INT,iprocNR(k),100*k,MPI_COMM_WORLD,ierror)          
-                 deallocate(halo_essential_from)
-              end if                                                    
-          end if
-       else ! Transfers up and down (3 and 7)
-           if(yodd) then !! SEND DOWN, RECEIVE FROM UP
-              !! Check whether this receive neighbour sent anything
-              if(iprocNR(k).ge.0)then        
-                 !! Build halo_essential_from ready for transfer
-                 allocate(halo_essential_from(inhalo(k)))
-                 halo_essential_from = halo_essential_all(nrecstart(k):nrecstart(k)+inhalo(k)-1)
-                 !! Send back to originator processor
-                 call MPI_SEND(halo_essential_from,inhalo(k),MPI_INT,iprocNR(k),100*k,MPI_COMM_WORLD,ierror)          
-                 deallocate(halo_essential_from)
-              end if        
-              !! Check whether this was an originator processor 
-              if(iprocNS(k).ge.0)then
-
-                 !! Receive the essential list
-                 allocate(halo_essential(nhalo(k)))
-                 call MPI_RECV(halo_essential,nhalo(k),MPI_INT,iprocNS(k),100*k,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
-
-                 !! Count the new halo size
-                 nhalo_new = 0
-                 do i=1,nhalo(k)
-                    if(halo_essential(i).eq.1) nhalo_new = nhalo_new + 1
-                 end do
-           
-                 write(6,*) iproc,"Reduced halo",k," from",nhalo(k),"to",nhalo_new
-                 !! Build the new halo lists...
-                 allocate(halo_list_tmp(nhalo_new))
-                 j=0
-                 do i=1,nhalo(k)
-                    if(halo_essential(i).eq.1)then
-                       j=j+1
-                       halo_list_tmp(j) = halo_lists(i,k)
-                    end if
-                 end do
-           
-                 !! Move new halo list to old halo list
-                 halo_lists(:,k)=0;halo_lists(1:nhalo_new,k) = halo_list_tmp;nhalo(k) = nhalo_new           
-                 deallocate(halo_list_tmp,halo_essential)                   
-              end if
-          else  !! RECEIVE FROM UP, SEND DOWN
-              !! Check whether this was an originator processor 
-              if(iprocNS(k).ge.0)then
-
-                 !! Receive the essential list
-                 allocate(halo_essential(nhalo(k)))
-                 call MPI_RECV(halo_essential,nhalo(k),MPI_INT,iprocNS(k),100*k,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
-
-                 !! Count the new halo size
-                 nhalo_new = 0
-                 do i=1,nhalo(k)
-                    if(halo_essential(i).eq.1) nhalo_new = nhalo_new + 1
-                 end do
-           
-                 write(6,*) iproc,"Reduced halo",k," from",nhalo(k),"to",nhalo_new
-                 !! Build the new halo lists...
-                 allocate(halo_list_tmp(nhalo_new))
-                 j=0
-                 do i=1,nhalo(k)
-                    if(halo_essential(i).eq.1)then
-                       j=j+1
-                       halo_list_tmp(j) = halo_lists(i,k)
-                    end if
-                 end do
-           
-                 !! Move new halo list to old halo list
-                 halo_lists(:,k)=0;halo_lists(1:nhalo_new,k) = halo_list_tmp;nhalo(k) = nhalo_new           
-                 deallocate(halo_list_tmp,halo_essential)                   
-              end if          
-              !! Check whether this receive neighbour sent anything
-              if(iprocNR(k).ge.0)then        
-                 !! Build halo_essential_from ready for transfer
-                 allocate(halo_essential_from(inhalo(k)))
-                 halo_essential_from = halo_essential_all(nrecstart(k):nrecstart(k)+inhalo(k)-1)
-                 !! Send back to originator processor
-                 call MPI_SEND(halo_essential_from,inhalo(k),MPI_INT,iprocNR(k),100*k,MPI_COMM_WORLD,ierror)          
-                 deallocate(halo_essential_from)
-              end if                                                    
-          end if             
-       end if  
+              !! Send the data back to originator processor
+              tag = 100*k+iproc
+              call MPI_SEND(halo_essential_from,inhalo_UD(k),MPI_INT,iproc_R_UD(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_essential_from)
+           end if
+        end if
      end do
-        
+     
+     !! Then left and right
+     do k=1,2*nprocsY
+        if(xodd) then !! ODD X: SEND FIRST, RECEIVE SECOND
+           if(iproc_R_LR(k).ge.0)then !! This neighbour sent something
+              !! Build halo_essential_from ready for transfer
+              allocate(halo_essential_from(inhalo_LR(k)))
+              halo_essential_from = halo_essential_all(nrecstart_UDLR(k+2):nrecstart_UDLR(k+2)+inhalo_LR(k)-1)
+
+              !! Send the data back to originator processor
+              tag = 100*k+iproc
+              call MPI_SEND(halo_essential_from,inhalo_LR(k),MPI_INT,iproc_R_LR(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_essential_from)
+           end if
+           if(iproc_S_LR(k).ge.0) then !! Receive neighbour exists
+              allocate(halo_essential(nhalo_LR(k)))
+              tag = 100*k+iproc_S_LR(k)
+              call MPI_RECV(halo_essential,nhalo_LR(k),MPI_INT,iproc_S_LR(k),tag,MPI_COMM_WORLD, &
+                            MPI_STATUS_IGNORE,ierror)
+                            
+              !! Count the new halo size
+              nhalo_new = 0
+              do i=1,nhalo_LR(k)
+                 if(halo_essential(i).eq.1) nhalo_new = nhalo_new + 1
+              end do
+              write(6,*) iproc,"Reduced halo_LR",k," from",nhalo_LR(k),"to",nhalo_new              
+              
+              !! Build the new halo lists...
+              allocate(halo_list_tmp(nhalo_new))
+              j=0
+              do i=1,nhalo_LR(k)
+                 if(halo_essential(i).eq.1)then
+                    j=j+1
+                    halo_list_tmp(j) = halo_lists_LR(i,k)
+                 end if
+              end do
+              
+              !! Move new halo list to old halo list
+              halo_lists_LR(:,k)=0;halo_lists_LR(1:nhalo_new,k) = halo_list_tmp;nhalo_LR(k) = nhalo_new
+              deallocate(halo_list_tmp)
+              deallocate(halo_essential)                                         
+           end if
+        else !! EVEN X: RECEIVE FIRST, SEND SECOND
+           if(iproc_S_LR(k).ge.0) then !! Receive neighbour exists
+              allocate(halo_essential(nhalo_LR(k)))
+              tag = 100*k+iproc_S_LR(k)
+              call MPI_RECV(halo_essential,nhalo_LR(k),MPI_INT,iproc_S_LR(k),tag,MPI_COMM_WORLD, &
+                            MPI_STATUS_IGNORE,ierror)
+
+              !! Count the new halo size
+              nhalo_new = 0
+              do i=1,nhalo_LR(k)
+                 if(halo_essential(i).eq.1) nhalo_new = nhalo_new + 1
+              end do
+              write(6,*) iproc,"Reduced halo_LR",k," from",nhalo_LR(k),"to",nhalo_new              
+              
+              !! Build the new halo lists...
+              allocate(halo_list_tmp(nhalo_new))
+              j=0
+              do i=1,nhalo_LR(k)
+                 if(halo_essential(i).eq.1)then
+                    j=j+1
+                    halo_list_tmp(j) = halo_lists_LR(i,k)
+                 end if
+              end do
+              
+              !! Move new halo list to old halo list
+              halo_lists_LR(:,k)=0;halo_lists_LR(1:nhalo_new,k) = halo_list_tmp;nhalo_LR(k) = nhalo_new
+              deallocate(halo_list_tmp)
+              deallocate(halo_essential)                                         
+           end if
+           if(iproc_R_LR(k).ge.0)then !! This neighbour sent something
+              !! Build halo_essential_from ready for transfer
+              allocate(halo_essential_from(inhalo_LR(k)))
+              halo_essential_from = halo_essential_all(nrecstart_UDLR(k+2):nrecstart_UDLR(k+2)+inhalo_LR(k)-1)
+
+              !! Send the data back to originator processor
+              tag = 100*k+iproc
+              call MPI_SEND(halo_essential_from,inhalo_LR(k),MPI_INT,iproc_R_LR(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_essential_from)
+           end if
+        end if
+     end do     
+     
+         
      !! Re-set np to without halos
      np = np_nohalo
+     deallocate(nrecstart_UDLR)
         
      !! Exchange halo sizes and node lists between processors
-     call send_halo_sizes_nodes
-     
-     !! Update size and node-types
-     suminhalo = sum(inhalo(1:8))
-     np = np_nohalo + suminhalo
-
+     call send_halo_sizes_nodes 
+    
+     suminhalo = sum(inhalo_LR(1:2*nprocsY)) + sum(inhalo_UD(1:2))         
+     np = np_nohalo + suminhalo     
         
      write(6,*) "New halos built",iproc,npfb,np_nohalo,np
   
@@ -801,36 +800,66 @@ contains
      !! processors
      integer(ikind) :: i,k,nrec_end,is,ie
    
-     inhalo = 0       
-     !! Loop over all send neighbour processors
-     do k=1,8
-
-        !! Check whether the k-th SEND neighbour exists
-        if(iprocNS(k).ge.0)then
-           !! Send the size
-           call MPI_SEND(nhalo(k),1,MPI_INT,iprocNS(k),1000*k+iproc,MPI_COMM_WORLD,ierror)                      
+   
+     !! UP-DOWN
+     do k=1,2
+       
+        !! Check whether k-th SEND exists
+        if(iproc_S_UD(k).ge.0) then
+           !! Send the halo size
+           call MPI_SEND(nhalo_UD(k),1,MPI_INT,iproc_S_UD(k),1000*k+iproc,MPI_COMM_WORLD,ierror)
         end if
-        
         !! Check whether the k-th RECEIVE neighbour exists
-        if(iprocNR(k).ge.0)then
+        if(iproc_R_UD(k).ge.0)then
            !! Recieve the size
-           call MPI_RECV(inhalo(k),1,MPI_INT,iprocNR(k),1000*k+iprocNR(k),MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)        
+           call MPI_RECV(inhalo_UD(k),1,MPI_INT,iproc_R_UD(k),1000*k+iproc_R_UD(k), & 
+                         MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)        
         end if         
      
-     end do
-           
-     write(6,*) "exchanged nhalo sizes",iproc,nhalo     
-     write(6,*) "exchanged inhalo sizes",iproc,inhalo  
-     
-     !! If the k-th halo has size zero, mark out the k-th send/receive processors
-     !! Also build the starting index for recieves
-     nrec_end = np_nohalo
-     do k=1,8
-        if(nhalo(k).eq.0) iprocNS(k)=-1
-        if(inhalo(k).eq.0) iprocNR(k)=-1
-        nrecstart(k) = nrec_end + 1;
-        nrec_end = nrec_end + inhalo(k)
      end do        
+
+     write(6,*) iproc,"UD-out",nhalo_UD(:)
+     write(6,*) iproc,"UD-in",inhalo_UD(:)
+    
+
+     !! LEFT-RIGHT
+     do k=1,2*nprocsY
+       
+        !! Check whether k-th SEND exists
+        if(iproc_S_LR(k).ge.0) then
+           !! Send the halo size
+           call MPI_SEND(nhalo_LR(k),1,MPI_INT,iproc_S_LR(k),1000*k+iproc,MPI_COMM_WORLD,ierror)
+        end if
+        !! Check whether the k-th RECEIVE neighbour exists
+        if(iproc_R_LR(k).ge.0)then
+           !! Recieve the size
+           call MPI_RECV(inhalo_LR(k),1,MPI_INT,iproc_R_LR(k),1000*k+iproc_R_LR(k), & 
+                         MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)        
+        end if         
+     
+     end do        
+     
+            
+     write(6,*) iproc,"LR-out",nhalo_LR(:)
+     write(6,*) iproc,"LR-in",inhalo_LR(:)
+     
+     
+     !! Mark out any send & receive processors if halo has zero size
+     !! Also build the starting index for recieves
+     allocate(nrecstart_UDLR(2+2*nprocsY))
+     nrec_end = np_nohalo
+     do k=1,2
+        if(nhalo_UD(k).eq.0) iproc_S_UD(k)=-1
+        if(inhalo_UD(k).eq.0) iproc_R_UD(k)=-1
+        nrecstart_UDLR(k) = nrec_end + 1
+        nrec_end = nrec_end + inhalo_UD(k)
+     end do
+     do k=1,2*nprocsY
+        if(nhalo_LR(k).eq.0) iproc_S_LR(k)=-1
+        if(inhalo_LR(k).eq.0) iproc_R_LR(k)=-1
+        nrecstart_UDLR(2+k) = nrec_end + 1
+        nrec_end = nrec_end + inhalo_LR(k)
+     end do
 
      !! Loop over all dimensions and exchange node positions
 #ifdef dim3
@@ -844,64 +873,23 @@ contains
      !! Adjust positions for X-periodicity
      if(xbcond.eq.1.and.nprocsX.gt.1) then
         if(iprocX.eq.0) then
-           is = nrecstart(5);ie = is + inhalo(5)-1
-           rp(is:ie,1) = rp(is:ie,1) - (xmax-xmin)
-
-           if(iprocNR(4).ne.-1) then
-              is = nrecstart(4);ie = is + inhalo(4)-1
+           do k=2+nprocsY+1,2+2*nprocsY
+              is = nrecstart_UDLR(k);ie = is + inhalo_LR(k-2)-1
               rp(is:ie,1) = rp(is:ie,1) - (xmax-xmin)
-           end if
-           if(iprocNR(6).ne.-1) then
-              is = nrecstart(6);ie = is + inhalo(6)-1
-              rp(is:ie,1) = rp(is:ie,1) - (xmax-xmin)
-           end if
-        end if
+           end do
+        end if           
         if(iprocX.eq.nprocsX-1) then
-           is = nrecstart(1);ie = is + inhalo(1)-1
-           rp(is:ie,1) = rp(is:ie,1) + (xmax-xmin)
+           do k=2+1,2+nprocsY        
+              is = nrecstart_UDLR(k);ie = is + inhalo_LR(k-2)-1
+              rp(is:ie,1) = rp(is:ie,1) + (xmax-xmin)
+           end do
+        end if   
+     end if    
 
-           if(iprocNR(2).ne.-1) then
-              is = nrecstart(2);ie = is + inhalo(2)-1
-              rp(is:ie,1) = rp(is:ie,1) + (xmax-xmin)
-           end if
-           if(iprocNR(8).ne.-1) then
-              is = nrecstart(8);ie = is + inhalo(8)-1
-              rp(is:ie,1) = rp(is:ie,1) + (xmax-xmin)
-           end if
-        end if    
-     end if     
-     !! Adjust positions for Y-periodicity
-     if(ybcond.eq.1.and.nprocsY.gt.1) then
-        if(iprocY.eq.0) then
-           is = nrecstart(7);ie = is + inhalo(7)-1
-           rp(is:ie,2) = rp(is:ie,2) - (ymax-ymin)
-           
-           if(iprocNR(6).ne.-1) then
-              is = nrecstart(6);ie = is + inhalo(6)-1
-              rp(is:ie,2) = rp(is:ie,2) - (ymax-ymin)
-           end if
-           if(iprocNR(8).ne.-1) then
-              is = nrecstart(8);ie = is + inhalo(8)-1
-              rp(is:ie,2) = rp(is:ie,2) - (ymax-ymin)           
-           end if
-        end if
-        if(iprocY.eq.nprocsY-1) then
-           is = nrecstart(3);ie = is + inhalo(3)-1
-           rp(is:ie,2) = rp(is:ie,2) + (ymax-ymin)
-           
-           if(iprocNR(2).ne.-1) then
-              is = nrecstart(2);ie = is + inhalo(2)-1
-              rp(is:ie,2) = rp(is:ie,2) + (ymax-ymin)           
-           end if
-           if(iprocNR(4).ne.-1) then
-              is = nrecstart(4);ie = is + inhalo(4)-1
-              rp(is:ie,2) = rp(is:ie,2) + (ymax-ymin)                      
-           end if
-        end if    
-     end if   
-               
+    
      return
   end subroutine send_halo_sizes_nodes
 !! ------------------------------------------------------------------------------------------------  
 #endif  
 end module mpi_transfers
+

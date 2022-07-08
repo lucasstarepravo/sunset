@@ -38,8 +38,7 @@ module common_2d
   real(rkind) :: emax_nm1,emax_n,emax_np1  !! errors for PID controller
   real(rkind) :: eflow_nm1,eflow_n,sum_eflow !! errors for PID to control <u> (constant-ish flow rate)
   real(rkind), dimension(dims) :: driving_force
-  real(rkind) :: heat_sink_mag,mean_int_energy0
-  real(rkind) :: ehsink_nm1,ehsink_n,sum_ehsink !! errors for PID to control <cv*T> (constant internal energy/temp)
+  real(rkind) :: mean_int_energy0
 
   !! Neighbour numbers and lists
   integer(ikind),dimension(:),allocatable :: ij_count
@@ -74,18 +73,13 @@ module common_2d
   
   !! MPI decomposition related variables
   integer(ikind) :: nprocs,iproc,ierror  !! processes, this process id, error int
-  integer(ikind) :: nprocsX,nprocsY,iprocX,iprocY     !! 2D decomposition grid sizes, and indices
+  integer(ikind) :: nprocsX,nprocsY,nprocsZ,iprocX,iprocY,iprocZ     !! decomposition grid sizes, and indices
   integer(ikind) :: np_nohalo !! nodes with no halos  
-  integer(ikind),dimension(12) :: iprocNS,iprocNR !! Neighbour lists for send and receive
-  integer(ikind),dimension(12) :: nhalo,inhalo  !! Outgoing and incoming halo sizes
-  integer(ikind),dimension(12) :: nrecstart !! Starting index for recieves
-  integer(ikind),dimension(:,:),allocatable :: halo_lists !! List of indices of halo nodes
-  integer(ikind),dimension(:),allocatable :: halo_listL,halo_listR    !! Halo_lists
-  integer(ikind),dimension(:),allocatable :: halo_listD,halo_listU    !! Halo_lists  
-  integer(ikind) :: nhaloL,nhaloR,nhaloU,nhaloD   !! Size of halos outgoing
   real(rkind) :: XL_thisproc,XR_thisproc,YU_thisproc,YD_thisproc
+  integer(ikind),dimension(:),allocatable :: iproc_S_LR,iproc_R_LR,iproc_S_UD,iproc_R_UD !! Neighbouring processors
+  integer(ikind),dimension(:,:),allocatable :: halo_lists_LR,halo_lists_UD  !! Lists of halo nodes 
+  integer(ikind),dimension(:),allocatable :: nhalo_LR,nhalo_UD,inhalo_LR,inhalo_UD  !! Halo sizes, outgoing, incoming
+  integer(ikind),dimension(:),allocatable :: nrecstart_UDLR  !! Indexing for halos
   
-  integer(ikind),dimension(:),allocatable :: proc_neighbours_
-
           
 end module common_2d

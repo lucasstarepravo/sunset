@@ -131,6 +131,7 @@ contains
      !! Calculate the vorticity 
      allocate(gradu(npfb,dims),gradv(npfb,dims),gradw(npfb,dims));gradw=zero
      allocate(vort(npfb))
+
      call calc_gradient(u,gradu)
      call calc_gradient(v,gradv)
 #ifdef dim3
@@ -148,7 +149,7 @@ contains
 #endif        
      end do
      !$omp end parallel do
-     
+
 !! TEMPORARY OUTPUT DENSITY GRADIENT AS VORT.
 !     call calc_gradient(lnro,gradu)
 !     !$omp parallel do private(tmpT)
@@ -217,8 +218,19 @@ contains
 #else
         write(20,*) rp(i,1),rp(i,2),s(i),node_type(i),exp(lnro(i)),u(i),v(i),vort(i), &
                     roE(i)/exp(lnro(i)),tmpT,Y0(i)
-!        write(20,*) rp(i,1),rp(i,2),h(i),node_type(i),exp(lnro(i)),u(i),v(i),vort(i) &
-!               ,roE(i)/exp(lnro(i)),tmpT,dble(ij_count(i))  !! Diagnostic/debugging output
+if(.false.)then
+if(i.le.npfb) then        
+        write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+1.5*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),vort(i) &
+               ,roE(i)/exp(lnro(i)),zero,dble(ij_count(i))  !! Diagnostic/debugging output
+else if(i.le.np_nohalo) then        
+        write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+1.5*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),zero &
+               ,roE(i)/exp(lnro(i)),one,zero  !! Diagnostic/debugging output
+else 
+        write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+1.5*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),zero &
+               ,roE(i)/exp(lnro(i)),two,zero  !! Diagnostic/debugging output               
+end if             
+endif
+
 #endif
      end do
 
@@ -451,7 +463,6 @@ contains
      integer(ikind) :: i
      real(rkind) :: tot_int_e,tot_vol,tmpro,dVi,tmpvel,tmp_int_e
      real(rkind) :: tot_int_e_tmp,tot_vol_tmp
-     real(rkind) :: facA,facB,facC,facT,dehsinkdt
        
      tot_int_e = zero
      tot_vol = zero
@@ -481,41 +492,13 @@ contains
      !! Set the initial (and henceforwards target) value:
      if(itime.eq.1) mean_int_energy0 = tot_int_e
         
-     !! If we want to P.I.D. control over the mean velocity
-#ifdef hsink     
-     !! New error     
-     ehsink_n = mean_int_energy0 - tot_int_e
-          
-     !! Integral term
-     sum_ehsink = sum_ehsink + ehsink_n*dt
-     
-     !! Derivative term
-     dehsinkdt = (ehsink_n-ehsink_nm1)/dt
-    
-     !! P, I and D factors..  
-     facA = two*one
-     facB = facA/1.0d-1
-     facC = facA*0.02d0
-         
-     heat_sink_mag = facA*ehsink_n + facB*sum_ehsink + facC*dehsinkdt
-     !! Impose some upper and lower limits (need to work out how to set these appropriately)
-     heat_sink_mag = min(5.0d2,heat_sink_mag)
-     heat_sink_mag = max(-5.0d2,heat_sink_mag)
-                       
-     !! Pass new eflow to old eflow
-     ehsink_nm1=ehsink_n
-#else
-     heat_sink_mag = zero
-#endif
-      
-      
 #ifdef mp
      if(iproc.eq.0)then
-        write(198,*) time,tot_int_e,heat_sink_mag
+        write(198,*) time,tot_int_e
         flush(198)
      end if
 #else
-     write(198,*) time,tot_int_e,heat_sink_mag
+     write(198,*) time,tot_int_e
      flush(198)
 #endif       
      
