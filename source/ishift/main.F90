@@ -21,6 +21,13 @@ program main
      write(6,*) "A positive number of processors in Y please. Stopping"
      stop
   end if  
+
+  write(6,*) "Enter number of processors in Z direction"
+  read(5,*) nprocsZ
+  if(nprocsZ.lt.1) then
+     write(6,*) "A positive number of processors in Z please. Stopping"
+     stop
+  end if  
   
   xbcond = 0;ybcond=0
   write(6,*) "Enter X boundary condition: periodic(1),symmetric(2)"

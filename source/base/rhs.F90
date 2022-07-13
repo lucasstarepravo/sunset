@@ -23,8 +23,9 @@ module rhs
 
   !! Allocatable arrays for 1st and 2nd gradients
   real(rkind),dimension(:,:),allocatable :: gradu,gradv,gradw,gradlnro,gradp,gradY0
-  real(rkind),dimension(:,:),allocatable :: grad2u,grad2v,grad2w,grad2Y0
-  real(rkind),dimension(:),allocatable :: divvel
+  real(rkind),dimension(:,:),allocatable :: grad2Y0
+  real(rkind),dimension(:,:),allocatable :: graddivvel
+  real(rkind),dimension(:),allocatable :: lapu,lapv,lapw,lapY0
   
   real(rkind),dimension(:),allocatable :: store_diff_E
   
@@ -52,7 +53,7 @@ contains
 
      !! Allocate some arrays for gradients
      allocate(gradlnro(npfb,dims));gradlnro=zero  
-     allocate(divvel(npfb));divvel=zero
+!     allocate(divvel(npfb));divvel=zero
      allocate(gradu(npfb,dims),gradv(npfb,dims),gradw(npfb,dims));gradw=zero
       
      !! Evaluate gradients
@@ -69,7 +70,7 @@ contains
         i=internal_list(j)
         tmp_vec(1) = u(i);tmp_vec(2) = v(i);tmp_vec(3)= w(i)
         tmp_scal = dot_product(tmp_vec,gradlnro(i,:))
-        divvel(i) = gradu(i,1) + gradv(i,2) + gradw(i,3)
+!        divvel(i) = gradu(i,1) + gradv(i,2) + gradw(i,3)
 
         rhs(i) = -divvel(i) - tmp_scal  
      end do
@@ -119,6 +120,10 @@ contains
      real(rkind) :: c
 
      segment_tstart = omp_get_wtime()          
+     
+     !! Gradient of velocity divergence
+     allocate(graddivvel(npfb,dims));graddivvel=zero
+     call calc_gradient(divvel,graddivvel)
           
      !! Determine secondary thermodynamic quantities and transport properties
      call pressure_from_primary_vars     
@@ -126,18 +131,16 @@ contains
      call visc_from_temp
 
      !! Allocate memory for spatial derivatives and stores
-     allocate(grad2u(npfb,6),grad2v(npfb,6),grad2w(npfb,6));grad2w=zero
+     allocate(lapu(npfb),lapv(npfb),lapw(npfb))
+     lapu=zero;lapv=zero;lapw=zero
      allocate(gradp(npfb,dims))
      allocate(store_diff_E(npfb))
 
      !! Calculate spatial derivatives
+     call calc_laplacian(u,lapu)
+     call calc_laplacian(v,lapv)
 #ifdef dim3
-     call calc_grad2(u,gradu,grad2u)
-     call calc_grad2(v,gradv,grad2v)
-     call calc_grad2(w,gradw,grad2w)
-#else     
-     call calc_grad2(u,grad2u)
-     call calc_grad2(v,grad2v)
+     call calc_laplacian(w,lapw)          
 #endif     
      call calc_gradient(p,gradp)
          
@@ -151,12 +154,10 @@ contains
         tmp_scal_v = dot_product(tmp_vec,gradv(i,:))      !! Convective term for v   
         tmp_scal_w = dot_product(tmp_vec,gradw(i,:))      !! Convective term for w    
         
-        f_visc_u = visc(i)*(fourthirds*grad2u(i,1) + grad2u(i,3) + grad2u(i,5) &
-                            + onethird*grad2v(i,2) + onethird*grad2w(i,6))
-        f_visc_v = visc(i)*(fourthirds*grad2v(i,3) + grad2v(i,5) + grad2v(i,1) &
-                            + onethird*grad2w(i,4) + onethird*grad2u(i,2))
-        f_visc_w = visc(i)*(fourthirds*grad2w(i,5) + grad2w(i,1) + grad2w(i,3) &
-                            + onethird*grad2u(i,6) + onethird*grad2v(i,4))
+        !! Viscous term
+        f_visc_u = visc(i)*(lapu(i) + onethird*graddivvel(i,1))
+        f_visc_v = visc(i)*(lapv(i) + onethird*graddivvel(i,2))
+        f_visc_w = visc(i)*(lapw(i) + onethird*graddivvel(i,3))
       
         !! Local density 
         tmpro = exp(lnro(i))  
@@ -225,9 +226,9 @@ contains
               L(j,4) = u(i)*gradw(i,1)
 
               !! Viscous
-              f_visc_u = visc(i)*(grad2u(i,1) + grad2u(i,3) + grad2u(i,5)) !! I should have cross derivs but don't yet !!
-              f_visc_v = visc(i)*(grad2v(i,3) + grad2v(i,5) + grad2v(i,1))
-              f_visc_w = visc(i)*(grad2w(i,5) + grad2w(i,1) + grad2w(i,3))
+              f_visc_u = visc(i)*(lapu(i)) !! I should have cross derivs but don't yet !!
+              f_visc_v = visc(i)*(lapv(i))
+              f_visc_w = visc(i)*(lapw(i))
      
               !! Body force
               body_force_u = grav(1) + driving_force(1)/tmpro
@@ -249,7 +250,8 @@ contains
      end if
          
      !! Deallocate any stores no longer required
-     deallocate(grad2u,grad2v,grad2w)
+     deallocate(lapu,lapv,lapw)
+     deallocate(graddivvel) 
       
      !! Profiling
      segment_tend = omp_get_wtime()
@@ -351,7 +353,7 @@ contains
 #endif
 
      !! Deallocation of spatial derivatives
-     deallocate(divvel)
+!     deallocate(divvel)
      deallocate(visc)
      deallocate(store_diff_E)
      if(nb.eq.0) deallocate(T,p)
@@ -366,16 +368,15 @@ contains
 #ifdef ms
      integer(ikind) :: i,j
      real(rkind),dimension(dims) :: tmp_vec
-     real(rkind) :: tmp_scal,lapY0
-     allocate(grad2Y0(npfb,6),gradY0(npfb,2))
-
+     real(rkind) :: tmp_scal,lapY0_tmp
      
+     allocate(grad2Y0(npfb,6),gradY0(npfb,2))
+     allocate(lapY0(npfb))
+     
+
+     call calc_grad2(Y0,grad2Y0)   
      call calc_gradient(Y0,gradY0)
-#ifdef dim3     
-     call calc_grad2(Y0,gradY0,grad2Y0)
-#else
-     call calc_grad2(Y0,grad2Y0)
-#endif     
+     call calc_laplacian(Y0,lapY0)
           
      !$omp parallel do private(i,tmp_vec,tmp_scal,lapY0)
      do j=1,npfb-nb
@@ -383,8 +384,7 @@ contains
         tmp_vec(1) = u(i);tmp_vec(2) = v(i);tmp_vec(3) = w(i)
         tmp_scal = dot_product(tmp_vec,gradY0(i,:))
 
-        lapY0 = grad2Y0(i,1) + grad2Y0(i,3) + grad2Y0(i,5)
-        rhs_Y0(i) = -tmp_scal + MD*(lapY0 + dot_product(gradY0(i,:),gradlnro(i,:)))
+        rhs_Y0(i) = -tmp_scal + MD*(lapY0(i) + dot_product(gradY0(i,:),gradlnro(i,:)))
      end do
      !$omp end parallel do
 
@@ -396,16 +396,16 @@ contains
            tmp_scal = exp(lnro(i))
            if(node_type(i).eq.0)then  !! walls in bound norm coords
 
-              lapY0 = grad2Y0(i,3) + grad2Y0(i,5) !! Transverse terms only (no diffusion of Y0 through walls!)
+              lapY0_tmp = grad2Y0(i,3) + grad2Y0(i,5) !! Transverse terms only (no diffusion of Y0 through walls!)
 
-              rhs_Y0(i) = MD*(lapY0 + dot_product(gradY0(i,:),gradlnro(i,:)))  !! diffusive terms only (u=0 on wall)
+              rhs_Y0(i) = MD*(lapY0_tmp + dot_product(gradY0(i,:),gradlnro(i,:)))  !! diffusive terms only (u=0 on wall)
 
               L(j,6) = zero !! No transport through walls 
            else !! inflow/outflow in x-y coords
-              lapY0 = grad2Y0(i,1) + grad2Y0(i,3) + grad2Y0(i,5)
+              lapY0_tmp = grad2Y0(i,1) + grad2Y0(i,3) + grad2Y0(i,5)
 
               rhs_Y0(i) = -v(i)*gradY0(i,2) - w(i)*gradY0(i,3) &
-                        + MD*(lapY0 + dot_product(gradY0(i,:),gradlnro(i,:))) !! Transverse and diffusive only
+                        + MD*(lapY0_tmp + dot_product(gradY0(i,:),gradlnro(i,:))) !! Transverse and diffusive only
 
               L(j,6) = u(i)*gradY0(i,1)                
            end if       
@@ -414,7 +414,7 @@ contains
      end if       
 
      !! Deallocate any stores no longer required    
-     deallocate(gradY0,grad2Y0)
+     deallocate(gradY0,grad2Y0,lapY0)
      if(nb.eq.0) deallocate(gradlnro)          
 #endif          
      return

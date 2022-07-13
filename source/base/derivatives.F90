@@ -65,9 +65,9 @@ contains
        lap_tmp = zero
        do k=1,ij_count(i)
           j = ij_link(k,i) 
-          lap_tmp = lap_tmp + phi(j)*(ij_w_grad2(1,k,i)+ij_w_grad2(3,k,i))
+          lap_tmp = lap_tmp + phi(j)*ij_w_lap(k,i)
        end do
-       lapphi(i) = lap_tmp - phi(i)*(ij_w_grad2_sum(1,i)+ij_w_grad2_sum(3,i)) 
+       lapphi(i) = lap_tmp - phi(i)*ij_w_lap_sum(i)
     end do
     !$OMP END PARALLEL DO
     
@@ -92,7 +92,7 @@ contains
     real(rkind),dimension(:),intent(in) :: phi1,phi2,phi3
     real(rkind),dimension(:),intent(inout) :: divphi
     integer :: i,j,k
-    real(rkind),dimension(dims) :: fji
+    real(rkind),dimension(2) :: fji
     real(rkind) :: divtmp
     
     !$OMP PARALLEL DO PRIVATE(j,k,fji,divtmp)
@@ -124,19 +124,11 @@ contains
     return
   end subroutine calc_divergence
 !! ------------------------------------------------------------------------------------------------  
-#ifdef dim3
-  subroutine calc_grad2(phi,gradphi,grad2)
-#else
   subroutine calc_grad2(phi,grad2)
-#endif  
     !! Calculate the 2nd derivatives of a scalar phi
     !! If three-dimensional, d/dz^2 is straight FD, and d/dxdz, d/dydz are FD (in Z) derivatives
     !! of the labfm derivative in the X-Y plane
-    real(rkind),dimension(:),intent(in) :: phi
-#ifdef dim3
-    real(rkind),dimension(:,:),intent(in) :: gradphi
-    real(rkind) :: gradxz,gradyz
-#endif        
+    real(rkind),dimension(:),intent(in) :: phi 
     real(rkind),dimension(:,:),intent(inout) :: grad2
     real(rkind),dimension(3) :: d2_tmp
     real(rkind) :: grad2ztmp
@@ -162,14 +154,11 @@ contains
           j = ij_link_fd(k,i) 
           !! Direct ZZ derivative
           grad2ztmp = grad2ztmp + phi(j)*ij_fd_grad2(k)
-
-          !! Cross derivatives
-          gradxz = gradxz + gradphi(j,1)*ij_fd_grad(k)
-          gradyz = gradyz + gradphi(j,2)*ij_fd_grad(k)          
+       
        end do
        grad2(i,5) = grad2ztmp
-       grad2(i,4) = gradyz      
-       grad2(i,6) = gradxz
+       grad2(i,4) = zero      
+       grad2(i,6) = zero
     end do
     !$OMP END PARALLEL DO 
 #else

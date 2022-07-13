@@ -11,6 +11,7 @@ module common_2d
   
   !! Secondary fluid properties
   real(rkind), dimension(:), allocatable, target :: p,visc,T
+  real(rkind), dimension(:), allocatable :: divvel  
   
   !! Discretisation properties
   real(rkind), dimension(:,:), allocatable, target :: rp,rnorm
@@ -47,9 +48,9 @@ module common_2d
 
   !! LABFM weightings for derivative operators
   real(rkind),dimension(:,:,:),allocatable :: ij_w_grad,ij_w_grad2
-  real(rkind),dimension(:,:),allocatable :: ij_w_hyp
+  real(rkind),dimension(:,:),allocatable :: ij_w_hyp,ij_w_lap
   real(rkind),dimension(:,:),allocatable :: ij_w_grad_sum,ij_w_grad2_sum
-  real(rkind),dimension(:),allocatable :: ij_w_hyp_sum
+  real(rkind),dimension(:),allocatable :: ij_w_hyp_sum,ij_w_lap_sum
   
   !! Finite Difference weightings 
   integer(ikind) :: ij_count_fd ! Size of FD stencil  

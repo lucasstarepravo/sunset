@@ -90,7 +90,13 @@ contains
          
 #ifdef mp
 
-     read(13,*) nprocsX,nprocsY
+     read(13,*) nprocsX,nprocsY,nprocsZ
+#ifndef dim3
+     if(nprocsZ.ne.1) then
+        write(6,*) "ERROR: 2D simulation, but 3D domain decomposition. Stopping."
+        call MPI_Abort(MPI_COMM_WORLD, ii, ierror)              
+     end if
+#endif
 
      !! Domain decomposition: How many processors in X and Y 
      call processor_mapping
@@ -102,7 +108,7 @@ contains
 
      !! Read the start and end indices of the decomposition schedule from ipart  
      read(13,*) dummy_int
-     if(dummy_int.ne.nprocs) then
+     if(dummy_int*nprocsZ.ne.nprocs) then
         write(6,*) "ERROR: nprocs doesn't match ishift decomposition schedule. Stopping."
         stop
      else
@@ -175,8 +181,10 @@ contains
      !! Set the spatial limits of this processor block
      XL_thisproc = minval(rp(1:npfb,1))
      XR_thisproc = maxval(rp(1:npfb,1))    
-     YU_thisproc = maxval(rp(10+floor(0.5*npfb):npfb,2))  !! Adjustments for cyclical columns. 
-     YD_thisproc = minval(rp(1:floor(0.5*npfb)-10,2))       !! Should be oK given node ordering
+     YU_thisproc = maxval(rp(floor(0.75*npfb):npfb,2))  !! Adjustments for cyclical columns. 
+     YD_thisproc = minval(rp(1:floor(0.25*npfb),2))       !! Should be oK given node ordering
+     
+!write(6,*) "iproc",iproc,"YU,YD",YU_thisproc,YD_thisproc
      
     
      write(6,*) "process",iproc,"npfb,nb",npfb,nb
@@ -224,7 +232,9 @@ contains
      !! Transfer discretisation properties   
      call halo_exchange(h)
      call halo_exchange(s)
-     call halo_exchange_int(node_type)     
+     call halo_exchange_int(node_type)    
+     call halo_exchange(rnorm(:,1))
+     call halo_exchange(rnorm(:,2)) 
 #ifdef dim3
      !! Transfer information about z-layer
      call halo_exchange_int(zlayer_index)
@@ -235,8 +245,8 @@ contains
 #endif     
 
      !! Allocate arrays for properties
-     allocate(u(np),v(np),w(np),lnro(np),roE(np),Y0(np))
-     u=zero;v=zero;w=zero;lnro=zero;roE=one;Y0=zero
+     allocate(u(np),v(np),w(np),lnro(np),roE(np),Y0(np),divvel(np))
+     u=zero;v=zero;w=zero;lnro=zero;roE=one;Y0=zero;divvel=zero
 
 #ifdef mp
      call halo_exchanges_all
@@ -289,7 +299,8 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 !! ------------------------------------------------------------------------------------------------
   subroutine initial_solution
      use boundaries
-     !! Temporary subroutine whilst building mfcomp. Initialises all fields
+     use derivatives
+     !! Temporary subroutine whilst developing. Initialises all fields
      integer(ikind) :: i,j,k,n_restart
      real(rkind) :: x,y,z,tmp,tmpro
      character(70) :: fname
@@ -405,6 +416,14 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      call halo_exchanges_all
 #endif          
      
+     !! Set the initial velocity divergence
+     call calc_divergence(u,v,w,divvel(1:npfb))
+     
+     !! Mirrors and halos for divvel                   
+     call reapply_mirror_bcs
+#ifdef mp
+     call halo_exchange_divvel
+#endif         
      
      !! Set the initial forcing to zero. It will only be changed if PID controller in velcheck is used.
      driving_force(:) = zero

@@ -61,7 +61,7 @@ contains
      nplink = maxval(ij_count(1:npfb))
 
      !! Left hand sides and arrays for interparticle weights
-     allocate(ij_w_grad(2,nplink,npfb),ij_w_grad2(3,nplink,npfb))
+     allocate(ij_w_grad(2,nplink,npfb),ij_w_grad2(3,nplink,npfb),ij_w_lap(nplink,npfb))
      allocate(ij_w_hyp(nplink,npfb),amathyp(nsizeG,nsizeG),amatyy(nsizeG,nsizeG))
      allocate(amatx(nsizeG,nsizeG),amaty(nsizeG,nsizeG),amatxx(nsizeG,nsizeG),amatxy(nsizeG,nsizeG))
      amatx=zero;amaty=zero;amatxx=zero;amatxy=zero;amatyy=zero
@@ -234,6 +234,7 @@ contains
            !! Weights for gradients
            ij_w_grad(1,k,i) = dot_product(bvecx,gvec)
            ij_w_grad(2,k,i) = dot_product(bvecy,gvec)
+           ij_w_lap(k,i) = dot_product(bvecxx+bvecyy,gvec)
            ij_w_grad2(1,k,i) = dot_product(bvecxx,gvec)
            ij_w_grad2(2,k,i) = dot_product(bvecxy,gvec)
            ij_w_grad2(3,k,i) = dot_product(bvecyy,gvec)
@@ -256,8 +257,8 @@ contains
  
      integer(ikind) :: i,j,k
 
-     allocate(ij_w_grad_sum(2,npfb),ij_w_grad2_sum(3,npfb),ij_w_hyp_sum(npfb))
-     ij_w_grad_sum=zero;ij_w_grad2_sum=zero;ij_w_hyp_sum=zero
+     allocate(ij_w_grad_sum(2,npfb),ij_w_grad2_sum(3,npfb),ij_w_lap_sum(npfb),ij_w_hyp_sum(npfb))
+     ij_w_grad_sum=zero;ij_w_grad2_sum=zero;ij_w_hyp_sum=zero;ij_w_lap_sum=zero
 
      !$OMP PARALLEL DO PRIVATE(k,j)
      do i=1,npfb
@@ -267,6 +268,7 @@ contains
            !! Sum the weights
            ij_w_grad_sum(:,i) = ij_w_grad_sum(:,i) + ij_w_grad(:,k,i)
            ij_w_grad2_sum(:,i) = ij_w_grad2_sum(:,i) + ij_w_grad2(:,k,i)
+           ij_w_lap_sum(i) = ij_w_lap_sum(i) + ij_w_lap(k,i)
            ij_w_hyp_sum(i) = ij_w_hyp_sum(i) + ij_w_hyp(k,i)  
 
         end do
@@ -485,17 +487,21 @@ contains
      
      !! Find the local radius of curvature...
      !! N.B. find 1/radius, as it is only used as denominator, so we are wary of instances when R->infinity
-     allocate(ooRcurve(nb))
+     allocate(ooRcurve(nb));ooRcurve=zero
      do jj=1,nb
         i=boundary_list(jj)
-        tmp_t = zero
-        do k=1,ij_count(i)
-           j=ij_link(k,i)
-           if(node_type(j).le.-5.or.node_type(j).ge.999) cycle  !! Only the first few rows...
-           tmp_n = dot_product(rnorm(j,:),rnorm(i,:))-one
-           tmp_t = tmp_t + ij_w_grad2(3,k,i)*tmp_n
-        end do
-        ooRcurve(jj) = sqrt(-tmp_t)  !! 1/radius of curvature...  
+        if(node_type(i).eq.0)then !! Only for walls
+           tmp_t = zero
+           do k=1,ij_count(i)
+              j=ij_link(k,i)
+              ii=node_type(j)
+              if(ii.eq.node_type(i))then !! only look through nodes on the same "layer"           
+                 tmp_n = dot_product(rnorm(j,:),rnorm(i,:))-one
+                 tmp_t = tmp_t + ij_w_grad2(3,k,i)*tmp_n
+              end if
+           end do
+           ooRcurve(jj) = sqrt(-tmp_t)  !! 1/radius of curvature...  
+        end if     
      end do
      !! PART 3: second cross derivatives... finite difference operating on labfm...
      !! Loop boundary nodes
@@ -514,6 +520,7 @@ contains
         if(node_type(i).eq.0)then
            do k=1,ij_count(i)  !! Will result in Laplacian being correct... (but d2/dn2 incorrect)
               ij_w_grad2(1,k,i) = ij_w_grad2(1,k,i) + ij_w_grad(1,k,i)*ooRcurve(jj) 
+              ij_w_lap(k,i) = ij_w_grad2(1,k,i) + ij_w_grad2(3,k,i)
            end do
         end if
      end do
@@ -878,7 +885,7 @@ contains
      qq = sqrt(qq/npfb)   
      
      !! Output to screen
-     write(6,*) "ij_count average and min:",qq,minval(w(1:npfb))
+     write(6,*) "iproc",iproc,"ij_count mean,min:",qq,floor(minval(w(1:npfb)))
           
      !! Zero w
      w = zero

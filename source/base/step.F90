@@ -199,6 +199,7 @@ contains
      !! Register 1 is lnro_W,u_W,v_W. Register 2 is lnro,u,v.
      !! Register 3 is tmplnro,tmpu,tmpv (only used for RHS)
      !! Register 4 is e_acc_lnro,e_acc_u,e_acc_v - error accumulator
+     use derivatives
      integer(ikind) :: i,k
      real(rkind) :: time0
      real(rkind),dimension(:),allocatable :: u_W,v_W,w_W,lnro_W,roE_W,Y0_W,tmpu,tmpv,tmplnro,tmproE,tmpY0,tmpw
@@ -258,10 +259,15 @@ contains
 #endif
         end do
         !$omp end parallel do
-       
+              
         !! Apply BCs and update halos
         call reapply_mirror_bcs
         call halo_exchanges_all
+        
+        !! Velocity divergence
+        call calc_divergence(u,v,w,divvel(1:npfb))
+        call reapply_mirror_bcs
+        call halo_exchange_divvel
         
      end do
      
@@ -298,13 +304,19 @@ contains
      !! Apply BCs and update halos
      call reapply_mirror_bcs
      call halo_exchanges_all
-          
+              
      !! Filter the solution 
      call filter_variables
 
      !! Apply BCs and update halos
      call reapply_mirror_bcs
      call halo_exchanges_all
+
+     !! Velocity divergence
+     call calc_divergence(u,v,w,divvel(1:npfb))
+     call reapply_mirror_bcs
+     call halo_exchange_divvel     
+
 
      return
   end subroutine step_rk3_4S_2R

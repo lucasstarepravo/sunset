@@ -94,7 +94,24 @@ contains
      segment_time_local(1) = segment_time_local(1) + segment_tend - segment_tstart
      return
   end subroutine halo_exchanges_all
-#ifdef mp
+!! ------------------------------------------------------------------------------------------------
+  subroutine halo_exchange_divvel  
+     !! If using mpi, this calls routines to transfer divvel between halos. If not using
+     !! mpi, it does nothing
+     segment_tstart = omp_get_wtime()
+
+#ifdef mp 
+     !! Velocity divergence
+     call halo_exchange(divvel)
+#endif     
+
+
+     !! Profiling
+     segment_tend = omp_get_wtime()
+     segment_time_local(1) = segment_time_local(1) + segment_tend - segment_tstart
+     return
+  end subroutine halo_exchange_divvel
+#ifdef mp  
 !! ------------------------------------------------------------------------------------------------
   subroutine processor_mapping
      integer(ikind) :: ii,i,j

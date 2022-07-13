@@ -257,6 +257,9 @@ contains
 #ifdef ms
         Y0(j)=Y0(i)
 #endif        
+        
+        !! Velocity divergence
+        divvel(j)=divvel(i)
      end do
      !$OMP END PARALLEL DO     
 

@@ -198,7 +198,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      write(212,*) nb,n,smax
      write(212,*) xmin,xmax,ymin,ymax
      write(212,*) xbcond,ybcond
-     write(212,*) nprocsX,nprocsY
+     write(212,*) nprocsX,nprocsY,nprocsZ
   
      !! Indices of each column 
      write(212,*) nprocs

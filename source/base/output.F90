@@ -125,7 +125,8 @@ contains
      integer(ikind),intent(in) :: n_out
      integer(ikind) :: i,j,k,np_out_local
      character(70) :: fname
-     real(rkind),dimension(:),allocatable :: vort
+     real(rkind),dimension(:),allocatable :: vort,testout
+     real(rkind),dimension(:,:),allocatable :: testoutv
      real(rkind) :: tmpT,xn,yn
 
      !! Calculate the vorticity 
@@ -180,7 +181,7 @@ contains
         end do
      end if     
      deallocate(gradu,gradv,gradw)
-
+          
      !! set the name of the file...
      !! first number is processor number, second is dump number (allowed up to 9999 processors)
 #ifdef mp
@@ -220,14 +221,14 @@ contains
                     roE(i)/exp(lnro(i)),tmpT,Y0(i)
 if(.false.)then
 if(i.le.npfb) then        
-        write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+1.5*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),vort(i) &
-               ,roE(i)/exp(lnro(i)),zero,dble(ij_count(i))  !! Diagnostic/debugging output
+        write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+2.2*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),dble(ij_count(i)) &
+               ,roE(i)/exp(lnro(i)),zero,Y0(i)  !! Diagnostic/debugging output
 else if(i.le.np_nohalo) then        
-        write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+1.5*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),zero &
-               ,roE(i)/exp(lnro(i)),one,zero  !! Diagnostic/debugging output
+        write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+2.2*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),zero &
+               ,roE(i)/exp(lnro(i)),one,Y0(i)  !! Diagnostic/debugging output
 else 
-        write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+1.5*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),zero &
-               ,roE(i)/exp(lnro(i)),two,zero  !! Diagnostic/debugging output               
+        write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+2.2*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),zero &
+               ,roE(i)/exp(lnro(i)),two,Y0(i)  !! Diagnostic/debugging output               
 end if             
 endif
 
