@@ -47,9 +47,9 @@ module common_2d
   integer(ikind),dimension(:,:),allocatable :: ij_link_fd
 
   !! LABFM weightings for derivative operators
-  real(rkind),dimension(:,:,:),allocatable :: ij_w_grad,ij_w_grad2
+  real(rkind),dimension(:,:,:),allocatable :: ij_w_grad,ij_wb_grad2
   real(rkind),dimension(:,:),allocatable :: ij_w_hyp,ij_w_lap
-  real(rkind),dimension(:,:),allocatable :: ij_w_grad_sum,ij_w_grad2_sum
+  real(rkind),dimension(:,:),allocatable :: ij_w_grad_sum,ij_wb_grad2_sum
   real(rkind),dimension(:),allocatable :: ij_w_hyp_sum,ij_w_lap_sum
   
   !! Finite Difference weightings 

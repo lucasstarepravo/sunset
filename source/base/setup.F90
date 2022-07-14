@@ -319,7 +319,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         tmp = -half*half*(cos(4.0d0*pi*x) + cos(4.0d0*pi*y))/csq
         lnro(i) = log(rho_char)!log(rho_char + tmp)!log(rho_char)       
         roE(i) = exp(lnro(i))*(T0*Rs0/gammagasm1 + half*u(i)*u(i) + half*v(i)*v(i) + half*w(i)*w(i))
-        
+                
 !        call evaluate_grf(x,y,z,tmp)
 !        if(tmp.le.zero) then 
 !           lnro(i) = log(rho_char)

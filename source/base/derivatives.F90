@@ -12,6 +12,7 @@ module derivatives
   implicit none
 
 contains
+!! ------------------------------------------------------------------------------------------------
   subroutine calc_gradient(phi,gradphi)
     !! Calculate the gradient of scalar phi.
     real(rkind),dimension(:),intent(in) :: phi
@@ -124,69 +125,45 @@ contains
     return
   end subroutine calc_divergence
 !! ------------------------------------------------------------------------------------------------  
-  subroutine calc_grad2(phi,grad2)
-    !! Calculate the 2nd derivatives of a scalar phi
-    !! If three-dimensional, d/dz^2 is straight FD, and d/dxdz, d/dydz are FD (in Z) derivatives
-    !! of the labfm derivative in the X-Y plane
-    real(rkind),dimension(:),intent(in) :: phi 
-    real(rkind),dimension(:,:),intent(inout) :: grad2
-    real(rkind),dimension(3) :: d2_tmp
-    real(rkind) :: grad2ztmp
-    integer i,j,k
+  subroutine calc_grad2bound(phi,g2phi)
+    !! Calculate the second derivatives of properties on boundary nodes ONLY
+    real(rkind),dimension(:),intent(in) :: phi
+    real(rkind),dimension(:,:),intent(inout) :: g2phi
+    integer i,j,k,ii
+    real(rkind),dimension(dims) :: g2_tmp
 
-    !$OMP PARALLEL DO PRIVATE(j,k,d2_tmp)
-    do i=1,npfb
-       d2_tmp = zero
+    !$OMP PARALLEL DO PRIVATE(i,j,k,g2_tmp)
+    do ii=1,nb
+       i=boundary_list(ii)
+       g2_tmp = zero
        do k=1,ij_count(i)
           j = ij_link(k,i) 
-          d2_tmp(:) = d2_tmp(:) + phi(j)*ij_w_grad2(:,k,i)
+          g2_tmp(1) = g2_tmp(1) + phi(j)*ij_wb_grad2(1,k,ii)
+          g2_tmp(2) = g2_tmp(2) + phi(j)*ij_wb_grad2(2,k,ii)
        end do
-       grad2(i,1:3) = d2_tmp(:) - phi(i)*ij_w_grad2_sum(:,i)                                                             
+       g2phi(ii,1) = g2_tmp(1) - phi(i)*ij_wb_grad2_sum(1,ii)
+       g2phi(ii,2) = g2_tmp(2) - phi(i)*ij_wb_grad2_sum(2,ii)       
     end do
     !$OMP END PARALLEL DO
 
 #ifdef dim3    
-    !$OMP PARALLEL DO PRIVATE(j,k,grad2ztmp,gradxz,gradyz)
-    do i=1,npfb
-       grad2ztmp=zero
-       gradxz = zero;gradyz=zero
+    !$OMP PARALLEL DO PRIVATE(i,j,k,g2_tmp)
+    do ii=1,npfb
+       i=boundary_list(ii)
+       g2_tmp = zero
        do k=1,ij_count_fd
           j = ij_link_fd(k,i) 
           !! Direct ZZ derivative
-          grad2ztmp = grad2ztmp + phi(j)*ij_fd_grad2(k)
-       
+          g2_tmp(3) = g2_tmp(3) + phi(j)*ij_fd_grad2(k)       
        end do
-       grad2(i,5) = grad2ztmp
-       grad2(i,4) = zero      
-       grad2(i,6) = zero
+       g2phi(ii,3) = g2_tmp(3)
     end do
     !$OMP END PARALLEL DO 
 #else
-    grad2(:,4:6) = zero
-#endif    
+    g2phi(:,3) = zero
+#endif      
 
-  end subroutine calc_grad2
-!! ------------------------------------------------------------------------------------------------
-  subroutine calc_grad2tang(phi,g2tphi)
-    !! Calculate the Laplacian of a scalar phi
-    real(rkind),dimension(:),intent(in) :: phi
-    real(rkind),dimension(:),intent(inout) :: g2tphi
-    integer i,j,k,ii
-    real(rkind) :: g2t_tmp
-
-    !$OMP PARALLEL DO PRIVATE(i,j,k,g2t_tmp)
-    do ii=1,nb
-       i=boundary_list(ii)
-       g2t_tmp = zero
-       do k=1,ij_count(i)
-          j = ij_link(k,i) 
-          g2t_tmp = g2t_tmp + phi(j)*ij_w_grad2(3,k,i)
-       end do
-       g2tphi(ii) = g2t_tmp - phi(i)*ij_w_grad2_sum(3,i)
-    end do
-    !$OMP END PARALLEL DO
-
-  end subroutine calc_grad2tang  
+  end subroutine calc_grad2bound
 !! ------------------------------------------------------------------------------------------------  
   subroutine calc_filtered_var(phi)
     !! Calculate the hyperviscosity filtered phi

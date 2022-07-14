@@ -23,7 +23,6 @@ module rhs
 
   !! Allocatable arrays for 1st and 2nd gradients
   real(rkind),dimension(:,:),allocatable :: gradu,gradv,gradw,gradlnro,gradp,gradY0
-  real(rkind),dimension(:,:),allocatable :: grad2Y0
   real(rkind),dimension(:,:),allocatable :: graddivvel
   real(rkind),dimension(:),allocatable :: lapu,lapv,lapw,lapY0
   
@@ -154,7 +153,7 @@ contains
         tmp_scal_v = dot_product(tmp_vec,gradv(i,:))      !! Convective term for v   
         tmp_scal_w = dot_product(tmp_vec,gradw(i,:))      !! Convective term for w    
         
-        !! Viscous term
+        !! Viscous term (Lap(U) + (1/3)grad(div.U) formulation - avoids explicit calculation of cross derivs)
         f_visc_u = visc(i)*(lapu(i) + onethird*graddivvel(i,1))
         f_visc_v = visc(i)*(lapv(i) + onethird*graddivvel(i,2))
         f_visc_w = visc(i)*(lapw(i) + onethird*graddivvel(i,3))
@@ -226,9 +225,9 @@ contains
               L(j,4) = u(i)*gradw(i,1)
 
               !! Viscous
-              f_visc_u = visc(i)*(lapu(i)) !! I should have cross derivs but don't yet !!
-              f_visc_v = visc(i)*(lapv(i))
-              f_visc_w = visc(i)*(lapw(i))
+              f_visc_u = visc(i)*(lapu(i) + onethird*graddivvel(i,1))
+              f_visc_v = visc(i)*(lapv(i) + onethird*graddivvel(i,2))
+              f_visc_w = visc(i)*(lapw(i) + onethird*graddivvel(i,3))
      
               !! Body force
               body_force_u = grav(1) + driving_force(1)/tmpro
@@ -265,8 +264,8 @@ contains
 #ifndef isoT     
      integer(ikind) :: i,j
      real(rkind) :: tmp_conv,tmp_visc,tmpro,tmp_p,tmp_E
-     real(rkind),dimension(:,:),allocatable :: gradE
-     real(rkind),dimension(:),allocatable :: lapT,grad2tT
+     real(rkind),dimension(:,:),allocatable :: gradE,grad2T
+     real(rkind),dimension(:),allocatable :: lapT
      
      segment_tstart = omp_get_wtime()
      
@@ -312,8 +311,8 @@ contains
      
      !! Populate viscous and transverse parts of rhs
      if(nb.ne.0)then
-        allocate(grad2tT(nb))
-        call calc_grad2tang(T,grad2tT)          
+        allocate(grad2T(nb,3))
+        call calc_grad2bound(T,grad2T)          
         !$omp parallel do private(i,tmp_visc)
         do j=1,nb
            i=boundary_list(j)
@@ -324,7 +323,7 @@ contains
               !! RHS (visc + cond + transverse + source). N.B. normal element of lap(T)=0... (adiabatic!)
               rhs_roE(i) = -roE(i)*gradv(i,2) - roE(i)*gradw(i,3) &
                            -p(i)*gradv(i,2) - p(i)*gradw(i,3) &
-                           + visc(i)*tmp_visc + lambda_cond*grad2tT(j)              
+                           + visc(i)*tmp_visc + lambda_cond*(grad2T(j,2)+grad2T(j,3))              
            else !! Inflow/outflow  (is in the x-y coordinate system)
               !! Viscous energy term: div.(tau u)
               tmp_visc = (fourthirds*gradu(i,1) - twothirds*gradv(i,2) - twothirds*gradw(i,3))*gradu(i,1) &
@@ -341,7 +340,7 @@ contains
            end if
         end do
         !$omp end parallel do
-        deallocate(grad2tT)
+        deallocate(grad2T)
      end if
      deallocate(gradE,lapT)
      
@@ -364,17 +363,16 @@ contains
 !! ------------------------------------------------------------------------------------------------
   subroutine calc_rhs_Y0(rhs_Y0)
      !! Construct the RHS for species Y0 equation
-     real(rkind),dimension(:),intent(out) :: rhs_Y0
+     real(rkind),dimension(:),intent(out) :: rhs_Y0     
 #ifdef ms
+     real(rkind),dimension(:,:),allocatable :: grad2Y0
      integer(ikind) :: i,j
      real(rkind),dimension(dims) :: tmp_vec
      real(rkind) :: tmp_scal,lapY0_tmp
      
-     allocate(grad2Y0(npfb,6),gradY0(npfb,2))
+     allocate(gradY0(npfb,2))
      allocate(lapY0(npfb))
      
-
-     call calc_grad2(Y0,grad2Y0)   
      call calc_gradient(Y0,gradY0)
      call calc_laplacian(Y0,lapY0)
           
@@ -390,19 +388,21 @@ contains
 
      !! Make L6 and boundary RHS
      if(nb.ne.0)then
+        allocate(grad2Y0(nb,3))
+        call calc_grad2bound(Y0,grad2Y0)   
         !$omp parallel do private(i,tmp_scal,xn,yn,un,ut,dutdt,lapY0)
         do j=1,nb
            i=boundary_list(j)
            tmp_scal = exp(lnro(i))
            if(node_type(i).eq.0)then  !! walls in bound norm coords
 
-              lapY0_tmp = grad2Y0(i,3) + grad2Y0(i,5) !! Transverse terms only (no diffusion of Y0 through walls!)
+              lapY0_tmp = grad2Y0(j,2) + grad2Y0(j,3) !! Transverse terms only (no diffusion of Y0 through walls!)
 
               rhs_Y0(i) = MD*(lapY0_tmp + dot_product(gradY0(i,:),gradlnro(i,:)))  !! diffusive terms only (u=0 on wall)
 
               L(j,6) = zero !! No transport through walls 
            else !! inflow/outflow in x-y coords
-              lapY0_tmp = grad2Y0(i,1) + grad2Y0(i,3) + grad2Y0(i,5)
+              lapY0_tmp = grad2Y0(j,1) + grad2Y0(j,2) + grad2Y0(j,3)
 
               rhs_Y0(i) = -v(i)*gradY0(i,2) - w(i)*gradY0(i,3) &
                         + MD*(lapY0_tmp + dot_product(gradY0(i,:),gradlnro(i,:))) !! Transverse and diffusive only
@@ -411,10 +411,11 @@ contains
            end if       
         end do
         !$omp end parallel do 
+        deallocate(grad2Y0)
      end if       
 
      !! Deallocate any stores no longer required    
-     deallocate(gradY0,grad2Y0,lapY0)
+     deallocate(gradY0,lapY0)
      if(nb.eq.0) deallocate(gradlnro)          
 #endif          
      return

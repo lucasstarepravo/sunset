@@ -61,7 +61,7 @@ contains
      nplink = maxval(ij_count(1:npfb))
 
      !! Left hand sides and arrays for interparticle weights
-     allocate(ij_w_grad(2,nplink,npfb),ij_w_grad2(3,nplink,npfb),ij_w_lap(nplink,npfb))
+     allocate(ij_w_grad(2,nplink,npfb),ij_w_lap(nplink,npfb))
      allocate(ij_w_hyp(nplink,npfb),amathyp(nsizeG,nsizeG),amatyy(nsizeG,nsizeG))
      allocate(amatx(nsizeG,nsizeG),amaty(nsizeG,nsizeG),amatxx(nsizeG,nsizeG),amatxy(nsizeG,nsizeG))
      amatx=zero;amaty=zero;amatxx=zero;amatxy=zero;amatyy=zero
@@ -235,9 +235,6 @@ contains
            ij_w_grad(1,k,i) = dot_product(bvecx,gvec)
            ij_w_grad(2,k,i) = dot_product(bvecy,gvec)
            ij_w_lap(k,i) = dot_product(bvecxx+bvecyy,gvec)
-           ij_w_grad2(1,k,i) = dot_product(bvecxx,gvec)
-           ij_w_grad2(2,k,i) = dot_product(bvecxy,gvec)
-           ij_w_grad2(3,k,i) = dot_product(bvecyy,gvec)
            ij_w_hyp(k,i) = dot_product(bvechyp,gvec)
         end do
         
@@ -257,8 +254,8 @@ contains
  
      integer(ikind) :: i,j,k
 
-     allocate(ij_w_grad_sum(2,npfb),ij_w_grad2_sum(3,npfb),ij_w_lap_sum(npfb),ij_w_hyp_sum(npfb))
-     ij_w_grad_sum=zero;ij_w_grad2_sum=zero;ij_w_hyp_sum=zero;ij_w_lap_sum=zero
+     allocate(ij_w_grad_sum(2,npfb),ij_w_lap_sum(npfb),ij_w_hyp_sum(npfb))
+     ij_w_grad_sum=zero;ij_w_hyp_sum=zero;ij_w_lap_sum=zero
 
      !$OMP PARALLEL DO PRIVATE(k,j)
      do i=1,npfb
@@ -267,13 +264,13 @@ contains
 
            !! Sum the weights
            ij_w_grad_sum(:,i) = ij_w_grad_sum(:,i) + ij_w_grad(:,k,i)
-           ij_w_grad2_sum(:,i) = ij_w_grad2_sum(:,i) + ij_w_grad2(:,k,i)
            ij_w_lap_sum(i) = ij_w_lap_sum(i) + ij_w_lap(k,i)
            ij_w_hyp_sum(i) = ij_w_hyp_sum(i) + ij_w_hyp(k,i)  
 
         end do
      end do
      !$OMP END PARALLEL DO
+          
      return
   end subroutine calc_labf_sums
 !! ------------------------------------------------------------------------------------------------
@@ -296,6 +293,10 @@ contains
      real(rkind),dimension(2,2) :: Jinv
      
      logical :: fd_2rows,bound_row
+     
+     !! Space for boundary weights for grad2. N.B. they are indexed only over [1..nb]
+     allocate(ij_wb_grad2(dims,nplink,nb));ij_wb_grad2=zero
+     allocate(ij_wb_grad2_sum(dims,nb));ij_wb_grad2_sum=zero
 
      !! Preface: remove neighbours from the boundary nodes, to save costs later
      allocate(ijlink_tmp(nplink))
@@ -332,7 +333,7 @@ contains
         dx = s(i)
         dx2=dx*dx;dx4=dx2*dx2
         
-        ij_w_grad(:,:,i) = zero;ij_w_grad2(:,:,i) = zero;ij_w_hyp(:,i)=zero
+        ij_w_grad(:,:,i) = zero;ij_wb_grad2(:,:,jj) = zero;ij_w_hyp(:,i)=zero
         do k=1,ij_count(i)
            j=ij_link(k,i)       
            if(node_type(j).eq.1000) cycle !! Not interested in ghost nodes
@@ -345,11 +346,11 @@ contains
            if(node_type(j).eq.-3)  ij_w_grad(1,k,i) =  fourthirds/dx              
            if(node_type(j).eq.-4)  ij_w_grad(1,k,i) = -0.25d0/dx
 
-           if(j.eq.i)              ij_w_grad2(1,k,i) =  zero                  !! SECOND DERIV
-           if(node_type(j).eq.-1)  ij_w_grad2(1,k,i) = -104.0d0/12.0d0/dx2
-           if(node_type(j).eq.-2)  ij_w_grad2(1,k,i) =  114.0d0/12.0d0/dx2
-           if(node_type(j).eq.-3)  ij_w_grad2(1,k,i) = -56.0d0/12.0d0/dx2              
-           if(node_type(j).eq.-4)  ij_w_grad2(1,k,i) =  11.0d0/12.0d0/dx2
+           if(j.eq.i)              ij_wb_grad2(1,k,jj) =  zero                  !! SECOND DERIV
+           if(node_type(j).eq.-1)  ij_wb_grad2(1,k,jj) = -104.0d0/12.0d0/dx2
+           if(node_type(j).eq.-2)  ij_wb_grad2(1,k,jj) =  114.0d0/12.0d0/dx2
+           if(node_type(j).eq.-3)  ij_wb_grad2(1,k,jj) = -56.0d0/12.0d0/dx2              
+           if(node_type(j).eq.-4)  ij_wb_grad2(1,k,jj) =  11.0d0/12.0d0/dx2
               
            !! Filter in boundary normal direction (WORKS WITHOUT)
 !           if(j.eq.i)              ij_w_hyp(k,i) = -zero   !! 4th DERIV
@@ -407,9 +408,71 @@ contains
      !! Allocation
      allocate(amatt(nsizeG,nsizeG),amattt(nsizeG,nsizeG),amatthyp(nsizeG,nsizeG))
      allocate(bvect(nsizeG),bvectt(nsizeG),bvecthyp(nsizeG),xvec(nsizeG),gvec(nsizeG))
-         
+     
+     !! Boundary and first 2 rows: set gradients
      do i=1,npfb
-        if(node_type(i).eq.999.or.node_type(i).le.-3) cycle !! Skip fluid and rows 3 and 4...
+        if(node_type(i).ge.-2.and.node_type(i).le.2) then
+           amatt=zero;bvect=zero;xvec = zero;gvec = zero
+           xt=-rnorm(i,2);yt=rnorm(i,1)  !! unit tangent vector
+           xn=rnorm(i,1);yn=rnorm(i,2)  !! unit normal vector
+           do k=1,ij_count(i)
+              j=ij_link(k,i)                   
+
+              ii=node_type(j)
+              if(ii.eq.node_type(i))then !! only look through nodes on the same "layer"
+           
+                 rij = rp(i,:)-rp(j,:)  !! ij-vector
+                 x = -dot_product(rij(1:2),(/xt,yt/)) !! relative coord of j (to i) along tangent
+                 y = -dot_product(rij(1:2),(/xn,yn/)) !! relative coord of j (to i) along normal
+                 if(i.eq.j) x=zero !! avoid NaN in above line         
+           
+                 xvec(1:nsizeG) = monomials1D(x)
+               
+                 ff1 = fac(abs(x/h(i)))
+                 x = x/h(i)
+           
+                 gvec(1:nsizeG) = abfs1D(x,ff1)
+                      
+                 do i1=1,nsizeG
+                    do i2=1,nsizeG
+                       amatt(i1,i2) = amatt(i1,i2) + xvec(i1)*gvec(i2)
+                    end do
+                 end do            
+              end if        
+           end do
+
+           !! Solve system for transverse deriv   
+           bvect(:)=zero;bvect(1)=one;i1=0;i2=0;nsize=nsizeG
+           call dgesv(nsize,1,amatt,nsize,i1,bvect,nsize,i2)                         
+
+           do k=1,ij_count(i)
+              j=ij_link(k,i)                   
+
+              !! Transverse derivatives...
+              ii=node_type(j)
+              if(ii.eq.node_type(i))then !! only look through nodes on the same "layer"
+                 rij = rp(i,:)-rp(j,:)  !! ij-vector
+                 x = -dot_product(rij(1:2),(/xt,yt/)) !! relative coord of j (to i) along tangent
+                 y = -dot_product(rij(1:2),(/xn,yn/)) !! relative coord of j (to i) along normal
+                 if(i.eq.j) x=zero !! avoid NaN in above line              
+              
+                 ff1 = fac(abs(x/h(i)))
+                 x = x/h(i)
+           
+                 gvec(1:nsizeG) = abfs1D(x,ff1)
+              
+                 !! Gradients for boundary and first 2 rows
+                 ij_w_grad(2,k,i) = dot_product(bvect,gvec)
+              
+              end if    
+           
+           end do
+        end if
+     end do
+     
+     !! Boundaries only, set grad2 and hyp
+     do jj=1,nb
+        i=boundary_list(jj)
         amatt=zero;amattt=zero;bvect=zero;bvectt=zero;xvec = zero;gvec = zero
         amatthyp=zero;bvecthyp=zero
         xt=-rnorm(i,2);yt=rnorm(i,1)  !! unit tangent vector
@@ -441,10 +504,6 @@ contains
         end do
         amattt = amatt;amatthyp = amatt
 
-        !! Solve system for transverse deriv   
-        bvect(:)=zero;bvect(1)=one;i1=0;i2=0;nsize=nsizeG
-        call dgesv(nsize,1,amatt,nsize,i1,bvect,nsize,i2)              
-
         !! Solve system for transverse 2nd deriv   
         bvectt(:)=zero;bvectt(2)=one;i1=0;i2=0;nsize=nsizeG
         call dgesv(nsize,1,amattt,nsize,i1,bvectt,nsize,i2)      
@@ -469,19 +528,22 @@ contains
               x = x/h(i)
            
               gvec(1:nsizeG) = abfs1D(x,ff1)
-              
-              !! Gradients for boundary and first 2 rows
-              ij_w_grad(2,k,i) = dot_product(bvect,gvec)
-              
+                            
               !! 2nd derivs and hyperviscosity for boundary rows     
-              if(node_type(i).ge.0.and.node_type(i).le.2)then   
-                 ij_w_grad2(3,k,i) = dot_product(bvectt,gvec) 
-                 ij_w_hyp(k,i) = ij_w_hyp(k,i) + dot_product(bvecthyp,gvec)                            
-              end if
+              ij_wb_grad2(2,k,jj) = dot_product(bvectt,gvec) 
+              ij_w_hyp(k,i) = ij_w_hyp(k,i) + dot_product(bvecthyp,gvec)                            
            end if    
            
         end do
-     end do
+
+        !! Build grad2 sum
+        do k=1,ij_count(i)
+           j = ij_link(k,i)         
+        
+           ij_wb_grad2_sum(:,jj) = ij_wb_grad2_sum(:,jj) + ij_wb_grad2(:,k,jj)        
+        end do
+     end do        
+        
         
      deallocate(bvect,bvectt,gvec,xvec,amatt,amattt)
      
@@ -497,7 +559,7 @@ contains
               ii=node_type(j)
               if(ii.eq.node_type(i))then !! only look through nodes on the same "layer"           
                  tmp_n = dot_product(rnorm(j,:),rnorm(i,:))-one
-                 tmp_t = tmp_t + ij_w_grad2(3,k,i)*tmp_n
+                 tmp_t = tmp_t + ij_wb_grad2(2,k,jj)*tmp_n
               end if
            end do
            ooRcurve(jj) = sqrt(-tmp_t)  !! 1/radius of curvature...  
@@ -519,8 +581,8 @@ contains
         i=boundary_list(jj)
         if(node_type(i).eq.0)then
            do k=1,ij_count(i)  !! Will result in Laplacian being correct... (but d2/dn2 incorrect)
-              ij_w_grad2(1,k,i) = ij_w_grad2(1,k,i) + ij_w_grad(1,k,i)*ooRcurve(jj) 
-              ij_w_lap(k,i) = ij_w_grad2(1,k,i) + ij_w_grad2(3,k,i)
+              ij_wb_grad2(1,k,jj) = ij_wb_grad2(1,k,jj) + ij_w_grad(1,k,i)*ooRcurve(jj) 
+              ij_w_lap(k,i) = ij_wb_grad2(1,k,jj) + ij_wb_grad2(2,k,jj)
            end do
         end if
      end do

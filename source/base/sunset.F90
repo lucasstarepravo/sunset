@@ -103,8 +103,8 @@ subroutine deallocate_weights
   deallocate(node_type,internal_list)
   if(allocated(boundary_list)) deallocate(boundary_list)
   if(allocated(ij_w_grad)) then
-     deallocate(ij_w_grad,ij_w_grad2,ij_w_hyp)
-     deallocate(ij_w_grad_sum,ij_w_grad2_sum,ij_w_hyp_sum)     
+     deallocate(ij_w_grad,ij_wb_grad2,ij_w_hyp)
+     deallocate(ij_w_grad_sum,ij_wb_grad2_sum,ij_w_hyp_sum)     
   end if
   if(allocated(ij_link_fd)) then
      deallocate(ij_link_fd)

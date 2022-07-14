@@ -180,7 +180,7 @@ contains
            end if
         end do
      end if     
-     deallocate(gradu,gradv,gradw)
+     deallocate(gradu,gradv,gradw)     
           
      !! set the name of the file...
      !! first number is processor number, second is dump number (allowed up to 9999 processors)
@@ -200,7 +200,7 @@ contains
      end if 
      
      !! Local number out
-     np_out_local = npfb_layer 
+     np_out_local = np!fb_layer 
 
 
      !! Write the main dump files
@@ -217,9 +217,9 @@ contains
         write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),node_type(i),exp(lnro(i)), &
                     u(i),v(i),w(i),vort(i),roE(i)/exp(lnro(i)),tmpT,Y0(i)
 #else
-        write(20,*) rp(i,1),rp(i,2),s(i),node_type(i),exp(lnro(i)),u(i),v(i),vort(i), &
-                    roE(i)/exp(lnro(i)),tmpT,Y0(i)
-if(.false.)then
+!        write(20,*) rp(i,1),rp(i,2),s(i),node_type(i),exp(lnro(i)),u(i),v(i),vort(i), &
+!                    roE(i)/exp(lnro(i)),tmpT,Y0(i)
+if(.true.)then
 if(i.le.npfb) then        
         write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+2.2*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),dble(ij_count(i)) &
                ,roE(i)/exp(lnro(i)),zero,Y0(i)  !! Diagnostic/debugging output
