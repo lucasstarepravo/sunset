@@ -73,7 +73,7 @@ module common_2d
   real(rkind) :: cputimecheck
   
   !! MPI decomposition related variables
-  integer(ikind) :: nprocs,iproc,ierror  !! processes, this process id, error int
+  integer(ikind) :: nprocs,iproc,ierror,iproc_in_sheet  !! processes, this process id, error int,process id in sheet
   integer(ikind) :: nprocsX,nprocsY,nprocsZ,iprocX,iprocY,iprocZ     !! decomposition grid sizes, and indices
   integer(ikind) :: np_nohalo !! nodes with no halos  
   real(rkind) :: XL_thisproc,XR_thisproc,YU_thisproc,YD_thisproc

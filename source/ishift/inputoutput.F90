@@ -191,24 +191,28 @@ write(6,*) "Shifting iteration",ll,"of ",kk
   end subroutine setup_domain
 !! ------------------------------------------------------------------------------------------------  
   subroutine output_newnodes
-     integer(ikind) :: i,n
+     integer(ikind) :: i,n,j
      
      n= npfb - 4*nb
      open(212,file='../../IPART')
-     write(212,*) nb,n,smax
+     write(212,*) nb,n*nprocsZ,smax
      write(212,*) xmin,xmax,ymin,ymax
      write(212,*) xbcond,ybcond
      write(212,*) nprocsX,nprocsY,nprocsZ
   
      !! Indices of each column 
-     write(212,*) nprocs
-     do i=1,nprocs
-        write(212,*) nstart(i),nend(i)
+     write(212,*) nprocs*nprocsZ
+     do j=1,nprocsZ
+        do i=1,nprocs
+           write(212,*) (j-1)*n + nstart(i),(j-1)*n + nend(i)
+        end do
      end do
      deallocate(nstart,nend)
      
-     do i=1,n
-        write(212,*) x(i),y(i),nt(i),xn(i),yn(i),ds(i)
+     do j=1,nprocsZ
+        do i=1,n
+           write(212,*) x(i),y(i),nt(i),xn(i),yn(i),ds(i)
+        end do
      end do
      
      deallocate(x,y,xn,yn,ds,nt)

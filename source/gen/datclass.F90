@@ -832,15 +832,15 @@ case(7) !! Something periodic
      b_node(2,:) = (/0.5d0*xl, -0.5d0*yl /)
      b_node(3,:) = (/0.5d0*xl, 0.5d0*yl /)
      b_node(4,:) = (/-0.5d0*xl, 0.5d0*yl /)
-     nb_blobs = 7
+     nb_blobs = 1
      allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,6),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
      blob_centre(1,:) = (/0.0d0,0.0d0/)   !! Row 0
-     blob_centre(2,:) = (/0.0d0,-S_cyl/)
-     blob_centre(3,:) = (/0.0d0,S_cyl/)
-     blob_centre(4,:) = (/S_cyl*sqrt(3.0d0)/2.0d0,-0.5d0*S_cyl/) !! Row 1/2
-     blob_centre(5,:) = (/S_cyl*sqrt(3.0d0)/2.0d0,0.5d0*S_cyl/)
-     blob_centre(6,:) = (/-S_cyl*sqrt(3.0d0)/2.0d0,-0.5d0*S_cyl/) !! Row -1/2
-     blob_centre(7,:) = (/-S_cyl*sqrt(3.0d0)/2.0d0,0.5d0*S_cyl/)
+!     blob_centre(2,:) = (/0.0d0,-S_cyl/)
+!     blob_centre(3,:) = (/0.0d0,S_cyl/)
+!     blob_centre(4,:) = (/S_cyl*sqrt(3.0d0)/2.0d0,-0.5d0*S_cyl/) !! Row 1/2
+!     blob_centre(5,:) = (/S_cyl*sqrt(3.0d0)/2.0d0,0.5d0*S_cyl/)
+!     blob_centre(6,:) = (/-S_cyl*sqrt(3.0d0)/2.0d0,-0.5d0*S_cyl/) !! Row -1/2
+!     blob_centre(7,:) = (/-S_cyl*sqrt(3.0d0)/2.0d0,0.5d0*S_cyl/)
                           
      
      do i=1,nb_blobs

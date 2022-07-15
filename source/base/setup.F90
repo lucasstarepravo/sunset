@@ -92,10 +92,10 @@ contains
 
      read(13,*) nprocsX,nprocsY,nprocsZ
 #ifndef dim3
-     if(nprocsZ.ne.1) then
-        write(6,*) "ERROR: 2D simulation, but 3D domain decomposition. Stopping."
-        call MPI_Abort(MPI_COMM_WORLD, ii, ierror)              
-     end if
+!     if(nprocsZ.ne.1) then
+!        write(6,*) "ERROR: 2D simulation, but 3D domain decomposition. Stopping."
+!        call MPI_Abort(MPI_COMM_WORLD, ii, ierror)              
+!     end if
 #endif
 
      !! Domain decomposition: How many processors in X and Y 
@@ -108,7 +108,7 @@ contains
 
      !! Read the start and end indices of the decomposition schedule from ipart  
      read(13,*) dummy_int
-     if(dummy_int*nprocsZ.ne.nprocs) then
+     if(dummy_int.ne.nprocs) then
         write(6,*) "ERROR: nprocs doesn't match ishift decomposition schedule. Stopping."
         stop
      else

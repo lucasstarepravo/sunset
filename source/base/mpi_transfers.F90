@@ -19,7 +19,9 @@ module mpi_transfers
   !!    2+npy-1   |   | 2+2*npy-1      
   !!  ---------------------------   
   !!    2+npy-2   |   | 2+2*npy-2       
-  !!  ---------------------------    
+  !!  ---------------------------
+  !!  forward:  2 + 2*npy + 1
+  !!  backward: 2 + 2*npy + 2    
   !!
   !!   RECEIVE ORDER
   !!
@@ -38,6 +40,8 @@ module mpi_transfers
   !!  ---------------------------   
   !!    2+npy+3   |   | 5       
   !!  ---------------------------      
+  !!  backward: 2 + 2*npy + 1
+  !!  forward:  2 + 2*npy + 2
   !!
   !!
   !! Transfers are SEND-RECEIVE for ODD processors, and RECEIVE-SEND for EVEN processors in EACH
@@ -118,7 +122,7 @@ contains
      integer(ikind),dimension(:),allocatable :: iproc_thiscolumn
   
      !! Number of processors in X and Y decomposition - check match with schedule     
-     if(nprocsX*nprocsY.ne.nprocs) then
+     if(nprocsX*nprocsY*nprocsZ.ne.nprocs) then
         write(6,*) "ERROR: nprocs doesn't match the decomposition schedule from ishift. STOPPING"
         call MPI_Abort(MPI_COMM_WORLD, ii, ierror)
      end if
@@ -128,9 +132,11 @@ contains
      iproc_S_LR=-1;iproc_R_LR=-1       !! Send-leftright,receive-leftright
      iproc_S_UD=-1;iproc_R_UD=-1       !! Send-updown, receive-updown
  
-     !! Indices of this processor in X,Y grid 
-     iprocX=iproc/nprocsY   
-     iprocY=mod(iproc,nprocsY)
+     !! Indices of this processor in X,Y,Z grid 
+     iprocZ = iproc/(nprocsY*nprocsX)
+     iproc_in_sheet = iproc - iprocZ*(nprocsY*nprocsX)
+     iprocX=iproc_in_sheet/nprocsY   
+     iprocY=mod(iproc_in_sheet,nprocsY)
      
      !! Build a list of the indices of the processors in this column
      allocate(iproc_thiscolumn(nprocsY))
