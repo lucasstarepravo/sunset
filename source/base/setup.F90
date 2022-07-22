@@ -460,9 +460,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      nz = ceiling(Lz/dz/dble(nprocsZ))
      dz = Lz/dble(nz)/dble(nprocsZ)
      nz_global = nz*nprocsZ
-
-             
-             
+                        
      !! Minimum number in z is ij_count_fd/2 + 2
      if(nz.lt.ij_count_fd/2 + 2) then
         nz = ij_count_fd/2 + 2
