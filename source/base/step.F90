@@ -24,6 +24,7 @@ module step
 contains
 !! ------------------------------------------------------------------------------------------------
   subroutine step_rk4
+     use derivatives  
      !! Classical 4th order Runge Kutta (i.e. the one on Wikipedia)
      integer(ikind) :: i,k
      real(rkind) :: time0
@@ -75,6 +76,11 @@ contains
         !! Apply BCs and update halos
         call reapply_mirror_bcs
         call halo_exchanges_all
+        
+        !! Velocity divergence
+        call calc_divergence(u,v,w,divvel(1:npfb))
+        call reapply_mirror_bcs
+        call halo_exchange_divvel           
    
         !! calc the RHS and store
         call calc_rhs_lnro(rhslnro(:,k))
@@ -107,13 +113,18 @@ contains
 
      !! Apply BCs and update halos     
      call reapply_mirror_bcs       
-     call halo_exchanges_all        
+     call halo_exchanges_all       
 
+     !! Velocity divergence
+     call calc_divergence(u,v,w,divvel(1:npfb))
+     call reapply_mirror_bcs
+     call halo_exchange_divvel      
 
      return
   end subroutine step_rk4
 !! ------------------------------------------------------------------------------------------------  
   subroutine step_rk3_2N
+     use derivatives  
      !! Third order low storage Runge Kutta
      integer(ikind) :: i,k
      real(rkind) :: time0
@@ -170,6 +181,11 @@ contains
         !! Apply BCs and update halos
         call reapply_mirror_bcs        
         call halo_exchanges_all
+
+        !! Velocity divergence
+        call calc_divergence(u,v,w,divvel(1:npfb))
+        call reapply_mirror_bcs
+        call halo_exchange_divvel           
        
      end do
      
@@ -182,6 +198,11 @@ contains
      !! Apply BCs and update halos     
      call reapply_mirror_bcs
      call halo_exchanges_all
+     
+     !! Velocity divergence
+     call calc_divergence(u,v,w,divvel(1:npfb))
+     call reapply_mirror_bcs
+     call halo_exchange_divvel        
          
      !! Set the new time   
      time = time0 + dt
@@ -322,6 +343,7 @@ contains
   end subroutine step_rk3_4S_2R
 !! ------------------------------------------------------------------------------------------------
   subroutine step_rk3_4S_2R_EE
+     use derivatives  
      !! 3rd order 4step 2 register Runge Kutta, with embedded 2nd order
      !! scheme for error estimation.     
      !! RK3(2)4[2R+]C Kennedy (2000) Appl. Num. Math. 35:177-219
@@ -418,6 +440,11 @@ contains
         call reapply_mirror_bcs
         call halo_exchanges_all
         
+        !! Velocity divergence
+        call calc_divergence(u,v,w,divvel(1:npfb))
+        call reapply_mirror_bcs
+        call halo_exchange_divvel        
+        
      end do
      
      !! Final substep: returns solution straight to lnro,u,v,E (register 2)
@@ -490,6 +517,11 @@ contains
      !! Apply BCs and update halos
      call reapply_mirror_bcs
      call halo_exchanges_all
+     
+     !! Velocity divergence
+     call calc_divergence(u,v,w,divvel(1:npfb))
+     call reapply_mirror_bcs
+     call halo_exchange_divvel        
 
      return
   end subroutine step_rk3_4S_2R_EE  

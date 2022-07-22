@@ -17,16 +17,16 @@ module common_2d
   real(rkind), dimension(:,:), allocatable, target :: rp,rnorm
   real(rkind), dimension(:), allocatable, target   :: h,filter_coeff,s
   integer(ikind),dimension(:),allocatable :: node_type !! Identify whether node is boundary, fluid etc...
-  integer(ikind),dimension(:),allocatable :: zlayer_index
-  integer(ikind),dimension(:),allocatable :: boundary_list,internal_list
-  real(rkind) :: dz   !! FD spacing in third dimension
-  integer(ikind) :: nz
+  integer(ikind),dimension(:),allocatable :: zlayer_index_global,ilayer_index !! Identify where in the z-stack the node is
+  integer(ikind),dimension(:),allocatable :: boundary_list,internal_list !! Lists for quick looping
+  real(rkind) :: dz,Lz   !! FD spacing in third dimension
+  integer(ikind) :: nz,nz_global
   
   !! Numbers of nodes and neighbour lists
-  integer(ikind) :: np,npfb,npfb_esti,nb,nplink  !! THESE ARE ALL LOCAL!!
+  integer(ikind) :: np,npfb,nb,nplink  !! THESE ARE ALL LOCAL!!
   integer(ikind) :: np_global,npfb_global,nb_global !! THESE ARE GLOBAL
-  integer(ikind) :: np_layer,npfb_layer,nb_layer  !! THESE ARE ALL LOCAL!!
-  integer(ikind) :: np_layer_global,npfb_layer_global,nb_layer_global !! THESE ARE GLOBAL
+  integer(ikind) :: npfb_layer  !! THESE ARE ALL LOCAL!!
+  integer(ikind) :: npfb_layer_global !! THESE ARE GLOBAL
 
 
   !! Variables related to stencil sizes 
@@ -53,8 +53,20 @@ module common_2d
   real(rkind),dimension(:),allocatable :: ij_w_hyp_sum,ij_w_lap_sum
   
   !! Finite Difference weightings 
-  integer(ikind) :: ij_count_fd ! Size of FD stencil  
-  real(rkind),dimension(:),allocatable :: ij_fd_grad,ij_fd_grad2,ij_fd_hyp
+  real(rkind),dimension(:),allocatable :: ij_fd_grad,ij_fd_grad2,ij_fd_hyp         
+#define FDORDER 8               
+  !! Size of Stencil
+#if FDORDER==4
+  integer(ikind),parameter :: ij_count_fd = 5
+#elif FDORDER==6
+  integer(ikind),parameter :: ij_count_fd = 7
+#elif FDORDER==8
+  integer(ikind),parameter :: ij_count_fd = 9
+#elif FDORDER==10
+  integer(ikind),parameter :: ij_count_fd = 11
+#elif FDORDER==12
+  integer(ikind),parameter :: ij_count_fd = 13
+#endif    
   
   !! Parents and boundaries... 
   integer(ikind),dimension(:),allocatable :: irelation,vrelation  ! used for periodic and symmetric boundaries
@@ -78,9 +90,12 @@ module common_2d
   integer(ikind) :: np_nohalo !! nodes with no halos  
   real(rkind) :: XL_thisproc,XR_thisproc,YU_thisproc,YD_thisproc
   integer(ikind),dimension(:),allocatable :: iproc_S_LR,iproc_R_LR,iproc_S_UD,iproc_R_UD !! Neighbouring processors
-  integer(ikind),dimension(:,:),allocatable :: halo_lists_LR,halo_lists_UD  !! Lists of halo nodes 
+  integer(ikind),dimension(:),allocatable :: iproc_S_FB,iproc_R_FB 
+  integer(ikind),dimension(:,:),allocatable :: halo_lists_LR,halo_lists_UD,halo_lists_FB  !! Lists of halo nodes 
   integer(ikind),dimension(:),allocatable :: nhalo_LR,nhalo_UD,inhalo_LR,inhalo_UD  !! Halo sizes, outgoing, incoming
-  integer(ikind),dimension(:),allocatable :: nrecstart_UDLR  !! Indexing for halos
+  integer(ikind),dimension(:),allocatable :: nhalo_FB,inhalo_FB
+  integer(ikind),dimension(:),allocatable :: nrecstart  !! Indexing for halos
+  
   
           
 end module common_2d

@@ -129,27 +129,30 @@ contains
      real(rkind),dimension(:,:),allocatable :: testoutv
      real(rkind) :: tmpT,xn,yn
 
-     !! Calculate the vorticity 
-     allocate(gradu(npfb,dims),gradv(npfb,dims),gradw(npfb,dims));gradw=zero
-     allocate(vort(npfb))
+     !! Only output from the first sheet
+     if(iprocZ.eq.0)then     
 
-     call calc_gradient(u,gradu)
-     call calc_gradient(v,gradv)
+        !! Calculate the vorticity 
+        allocate(gradu(npfb,dims),gradv(npfb,dims),gradw(npfb,dims));gradw=zero
+        allocate(vort(npfb))
+
+        call calc_gradient(u,gradu)
+        call calc_gradient(v,gradv)
 #ifdef dim3
-     call calc_gradient(v,gradw)
+        call calc_gradient(w,gradw)
 #endif     
-     !$omp parallel do 
-     do i=1,npfb
+        !$omp parallel do 
+        do i=1,npfb
 #ifdef dim3
-        vort(i) = (gradw(i,2) - gradv(i,3))**two &
-                + (gradu(i,3) - gradw(i,1))**two &
-                + (gradv(i,1) - gradu(i,2))**two  !! Vorticity magnitude if 3D
-        vort(i) = sqrt(vort(i))
+           vort(i) = (gradw(i,2) - gradv(i,3))**two &
+                   + (gradu(i,3) - gradw(i,1))**two &
+                   + (gradv(i,1) - gradu(i,2))**two  !! Vorticity magnitude if 3D
+           vort(i) = sqrt(vort(i))
 #else     
-        vort(i) = gradv(i,1) - gradu(i,2)
+           vort(i) = gradv(i,1) - gradu(i,2)
 #endif        
-     end do
-     !$omp end parallel do
+        end do
+        !$omp end parallel do
 
 !! TEMPORARY OUTPUT DENSITY GRADIENT AS VORT.
 !     call calc_gradient(lnro,gradu)
@@ -164,85 +167,87 @@ contains
 !! END TEMPORARY     
      
     
-     if(nb.ne.0)then
-        do j=1,nb  !! On WALL boundaries, vorticity requires some rotation...
-           i=boundary_list(j)
-           if(node_type(i).eq.0)then
-              xn = rnorm(i,1);yn = rnorm(i,2)
+        if(nb.ne.0)then
+           do j=1,nb  !! On WALL boundaries, vorticity requires some rotation...
+              i=boundary_list(j)
+              if(node_type(i).eq.0)then
+                 xn = rnorm(i,1);yn = rnorm(i,2)
 #ifdef dim3           
-              vort(i) = (gradw(i,2) - (xn*gradv(i,3)-yn*gradu(i,3)))**two &
-                      + ((xn*gradu(i,3)+yn*gradv(i,3)) - gradw(i,1))**two &
-                      + (xn*gradv(i,1)-yn*gradu(i,1)-xn*gradu(i,2)-yn*gradv(i,2))**two
-              vort(i) = sqrt(vort(i))                      
+                 vort(i) = (gradw(i,2) - (xn*gradv(i,3)-yn*gradu(i,3)))**two &
+                         + ((xn*gradu(i,3)+yn*gradv(i,3)) - gradw(i,1))**two &
+                         + (xn*gradv(i,1)-yn*gradu(i,1)-xn*gradu(i,2)-yn*gradv(i,2))**two
+                 vort(i) = sqrt(vort(i))                      
 #else
-              vort(i) = xn*(gradv(i,1)-gradu(i,2)) - yn*(gradu(i,1) + gradv(i,2))
+                 vort(i) = xn*(gradv(i,1)-gradu(i,2)) - yn*(gradu(i,1) + gradv(i,2))
 #endif
-           end if
-        end do
-     end if     
-     deallocate(gradu,gradv,gradw)     
+              end if
+           end do
+        end if     
+        deallocate(gradu,gradv,gradw)     
           
-     !! set the name of the file...
-     !! first number is processor number, second is dump number (allowed up to 9999 processors)
+        !! set the name of the file...
+        !! first number is processor number, second is dump number (allowed up to 9999 processors)
 #ifdef mp
-     k=10000+iproc
+        k=10000+iproc
 #else
-     k=10000
+        k=10000
 #endif     
-     if( n_out .lt. 10 ) then 
-        write(fname,'(A17,I5,A1,I1)') './data_out/layer_',k,'_',n_out        
-     else if( n_out .lt. 100 ) then 
-        write(fname,'(A17,I5,A1,I2)') './data_out/layer_',k,'_',n_out        
-     else if( n_out .lt. 1000 ) then
-        write(fname,'(A17,I5,A1,I3)') './data_out/layer_',k,'_',n_out        
-     else
-        write(fname,'(A17,I5,A1,I4)') './data_out/layer_',k,'_',n_out        
-     end if 
+        if( n_out .lt. 10 ) then 
+           write(fname,'(A17,I5,A1,I1)') './data_out/layer_',k,'_',n_out        
+        else if( n_out .lt. 100 ) then 
+           write(fname,'(A17,I5,A1,I2)') './data_out/layer_',k,'_',n_out        
+        else if( n_out .lt. 1000 ) then
+           write(fname,'(A17,I5,A1,I3)') './data_out/layer_',k,'_',n_out        
+        else
+           write(fname,'(A17,I5,A1,I4)') './data_out/layer_',k,'_',n_out        
+        end if 
      
-     !! Local number out
-     np_out_local = npfb_layer 
+        !! Local number out
+        np_out_local = npfb_layer 
 
 
-     !! Write the main dump files
-     open(unit = 20,file=fname)  
-     write(20,*) np_out_local
-     do i=1,np_out_local
+        !! Write the main dump files
+        open(unit = 20,file=fname)  
+        write(20,*) np_out_local
+        do i=1,np_out_local
 #ifdef isoT
-        tmpT = csq*(exp(lnro(i))-one) !! if isoT, output |u| in E and pressure in tmpT. N.B. p_out=p-csq*rho0
-        roE(i) = exp(lnro(i))*sqrt(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))             
+           tmpT = csq*(exp(lnro(i))-one) !! if isoT, output |u| in E and pressure in tmpT. N.B. p_out=p-csq*rho0
+           roE(i) = exp(lnro(i))*sqrt(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))             
 #else
-        tmpT=(roE(i)/exp(lnro(i))-0.5*(u(i)*u(i)+v(i)*v(i) + w(i)*w(i)))*gammagasm1/Rs0 !! The temperature  
+           tmpT=(roE(i)/exp(lnro(i))-0.5*(u(i)*u(i)+v(i)*v(i) + w(i)*w(i)))*gammagasm1/Rs0 !! The temperature  
 #endif        
 #ifdef dim3
-        write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),node_type(i),exp(lnro(i)), &
-                    u(i),v(i),w(i),vort(i),roE(i)/exp(lnro(i)),tmpT,Y0(i)
+           write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),node_type(i),exp(lnro(i)), &
+                       u(i),v(i),w(i),vort(i),roE(i)/exp(lnro(i)),tmpT,Y0(i)
 #else
-        write(20,*) rp(i,1),rp(i,2)+2.5*iprocZ,s(i),node_type(i),exp(lnro(i)),u(i),v(i),vort(i), &
-                    roE(i)/exp(lnro(i)),tmpT,Y0(i)
-if(.false.)then
-if(i.le.npfb) then        
-        write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+2.2*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),dble(ij_count(i)) &
-               ,roE(i)/exp(lnro(i)),zero,Y0(i)  !! Diagnostic/debugging output
-else if(i.le.np_nohalo) then        
-        write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+2.2*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),zero &
-               ,roE(i)/exp(lnro(i)),one,Y0(i)  !! Diagnostic/debugging output
-else 
-        write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+2.2*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),zero &
-               ,roE(i)/exp(lnro(i)),two,Y0(i)  !! Diagnostic/debugging output               
-end if             
-endif
+           write(20,*) rp(i,1),rp(i,2),s(i),node_type(i),exp(lnro(i)),u(i),v(i),vort(i), &
+                       roE(i)/exp(lnro(i)),tmpT,Y0(i)
+!if(.false.)then
+!if(i.le.npfb) then        
+!           write(20,*) rp(i,1)+0.0*iprocX,rp(i,2)+0.0*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),dble(ij_count(i)) &
+!                  ,roE(i)/exp(lnro(i)),zero,Y0(i)  !! Diagnostic/debugging output
+!else if(i.le.np_nohalo) then        
+!           write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+2.2*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),zero &
+!                  ,roE(i)/exp(lnro(i)),one,Y0(i)  !! Diagnostic/debugging output
+!else 
+!           write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+2.2*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),zero &
+!                  ,roE(i)/exp(lnro(i)),two,Y0(i)  !! Diagnostic/debugging output               
+!end if             
+!endif
 
 #endif
-     end do
+        end do
 
-     flush(20)
-     close(20)
+        flush(20)
+        close(20)
+     
+     end if
 
      !! Write the time,dump number and # nodes to file
 #ifdef mp  
 !     call MPI_ALLREDUCE(np_out_local,np_global,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD,ierror)     
      if(iproc.eq.0) then 
-        write(21,*) time,npfb_global,n_out,nb_global,nprocs
+        write(21,*) time,npfb_global,n_out,nprocsX*nprocsY
         flush(21)
      end if
 #else

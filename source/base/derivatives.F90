@@ -121,6 +121,8 @@ contains
     end do
     !$OMP END PARALLEL DO  
 #endif     
+
+
     
     return
   end subroutine calc_divergence
@@ -148,7 +150,7 @@ contains
 
 #ifdef dim3    
     !$OMP PARALLEL DO PRIVATE(i,j,k,g2_tmp)
-    do ii=1,npfb
+    do ii=1,nb
        i=boundary_list(ii)
        g2_tmp = zero
        do k=1,ij_count_fd

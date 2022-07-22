@@ -40,7 +40,7 @@ contains
     ! allocate cell lists
     nct_temp=nct+ncx+ncy+3
 #ifdef dim3
-    nct_temp = nct_temp*nz
+    nct_temp = nct_temp*nz_global
 #endif    
     allocate(ist(nct_temp+1))
     allocate(nc(nct_temp))
@@ -166,8 +166,8 @@ contains
        jcell = int( ddy *unoss) + 1       !! Cell label in y
        ii = icell + (jcell - 1)*ncx        !! ii is linear cell position in the matrix of cells
 #ifdef dim3
-       !! Adjust ii based on zlayer_index if 3d simulation
-       ii = (zlayer_index(k)-1)*ncx*ncy + ii
+       !! Adjust ii based on zlayer_index_global if 3d simulation
+       ii = (zlayer_index_global(k)-1)*ncx*ncy + ii
 #endif       
 
        nc(ii) = nc(ii)+1     ! add 1 to the number of particles in this cell
@@ -180,7 +180,7 @@ contains
 
     !! loop over all cells
     ist(1)=1_ikind
-    do ii=1, nct*nz
+    do ii=1, nct*nz_global
        ist(ii+1)=ist(ii)+nc(ii)   ! ist(ii) is the starting index for each cell
        nc(ii)=0_ikind             ! erase the nc in each cell here 
     end do
@@ -209,7 +209,7 @@ contains
        !! Which cell are we in?
        ic = cellpart(i)         
 #ifdef dim3 
-       ic = ic - ncx*ncy*(zlayer_index(i)-1)
+       ic = ic - ncx*ncy*(zlayer_index_global(i)-1)
 #endif       
 
        rpi(:) = rp(i,:)
@@ -218,7 +218,7 @@ contains
        do kc=1,ic_count(ic)
           jc = ic_link(ic,kc)
 #ifdef dim3
-          jc = jc + ncx*ncy*(zlayer_index(i)-1)
+          jc = jc + ncx*ncy*(zlayer_index_global(i)-1)
 #endif          
           
           !! Add any neighbours in cell jc to neighbour list of particle i

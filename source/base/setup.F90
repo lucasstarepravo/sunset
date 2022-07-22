@@ -92,13 +92,13 @@ contains
 
      read(13,*) nprocsX,nprocsY,nprocsZ
 #ifndef dim3
-!     if(nprocsZ.ne.1) then
-!        write(6,*) "ERROR: 2D simulation, but 3D domain decomposition. Stopping."
-!        call MPI_Abort(MPI_COMM_WORLD, ii, ierror)              
-!     end if
+     if(nprocsZ.ne.1) then
+        write(6,*) "ERROR: 2D simulation, but 3D domain decomposition. Stopping."
+        call MPI_Abort(MPI_COMM_WORLD, ii, ierror)              
+     end if
 #endif
 
-     !! Domain decomposition: How many processors in X and Y 
+     !! Domain decomposition: How many processors in X and Y, and build lists of neighbour processors 
      call processor_mapping
 
      !! Total numbers of particles...
@@ -200,9 +200,11 @@ contains
      call build_3rd_dimension
 #else
      !! Layer sizes (local and global)
-     npfb_layer = npfb;nb_layer=nb;nb_layer_global = nb_global;npfb_layer_global = npfb_global  
+     npfb_layer = npfb;npfb_layer_global = npfb_global  
      dz = h0/hovs  
-     nz=1     
+     nz=1    
+     nz_global = 1
+     Lz=one 
 #endif     
 
      !! STEP 2: build mirrors, halos and neighbours
@@ -215,7 +217,8 @@ contains
 
 #ifdef dim3
      !! Transfer information about z-layer
-     call halo_exchange_int(zlayer_index)
+     call halo_exchange_int(zlayer_index_global)  
+     call halo_exchange_int(ilayer_index)   
 #endif     
            
      write(6,*) "Proc",iproc,"with",nb,npfb,np_nohalo,np
@@ -237,7 +240,9 @@ contains
      call halo_exchange(rnorm(:,2)) 
 #ifdef dim3
      !! Transfer information about z-layer
-     call halo_exchange_int(zlayer_index)
+     call halo_exchange_int(zlayer_index_global)     
+     call halo_exchange_int(ilayer_index)
+     ilayer_index(npfb+1:nrecstart(2+2*nprocsY+1)-1)=0 !! Zero out local mirrors and UDLR halo nodes
 #endif
      
 #else
@@ -313,12 +318,14 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      !$OMP PARALLEL DO PRIVATE(x,y,z,tmp)
      do i=1,npfb
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
-        u(i) = u_char!-cos(two*pi*x)*sin(two*pi*y)!*oosqrt2
-        v(i) = zero!sin(two*pi*x)*cos(two*pi*y)!*cos(two*pi*z/dble(nz)/dz)    !!c c
+        u(i) = u_char!-cos(two*pi*x)*sin(two*pi*y)*cos(two*pi*z/Lz)!*oosqrt2
+        v(i) = zero!sin(two*pi*x)*cos(two*pi*y)*cos(two*pi*z/Lz)    !!c c
         w(i) = zero!u(i);u(i)=zero
         tmp = -half*half*(cos(4.0d0*pi*x) + cos(4.0d0*pi*y))/csq
         lnro(i) = log(rho_char)!log(rho_char + tmp)!log(rho_char)       
-        roE(i) = exp(lnro(i))*(T0*Rs0/gammagasm1 + half*u(i)*u(i) + half*v(i)*v(i) + half*w(i)*w(i))
+
+        tmp = T0!*(one + 0.01*sin(two*pi*z/Lz)) !! z-variation of temperature...
+        roE(i) = exp(lnro(i))*(tmp*Rs0/gammagasm1 + half*u(i)*u(i) + half*v(i)*v(i) + half*w(i)*w(i))
                 
 !        call evaluate_grf(x,y,z,tmp)
 !        if(tmp.le.zero) then 
@@ -329,7 +336,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 
         
         !! Hydrostatic energy gradient 
-!        tmp = T0*(one + 0.01*sin(two*pi*z/dble(nz)/dz))
+!        tmp = T0*(one + 0.01*sin(two*pi*z/Lz))
 !        tmp = (rho_char/exp(lnro(i)))*tmp*Rs0/gammagasm1 + dot_product(grav,rp(i,:))/gammagasm1
 !        roE(i) = (tmp + half*u(i)*u(i) + half*v(i)*v(i) + half*w(i)*w(i))*exp(lnro(i))
               
@@ -353,7 +360,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
               if(node_type(i).eq.0) then !! wall initial conditions
                  u(i)=zero;v(i)=zero;w(i)=zero
 
-                 tmp = T0*(one + 0.01*sin(two*pi*rp(i,3)/dble(nz)/dz))
+                 tmp = T0*(one + 0.01*sin(two*pi*rp(i,3)/Lz))
                  T_bound(j) = tmp*rho_char/exp(lnro(i)) + dot_product(grav,rp(i,:))/Rs0                
 !                 T_bound(j) = (rho_char/exp(lnro(i)))*T0
                  tmp = T_bound(j)*Rs0/gammagasm1
@@ -448,19 +455,21 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      dz = dz_local
 #endif     
 
-     !! Z dimension = L_char
-!     nz = ceiling(L_char/dz)
-!     dz = L_char/dble(nz)
-     
-     nz = 10
-     
-     !! Minimum number in z is 6
-     if(nz.lt.6) then
-        nz = 6
-        dz = L_char/6.0d0
+     !! Extent of domain in Z dimension = L_char
+     Lz = L_char
+     nz = ceiling(Lz/dz/dble(nprocsZ))
+     dz = Lz/dble(nz)/dble(nprocsZ)
+     nz_global = nz*nprocsZ
+
+             
+             
+     !! Minimum number in z is ij_count_fd/2 + 2
+     if(nz.lt.ij_count_fd/2 + 2) then
+        nz = ij_count_fd/2 + 2
+        dz = L_char/dble(ij_count_fd/2 + 2)
      end if
      
-     write(6,*) dz,nz         
+     write(6,*) "iproc",iproc,"Z-domain number and spacing",nz_global,dz
      
      !! Temporary arrays
      allocate(rptmp(npfb,dims),rnormtmp(npfb,dims),htmp(npfb),stmp(npfb))
@@ -477,10 +486,10 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      !$omp end parallel do
 
      !! Layer sizes (local and global)
-     npfb_layer = npfb;nb_layer=nb;nb_layer_global = nb_global;npfb_layer_global = npfb_global
+     npfb_layer = npfb;npfb_layer_global = npfb_global
 
      !! New sizes (local and global)
-     npfb = npfb*nz;nb = nb*nz;nb_global = nb_global*nz;npfb_global = npfb_global*nz
+     npfb = npfb*nz;nb = nb*nz;npfb_global = npfb_global*nz_global
      
      !! Deallocate and reallocate arrays
      nm = 10
@@ -488,7 +497,8 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      allocate(rp(nm*npfb,dims),rnorm(nm*npfb,dims),h(nm*npfb),s(nm*npfb));rp=zero
      allocate(node_type(nm*npfb));node_type=0
      allocate(fd_parent(nm*npfb));fd_parent=0
-     allocate(zlayer_index(nm*npfb))
+     allocate(zlayer_index_global(nm*npfb))
+     allocate(ilayer_index(nm*npfb));ilayer_index=0
      
      !! Build layers
      k=0
@@ -502,8 +512,9 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
            s(k) = stmp(i)
            node_type(k) = node_typetmp(i)
            fd_parent(k) = ilayerm1 + fd_parenttmp(i)
-           zlayer_index(k) = iz
-           rp(k,3) = dble(iz-1)*dz
+           zlayer_index_global(k) = iz + iprocZ*nz  !! z-layer within global stack
+           ilayer_index(k) = i                      !! index within layer
+           rp(k,3) = dble(iz + iprocZ*nz - 1)*dz
         end do
      end do
         

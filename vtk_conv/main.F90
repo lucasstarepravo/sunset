@@ -3,20 +3,17 @@ program main
   implicit none
 
   integer :: n,i,nthreads,np,npp,ngrab,Nframes,iframe,i_loop_finish,N_start,ii,i_PART_counter
-  integer,parameter :: np_max = 999999
+  integer,parameter :: np_max = 1000010
   integer, parameter :: i_PART_counter_max=20000
   character chartemp*40, name_orig*40
   character name_vtu*40, name_vtu2*12, name_vtu3*9
   character np_string3*3, np_string4*4, np_string5*5
   character np_string6*6, np_string7*7, np_string8*8
-  character frame_string1*1, frame_string2*2, frame_string3*3
-  character frame_string4*4, frame_string5*5, frame_string6*6
-  character supp*4,supp3*3,supp2*2,supp1*1, zero_string
+  character supp*4,supp3*3,supp2*2,supp1*1
   character string1*100,string2*100,string3*100,string4*100
   character chartemp2*100
   character proc5*5
-  CHARACTER(LEN=10) :: FMT,FMT1
-  CHARACTER(LEN=1)  :: TAB,DQ
+  CHARACTER(LEN=1)  :: DQ
       
   integer :: itn,ifi,ifo,di,dim_flag
   real :: dr
@@ -26,7 +23,7 @@ program main
   integer np_all(i_PART_counter_max), IT(i_PART_counter_max)
   integer processor(np_max),node_type(np_max),subset_flag
   real  DT1(i_PART_counter_max),DT2(i_PART_counter_max)  
-  integer :: nprocs,iproc,np_ini,np_end
+  integer :: nprocs,iproc,np_ini,np_end,dummy_int
   
   allocate(xp(np_max))
   allocate(zp(np_max))
@@ -42,9 +39,6 @@ program main
   allocate(Temp(np_max))
   allocate(Y0(np_max))
 
-  TAB=CHAR(9)     
-  FMT="(A)"
-  FMT1="(2A)"
   DQ=CHAR(34)
   
   !! How many dimensions
@@ -72,7 +66,7 @@ program main
         write(6,*) 'Adjust i_PART_counter_max, i_PART_counter_max = ',i_PART_counter_max
         stop
      endif
-     read(70,*,END = 76)time(i_PART_counter),np_all(i_PART_counter),IT(i_PART_counter),DT(i_PART_counter),nprocs
+     read(70,*,END = 76)time(i_PART_counter),np_all(i_PART_counter),dummy_int,nprocs
            
      !Determine whether to exit loop
      if(i_loop_finish.eq.0)then

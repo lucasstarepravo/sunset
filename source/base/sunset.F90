@@ -109,7 +109,7 @@ subroutine deallocate_weights
   if(allocated(ij_link_fd)) then
      deallocate(ij_link_fd)
      deallocate(ij_fd_grad,ij_fd_grad2,ij_fd_hyp)
-     deallocate(zlayer_index)
+     deallocate(zlayer_index_global)
   end if
   return
 end subroutine deallocate_weights
