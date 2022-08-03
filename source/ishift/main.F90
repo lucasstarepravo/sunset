@@ -29,11 +29,11 @@ program main
      stop
   end if  
   
-  xbcond = 0;ybcond=0
-  write(6,*) "Enter X boundary condition: periodic(1),symmetric(2)"
-  read(5,*) xbcond
-  write(6,*) "Enter Y boundary condition: periodic(1),symmetric(2)"
-  read(5,*) ybcond
+!  xbcond = 0;ybcond=0
+!  write(6,*) "Enter X boundary condition: periodic(1),symmetric(2)"
+!  read(5,*) xbcond
+!  write(6,*) "Enter Y boundary condition: periodic(1),symmetric(2)"
+!  read(5,*) ybcond
    
   write(6,*) "User specified processor grid:",nprocsX,nprocsY
   write(6,*) "Total # of processors:",nprocsX*nprocsY

@@ -13,7 +13,7 @@ module boundaries
   !! 999 = regular fluid
   !! 1000 = mirror/ghost 
 
-  public :: create_mirror_particles,reapply_mirror_bcs
+  public :: create_mirror_particles,reapply_mirror_bcs,reapply_mirror_bcs_divvel_only
 contains
 !! ------------------------------------------------------------------------------------------------  
   subroutine create_mirror_particles
@@ -217,14 +217,14 @@ contains
 !! ------------------------------------------------------------------------------------------------  
   subroutine reapply_mirror_bcs
      use omp_lib
-     integer(ikind) :: i,j
+     integer(ikind) :: i,j,ispec
      real(rkind) :: delta_roE
      real(rkind),dimension(dims) :: rij
      
      segment_tstart = omp_get_wtime()
      
      !! Update properties in the boundary particles
-     !$OMP PARALLEL DO PRIVATE(i,rij,delta_roE)
+     !$OMP PARALLEL DO PRIVATE(i,ispec,rij,delta_roE)
 #ifdef mp
      do j=npfb+1,np_nohalo
 #else
@@ -255,7 +255,9 @@ contains
          
         roE(j) = roE(i) + delta_roE
 #ifdef ms
-        Y0(j)=Y0(i)
+        do ispec=1,nspec
+           Yspec(j,ispec)=Yspec(i,ispec)
+        end do
 #endif        
         
         !! Velocity divergence
@@ -268,5 +270,29 @@ contains
      segment_time_local(2) = segment_time_local(2) + segment_tend - segment_tstart
      return
   end subroutine reapply_mirror_bcs
-!! ------------------------------------------------------------------------------------------------  
+!! ------------------------------------------------------------------------------------------------ 
+  subroutine reapply_mirror_bcs_divvel_only
+     use omp_lib
+     integer(ikind) :: i,j
+     
+     segment_tstart = omp_get_wtime()
+     
+     !! Update properties in the boundary particles
+     !$OMP PARALLEL DO PRIVATE(i)
+#ifdef mp
+     do j=npfb+1,np_nohalo
+#else
+     do j=npfb+1,np
+#endif
+        i = irelation(j)
+        divvel(j)=divvel(i)
+     end do
+     !$OMP END PARALLEL DO     
+
+     !! Profiling
+     segment_tend = omp_get_wtime()
+     segment_time_local(2) = segment_time_local(2) + segment_tend - segment_tstart
+     return
+  end subroutine reapply_mirror_bcs_divvel_only
+!! ------------------------------------------------------------------------------------------------ 
 end module boundaries

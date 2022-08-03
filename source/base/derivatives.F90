@@ -121,8 +121,6 @@ contains
     end do
     !$OMP END PARALLEL DO  
 #endif     
-
-
     
     return
   end subroutine calc_divergence

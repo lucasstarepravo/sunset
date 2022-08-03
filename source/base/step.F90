@@ -15,200 +15,14 @@ module step
   implicit none
 
   private
-  public step_rk4,set_tstep,step_rk3_2N,step_rk3_4S_2R, &
+  public set_tstep,step_rk3_4S_2R,step_rk3_4S_2R_EE, &
          set_tstep_PID
   
   !! Error norms for RK3(2)4S[2R+]C scheme
-  real(rkind) :: enrm_ro,enrm_u,enrm_v,enrm_E,enrm_Y0,enrm_w
+  real(rkind) :: enrm_ro,enrm_u,enrm_v,enrm_E,enrm_w
+  real(rkind),dimension(nspec) :: enrm_Yspec
 
 contains
-!! ------------------------------------------------------------------------------------------------
-  subroutine step_rk4
-     use derivatives  
-     !! Classical 4th order Runge Kutta (i.e. the one on Wikipedia)
-     integer(ikind) :: i,k
-     real(rkind) :: time0
-     real(rkind),dimension(:),allocatable :: u0,v0,lnro0,roE0,Y00,w0
-     real(rkind),dimension(:,:),allocatable :: rhsu,rhsv,rhslnro,rhsroE,rhsY0,rhsw
-
-     allocate(u0(npfb),v0(npfb),w0(npfb))
-     allocate(lnro0(npfb),roE0(npfb),Y00(npfb))
-     allocate(rhsu(npfb,4),rhsv(npfb,4),rhsw(npfb,4))
-     allocate(rhslnro(npfb,4))
-     allocate(rhsroE(npfb,4),rhsY0(npfb,4))
-        
-     !! Temporary storage of u and time
-     time0=time
-     !$OMP PARALLEL DO
-     do i=1,npfb
-        lnro0(i) = lnro(i)
-        u0(i) = u(i)
-        v0(i) = v(i)
-        w0(i) = w(i)
-        roE0(i) = roE(i)
-     end do
-     !$OMP END PARALLEL DO
-       
-     !! RK step 1
-     call calc_rhs_lnro(rhslnro(:,1))
-     call calc_rhs_vel(rhsu(:,1),rhsv(:,1),rhsw(:,1))
-     call calc_rhs_roE(rhsroE(:,1))
-     call calc_rhs_Y0(rhsY0(:,1))
-     if(nb.ne.0) call calc_rhs_nscbc(rhslnro(1:nb,1),rhsu(1:nb,1),rhsv(1:nb,1),rhsw(1:nb,1),rhsroE(1:nb,1),rhsY0(1:nb,1))
-
-     !! RK steps 2,3,4
-     do k=2,4
-        !! Set the time for this substep
-        time = time0 + rk4_c(k)*dt
-           
-        !! Find the temporary u for next substep
-        !$OMP PARALLEL DO
-        do i=1,npfb
-           lnro(i) = lnro0(i) + rk4_a(k)*rhslnro(i,k-1)*dt
-           u(i) = u0(i) + rk4_a(k)*rhsu(i,k-1)*dt
-           v(i) = v0(i) + rk4_a(k)*rhsv(i,k-1)*dt
-           w(i) = w0(i) + rk4_a(k)*rhsw(i,k-1)*dt           
-           roE(i) = roE0(i) + rk4_a(k)*rhsroE(i,k-1)*dt
-           Y0(i) = Y00(i) + rk4_a(k)*rhsY0(i,k-1)*dt
-        end do
-        !$OMP END PARALLEL DO
-        
-        !! Apply BCs and update halos
-        call reapply_mirror_bcs
-        call halo_exchanges_all
-        
-        !! Velocity divergence
-        call calc_divergence(u,v,w,divvel(1:npfb))
-        call reapply_mirror_bcs
-        call halo_exchange_divvel           
-   
-        !! calc the RHS and store
-        call calc_rhs_lnro(rhslnro(:,k))
-        call calc_rhs_vel(rhsu(:,k),rhsv(:,k),rhsw(:,k))
-        call calc_rhs_roE(rhsroE(:,k))
-        call calc_rhs_Y0(rhsY0(:,k))
-        if(nb.ne.0) call calc_rhs_nscbc(rhslnro(:,k),rhsu(:,k),rhsv(:,k),rhsw(:,k),rhsroE(:,k),rhsY0(:,k))        
-     end do
-
-     !! Final weighted sum of substeps
-     time = time0 + dt
-     !$OMP PARALLEL DO
-     do i=1,npfb
-        lnro(i) = lnro0(i) + dt*dot_product(rk4_b(:),rhslnro(i,:))       
-        u(i) = u0(i) + dt*dot_product(rk4_b(:),rhsu(i,:))
-        v(i) = v0(i) + dt*dot_product(rk4_b(:),rhsv(i,:))
-        w(i) = w0(i) + dt*dot_product(rk4_b(:),rhsw(i,:))        
-        roE(i) = roE0(i) + dt*dot_product(rk4_b(:),rhsroE(i,:))
-        Y0(i) = Y00(i) + dt*dot_product(rk4_b(:),rhsY0(i,:))
-     end do
-     !$OMP END PARALLEL DO
-     deallocate(rhslnro,rhsu,rhsv,rhsroE,u0,v0,lnro0,roE0,rhsY0,Y00,rhsw,w0)
-
-     !! Apply BCs and update halos
-     call reapply_mirror_bcs  
-     call halo_exchanges_all
-     
-     !! Filter the solution
-     call filter_variables
-
-     !! Apply BCs and update halos     
-     call reapply_mirror_bcs       
-     call halo_exchanges_all       
-
-     !! Velocity divergence
-     call calc_divergence(u,v,w,divvel(1:npfb))
-     call reapply_mirror_bcs
-     call halo_exchange_divvel      
-
-     return
-  end subroutine step_rk4
-!! ------------------------------------------------------------------------------------------------  
-  subroutine step_rk3_2N
-     use derivatives  
-     !! Third order low storage Runge Kutta
-     integer(ikind) :: i,k
-     real(rkind) :: time0
-     real(rkind),dimension(:),allocatable :: u_W,v_W,lnro_W,tmpu,tmpv,tmplnro,roE_W,tmproE   
-     real(rkind),dimension(:),allocatable :: Y0_W,tmpY0,w_W,tmpw
-
-     allocate(u_W(npfb),v_W(npfb),lnro_W(npfb),roE_W(npfb),w_W(npfb));u_W=zero;v_W=zero;lnro_W=zero;roE_W=zero;w_W=zero
-     allocate(tmpu(npfb),tmpv(npfb),tmplnro(npfb),tmproE(npfb),tmpw(npfb))
-     allocate(Y0_W(npfb),tmpY0(npfb));Y0_W=zero
-        
-     !! Temporary storage of time
-     time0=time
-
-     do k=1,3
-
-        !! Calculate the RHS
-        call calc_rhs_lnro(tmplnro)
-        call calc_rhs_vel(tmpu,tmpv,tmpw)
-        call calc_rhs_roE(tmproE)
-        call calc_rhs_Y0(tmpY0)
-
-        if(nb.ne.0) call calc_rhs_nscbc(tmplnro,tmpu,tmpv,tmpw,tmproE,tmpY0)
-
-        !! Set the intermediate time
-        time = time0 + rk3_2N_c(k)*dt        
-
-        !! Set w_i and new u,v
-        !$omp parallel do
-        do i=1,npfb
-           lnro_W(i) = rk3_2n_a(k)*lnro_W(i) + dt*tmplnro(i)
-           u_W(i) = rk3_2n_a(k)*u_W(i) + dt*tmpu(i)
-           v_W(i) = rk3_2n_a(k)*v_W(i) + dt*tmpv(i)
-           w_W(i) = rk3_2n_a(k)*w_W(i) + dt*tmpw(i)           
-#ifndef isoT           
-           roE_W(i) = rk3_2n_a(k)*roE_W(i) + dt*tmproE(i)
-#endif           
-#ifdef ms
-           Y0_W(i) = rk3_2n_a(k)*Y0_W(i) + dt*tmpY0(i)
-#endif
-           
-           lnro(i) = lnro(i) + rk3_2n_b(k)*lnro_W(i)
-           u(i) = u(i) + rk3_2n_b(k)*u_W(i)
-           v(i) = v(i) + rk3_2n_b(k)*v_W(i)
-           w(i) = w(i) + rk3_2n_b(k)*w_W(i)           
-#ifndef isoT
-           roE(i) = roE(i) + rk3_2n_b(k)*roE_W(i)
-#endif           
-#ifdef ms
-           Y0(i) = Y0(i) + rk3_2n_b(k)*Y0_W(i)
-#endif
-        end do
-        !$omp end parallel do
-       
-        !! Apply BCs and update halos
-        call reapply_mirror_bcs        
-        call halo_exchanges_all
-
-        !! Velocity divergence
-        call calc_divergence(u,v,w,divvel(1:npfb))
-        call reapply_mirror_bcs
-        call halo_exchange_divvel           
-       
-     end do
-     
-     !! Deallocation
-     deallocate(u_W,v_W,lnro_W,roE_W,tmpu,tmpv,tmplnro,tmproE,Y0_W,tmpY0,w_W,tmpw) 
-
-     !! Filter the solution
-     call filter_variables
-     
-     !! Apply BCs and update halos     
-     call reapply_mirror_bcs
-     call halo_exchanges_all
-     
-     !! Velocity divergence
-     call calc_divergence(u,v,w,divvel(1:npfb))
-     call reapply_mirror_bcs
-     call halo_exchange_divvel        
-         
-     !! Set the new time   
-     time = time0 + dt
- 
-     return
-  end subroutine step_rk3_2N  
 !! ------------------------------------------------------------------------------------------------  
   subroutine step_rk3_4S_2R
      !! 3rd order 4step 2 register Runge Kutta
@@ -217,13 +31,14 @@ contains
      !! Implemented over three registers, because speed is more
      !! important than memory at present.    
      
-     !! Register 1 is lnro_W,u_W,v_W. Register 2 is lnro,u,v.
-     !! Register 3 is tmplnro,tmpu,tmpv (only used for RHS)
-     !! Register 4 is e_acc_lnro,e_acc_u,e_acc_v - error accumulator
+     !! Register 1 is lnro_reg1,u_reg1,v_reg1 etc
+     !! Register 2 is lnro,u,v etc
+     !! Register 3 is rhs_lnro, rhs_u, rhs_v etc
      use derivatives
-     integer(ikind) :: i,k
+     integer(ikind) :: i,k,ispec
      real(rkind) :: time0
-     real(rkind),dimension(:),allocatable :: u_W,v_W,w_W,lnro_W,roE_W,Y0_W,tmpu,tmpv,tmplnro,tmproE,tmpY0,tmpw
+     real(rkind),dimension(:),allocatable :: u_reg1,v_reg1,w_reg1,lnro_reg1,roE_reg1
+     real(rkind),dimension(:,:),allocatable :: Yspec_reg1
      real(rkind),dimension(3) :: RKa
      real(rkind),dimension(4) :: RKb
          
@@ -231,13 +46,17 @@ contains
      RKa(:) = dt*rk3_4s_2r_a(:)
      RKb(:) = dt*rk3_4s_2r_b(:)
 
-     allocate(u_W(npfb),v_W(npfb),lnro_W(npfb),roE_W(npfb),Y0_W(npfb),w_W(npfb))
-     allocate(tmpu(npfb),tmpv(npfb),tmplnro(npfb),tmproE(npfb),tmpY0(npfb),tmpw(npfb))
+     allocate(u_reg1(npfb),v_reg1(npfb),lnro_reg1(npfb),roE_reg1(npfb),w_reg1(npfb))
+     allocate(rhs_u(npfb),rhs_v(npfb),rhs_lnro(npfb),rhs_roE(npfb),rhs_w(npfb))
+     allocate(Yspec_reg1(npfb,nspec),rhs_Yspec(npfb,nspec))
 
-     !! Store prim vars in register 1 (w-register)
-     !$omp parallel do
+     !! Store primary variables in register 1 (w-register)
+     !$omp parallel do private(ispec)
      do i=1,npfb
-        lnro_W(i)=lnro(i);u_W(i)=u(i);v_W(i)=v(i);w_W(i)=w(i);roE_W(i)=roE(i);Y0_W(i)=Y0(i)
+        lnro_reg1(i)=lnro(i);u_reg1(i)=u(i);v_reg1(i)=v(i);w_reg1(i)=w(i);roE_reg1(i)=roE(i)
+        do ispec=1,nspec
+           Yspec_reg1(i,ispec) = Yspec(i,ispec)
+        end do
      end do
      !$omp end parallel do             
 
@@ -246,37 +65,37 @@ contains
 
      do k=1,3
         !! Calculate the RHS
-        call calc_rhs_lnro(tmplnro)
-        call calc_rhs_vel(tmpu,tmpv,tmpw)
-        call calc_rhs_roE(tmproE)
-        call calc_rhs_Y0(tmpY0)
-        if(nb.ne.0) call calc_rhs_nscbc(tmplnro,tmpu,tmpv,tmpw,tmproE,tmpY0)        
+        call calc_all_rhs
      
         !! Set w_i and new u,v
-        !$omp parallel do
+        !$omp parallel do private(ispec)
         do i=1,npfb
            !! Store next U in register 2
-           lnro(i) = lnro_W(i) + RKa(k)*tmplnro(i)
-           u(i) = u_W(i) + RKa(k)*tmpu(i)
-           v(i) = v_W(i) + RKa(k)*tmpv(i)
-           w(i) = w_W(i) + RKa(k)*tmpw(i)           
+           lnro(i) = lnro_reg1(i) + RKa(k)*rhs_lnro(i)
+           u(i) = u_reg1(i) + RKa(k)*rhs_u(i)
+           v(i) = v_reg1(i) + RKa(k)*rhs_v(i)
+           w(i) = w_reg1(i) + RKa(k)*rhs_w(i)           
 #ifndef isoT           
-           roE(i) = roE_W(i) + RKa(k)*tmproE(i)
+           roE(i) = roE_reg1(i) + RKa(k)*rhs_roE(i)
 #endif
 #ifdef ms           
-           Y0(i) = Y0_W(i) + RKa(k)*tmpY0(i)
+           do ispec=1,nspec
+              Yspec(i,ispec) = Yspec_reg1(i,ispec) + RKa(k)*rhs_Yspec(i,ispec)
+           end do
 #endif
 
            !! Store next S in register 1
-           lnro_W(i) = lnro_W(i) + RKb(k)*tmplnro(i)
-           u_W(i) = u_W(i) + RKb(k)*tmpu(i)
-           v_W(i) = v_W(i) + RKb(k)*tmpv(i) 
-           w_W(i) = w_W(i) + RKb(k)*tmpw(i)            
+           lnro_reg1(i) = lnro_reg1(i) + RKb(k)*rhs_lnro(i)
+           u_reg1(i) = u_reg1(i) + RKb(k)*rhs_u(i)
+           v_reg1(i) = v_reg1(i) + RKb(k)*rhs_v(i) 
+           w_reg1(i) = w_reg1(i) + RKb(k)*rhs_w(i)            
 #ifndef isoT
-           roE_W(i) = roE_W(i) + RKb(k)*tmproE(i)
+           roE_reg1(i) = roE_reg1(i) + RKb(k)*rhs_roE(i)
 #endif
 #ifdef ms           
-           Y0_W(i) = Y0_W(i) + RKb(k)*tmpY0(i)
+           do ispec=1,nspec
+              Yspec_reg1(i,ispec) = Yspec_reg1(i,ispec) + RKb(k)*rhs_Yspec(i,ispec)
+           end do
 #endif
         end do
         !$omp end parallel do
@@ -287,37 +106,36 @@ contains
         
         !! Velocity divergence
         call calc_divergence(u,v,w,divvel(1:npfb))
-        call reapply_mirror_bcs
+        call reapply_mirror_bcs_divvel_only
         call halo_exchange_divvel
         
      end do
      
      !! Final substep: returns solution straight to lnro,u,v,E (register 2)
      !! and doesn't update S
-     call calc_rhs_lnro(tmplnro)
-     call calc_rhs_vel(tmpu,tmpv,tmpw)
-     call calc_rhs_roE(tmproE)
-     call calc_rhs_Y0(tmpY0)
-     if(nb.ne.0) call calc_rhs_nscbc(tmplnro,tmpu,tmpv,tmpw,tmproE,tmpY0)     
+     call calc_all_rhs  
      
-     !$omp parallel do
+     !$omp parallel do private(ispec)
      do i=1,npfb
         !! Final values of prim vars
-        lnro(i) = lnro_W(i) + RKb(4)*tmplnro(i)
-        u(i) = u_W(i) + RKb(4)*tmpu(i)
-        v(i) = v_W(i) + RKb(4)*tmpv(i)
-        w(i) = w_W(i) + RKb(4)*tmpw(i)        
+        lnro(i) = lnro_reg1(i) + RKb(4)*rhs_lnro(i)
+        u(i) = u_reg1(i) + RKb(4)*rhs_u(i)
+        v(i) = v_reg1(i) + RKb(4)*rhs_v(i)
+        w(i) = w_reg1(i) + RKb(4)*rhs_w(i)        
 #ifndef isoT
-        roE(i) = roE_W(i) + RKb(4)*tmproE(i)
+        roE(i) = roE_reg1(i) + RKb(4)*rhs_roE(i)
 #endif
 #ifdef ms 
-        Y0(i) = Y0_W(i) + RKb(4)*tmpY0(i)
+        do ispec=1,nspec
+           Yspec(i,ispec) = Yspec_reg1(i,ispec) + RKb(4)*rhs_Yspec(i,ispec)
+        end do
 #endif        
      end do
      !$omp end parallel do  
 
      !! Deallocation
-     deallocate(u_W,v_W,w_W,lnro_W,roE_W,tmpu,tmpv,tmpw,tmplnro,tmproE,Y0_W,tmpY0)     
+     deallocate(u_reg1,v_reg1,w_reg1,lnro_reg1,roE_reg1,Yspec_reg1)
+     deallocate(rhs_u,rhs_v,rhs_w,rhs_lnro,rhs_roE,rhs_Yspec)     
 
      !! Set the new time   
      time = time0 + dt
@@ -335,7 +153,7 @@ contains
 
      !! Velocity divergence
      call calc_divergence(u,v,w,divvel(1:npfb))
-     call reapply_mirror_bcs
+     call reapply_mirror_bcs_divvel_only
      call halo_exchange_divvel     
 
 
@@ -351,13 +169,15 @@ contains
      !! Implemented over three registers, because speed is more
      !! important than memory at present.    
      
-     !! Register 1 is lnro_W,u_W,v_W. Register 2 is lnro,u,v.
-     !! Register 3 is tmplnro,tmpu,tmpv (only used for RHS)
+     !! Register 1 is lnro_reg1,u_reg1,v_reg1 etc
+     !! Register 2 is lnro,u,v etc...
+     !! Register 3 is rhs_lnro,rhs_u,rhs_v (only used for RHS)
      !! Register 4 is e_acc_lnro,e_acc_u,e_acc_v - error accumulator
-     integer(ikind) :: i,k
+     integer(ikind) :: i,k,ispec
      real(rkind) :: time0
-     real(rkind),dimension(:),allocatable :: u_W,v_W,lnro_W,roE_W,Y0_W,tmpu,tmpv,tmplnro,tmproE,tmpY0,w_W,tmpw
-     real(rkind),dimension(:),allocatable :: e_acc_lnro,e_acc_u,e_acc_v,e_acc_E,e_acc_Y0,e_acc_w
+     real(rkind),dimension(:),allocatable :: u_reg1,v_reg1,w_reg1,lnro_reg1,roE_reg1
+     real(rkind),dimension(:),allocatable :: e_acc_lnro,e_acc_u,e_acc_v,e_acc_E,e_acc_w
+     real(rkind),dimension(:,:),allocatable :: Yspec_reg1,e_acc_Yspec
      real(rkind),dimension(3) :: RKa
      real(rkind),dimension(4) :: RKb,RKbmbh
      
@@ -369,15 +189,19 @@ contains
      RKb(:) = dt*rk3_4s_2r_b(:)
      RKbmbh(:) = dt*rk3_4s_2r_bmbh(:)
 
-     allocate(u_W(npfb),v_W(npfb),lnro_W(npfb),roE_W(npfb),Y0_W(npfb),w_W(npfb))
-     allocate(tmpu(npfb),tmpv(npfb),tmplnro(npfb),tmproE(npfb),tmpY0(npfb),tmpw(npfb))
-     allocate(e_acc_lnro(npfb),e_acc_u(npfb),e_acc_v(npfb),e_acc_E(npfb),e_acc_Y0(npfb),e_acc_w(npfb))
-     e_acc_lnro=zero;e_acc_u=zero;e_acc_v=zero;e_acc_E=zero;e_acc_Y0=zero;e_acc_w=zero
+     allocate(u_reg1(npfb),v_reg1(npfb),lnro_reg1(npfb),roE_reg1(npfb),w_reg1(npfb))
+     allocate(rhs_u(npfb),rhs_v(npfb),rhs_lnro(npfb),rhs_roE(npfb),rhs_w(npfb))
+     allocate(e_acc_lnro(npfb),e_acc_u(npfb),e_acc_v(npfb),e_acc_E(npfb),e_acc_w(npfb))
+     allocate(Yspec_reg1(npfb,nspec),rhs_Yspec(npfb,nspec),e_acc_Yspec(npfb,nspec))
+     e_acc_lnro=zero;e_acc_u=zero;e_acc_v=zero;e_acc_E=zero;e_acc_Yspec=zero;e_acc_w=zero
 
      !! Store prim vars in register 1 (w-register)
-     !$omp parallel do
+     !$omp parallel do private(ispec)
      do i=1,npfb
-        lnro_W(i)=lnro(i);u_W(i)=u(i);v_W(i)=v(i);w_W(i)=w(i);roE_W(i)=roE(i);Y0_W(i)=Y0(i)
+        lnro_reg1(i)=lnro(i);u_reg1(i)=u(i);v_reg1(i)=v(i);w_reg1(i)=w(i);roE_reg1(i)=roE(i)
+        do ispec=1,nspec
+           Yspec_reg1(i,ispec)=Yspec(i,ispec)
+        end do
      end do
      !$omp end parallel do             
 
@@ -386,52 +210,54 @@ contains
 
      do k=1,3
         !! Calculate the RHS
-        call calc_rhs_lnro(tmplnro)
-        call calc_rhs_vel(tmpu,tmpv,tmpw)
-        call calc_rhs_roE(tmproE)
-        call calc_rhs_Y0(tmpY0)
-        if(nb.ne.0) call calc_rhs_nscbc(tmplnro,tmpu,tmpv,tmpw,tmproE,tmpY0)        
+        call calc_all_rhs      
 
         !! Set the intermediate time
 !        time = time0 + RK_c(k)*dt        
 
         !! Set w_i and new u,v
-        !$omp parallel do
+        !$omp parallel do private(ispec)
         do i=1,npfb
            !! Store next U in register 2
-           lnro(i) = lnro_W(i) + RKa(k)*tmplnro(i)
-           u(i) = u_W(i) + RKa(k)*tmpu(i)
-           v(i) = v_W(i) + RKa(k)*tmpv(i)
-           w(i) = w_W(i) + RKa(k)*tmpw(i)           
+           lnro(i) = lnro_reg1(i) + RKa(k)*rhs_lnro(i)
+           u(i) = u_reg1(i) + RKa(k)*rhs_u(i)
+           v(i) = v_reg1(i) + RKa(k)*rhs_v(i)
+           w(i) = w_reg1(i) + RKa(k)*rhs_w(i)           
 #ifndef isoT           
-           roE(i) = roE_W(i) + RKa(k)*tmproE(i)
+           roE(i) = roE_reg1(i) + RKa(k)*rhs_roE(i)
 #endif
 #ifdef ms           
-           Y0(i) = Y0_W(i) + RKa(k)*tmpY0(i)
+           do ispec=1,nspec
+              Yspec(i,ispec) = Yspec_reg1(i,ispec) + RKa(k)*rhs_Yspec(i,ispec)
+           end do
 #endif
 
            !! Store next S in register 1
-           lnro_W(i) = lnro_W(i) + RKb(k)*tmplnro(i)
-           u_W(i) = u_W(i) + RKb(k)*tmpu(i)
-           v_W(i) = v_W(i) + RKb(k)*tmpv(i) 
-           w_W(i) = w_W(i) + RKb(k)*tmpw(i)            
+           lnro_reg1(i) = lnro_reg1(i) + RKb(k)*rhs_lnro(i)
+           u_reg1(i) = u_reg1(i) + RKb(k)*rhs_u(i)
+           v_reg1(i) = v_reg1(i) + RKb(k)*rhs_v(i) 
+           w_reg1(i) = w_reg1(i) + RKb(k)*rhs_w(i)            
 #ifndef isoT
-           roE_W(i) = roE_W(i) + RKb(k)*tmproE(i)
+           roE_reg1(i) = roE_reg1(i) + RKb(k)*rhs_roE(i)
 #endif
 #ifdef ms           
-           Y0_W(i) = Y0_W(i) + RKb(k)*tmpY0(i)
+           do ispec=1,nspec
+              Yspec_reg1(i,ispec) = Yspec_reg1(i,ispec) + RKb(k)*rhs_Yspec(i,ispec)
+           end do
 #endif
            
            !! Error accumulation
-           e_acc_lnro(i) = e_acc_lnro(i) + RKbmbh(k)*tmplnro(i)       
-           e_acc_u(i) = e_acc_u(i) + RKbmbh(k)*tmpu(i)
-           e_acc_v(i) = e_acc_v(i) + RKbmbh(k)*tmpv(i)  
-           e_acc_w(i) = e_acc_w(i) + RKbmbh(k)*tmpw(i)             
+           e_acc_lnro(i) = e_acc_lnro(i) + RKbmbh(k)*rhs_lnro(i)       
+           e_acc_u(i) = e_acc_u(i) + RKbmbh(k)*rhs_u(i)
+           e_acc_v(i) = e_acc_v(i) + RKbmbh(k)*rhs_v(i)  
+           e_acc_w(i) = e_acc_w(i) + RKbmbh(k)*rhs_w(i)             
 #ifndef isoT
-           e_acc_E(i) = e_acc_E(i) + RKbmbh(k)*tmproE(i)                    
+           e_acc_E(i) = e_acc_E(i) + RKbmbh(k)*rhs_roE(i)                    
 #endif
 #ifdef ms           
-           e_acc_Y0(i) = e_acc_Y0(i) + RKbmbh(k)*tmpY0(i)
+           do ispec=1,nspec
+              e_acc_Yspec(i,ispec) = e_acc_Yspec(i,ispec) + RKbmbh(k)*rhs_Yspec(i,ispec)
+           end do
 #endif
         end do
         !$omp end parallel do
@@ -442,44 +268,44 @@ contains
         
         !! Velocity divergence
         call calc_divergence(u,v,w,divvel(1:npfb))
-        call reapply_mirror_bcs
+        call reapply_mirror_bcs_divvel_only
         call halo_exchange_divvel        
         
      end do
      
      !! Final substep: returns solution straight to lnro,u,v,E (register 2)
      !! and doesn't update S
-     call calc_rhs_lnro(tmplnro)
-     call calc_rhs_vel(tmpu,tmpv,tmpw)
-     call calc_rhs_roE(tmproE)
-     call calc_rhs_Y0(tmpY0)
-     if(nb.ne.0) call calc_rhs_nscbc(tmplnro,tmpu,tmpv,tmpw,tmproE,tmpY0)     
+     call calc_all_rhs    
      
-     enrm_ro=zero;enrm_u=zero;enrm_v=zero;enrm_E=zero;enrm_Y0=zero;enrm_w=zero
-     !$omp parallel do reduction(max:enrm_ro,enrm_u,enrm_v,enrm_E,enrm_Y0,enrm_w)
+     enrm_ro=zero;enrm_u=zero;enrm_v=zero;enrm_E=zero;enrm_Yspec=zero;enrm_w=zero
+     !$omp parallel do private(ispec) reduction(max:enrm_ro,enrm_u,enrm_v,enrm_E,enrm_Yspec,enrm_w)
      do i=1,npfb
         !! Final values of prim vars
-        lnro(i) = lnro_W(i) + RKb(4)*tmplnro(i)
-        u(i) = u_W(i) + RKb(4)*tmpu(i)
-        v(i) = v_W(i) + RKb(4)*tmpv(i)
-        w(i) = w_W(i) + RKb(4)*tmpw(i)        
+        lnro(i) = lnro_reg1(i) + RKb(4)*rhs_lnro(i)
+        u(i) = u_reg1(i) + RKb(4)*rhs_u(i)
+        v(i) = v_reg1(i) + RKb(4)*rhs_v(i)
+        w(i) = w_reg1(i) + RKb(4)*rhs_w(i)        
 #ifndef isoT
-        roE(i) = roE_W(i) + RKb(4)*tmproE(i)
+        roE(i) = roE_reg1(i) + RKb(4)*rhs_roE(i)
 #endif
 #ifdef ms 
-        Y0(i) = Y0_W(i) + RKb(4)*tmpY0(i)
+        do ispec=1,nspec
+           Yspec(i,ispec) = Yspec_reg1(i,ispec) + RKb(4)*rhs_Yspec(i,ispec)
+        end do
 #endif        
         
         !! Final error accumulators
-        e_acc_lnro(i) = e_acc_lnro(i) + RKbmbh(4)*tmplnro(i)       
-        e_acc_u(i) = e_acc_u(i) + RKbmbh(4)*tmpu(i)
-        e_acc_v(i) = e_acc_v(i) + RKbmbh(4)*tmpv(i) 
-        e_acc_w(i) = e_acc_w(i) + RKbmbh(4)*tmpw(i)         
+        e_acc_lnro(i) = e_acc_lnro(i) + RKbmbh(4)*rhs_lnro(i)       
+        e_acc_u(i) = e_acc_u(i) + RKbmbh(4)*rhs_u(i)
+        e_acc_v(i) = e_acc_v(i) + RKbmbh(4)*rhs_v(i) 
+        e_acc_w(i) = e_acc_w(i) + RKbmbh(4)*rhs_w(i)         
 #ifndef isoT
-        e_acc_E(i) = e_acc_E(i) + RKbmbh(4)*tmproE(i)   
+        e_acc_E(i) = e_acc_E(i) + RKbmbh(4)*rhs_roE(i)   
 #endif
 #ifdef ms 
-        e_acc_Y0(i) = e_acc_Y0(i) + RKbmbh(4)*tmpY0(i)
+        do ispec=1,nspec
+           e_acc_Yspec(i,ispec) = e_acc_Yspec(i,ispec) + RKbmbh(4)*rhs_Yspec(i,ispec)
+        end do
 #endif
         
         !! Calculating L_infinity of error norms
@@ -491,18 +317,21 @@ contains
         enrm_E = abs(e_acc_E(i))/(abs(roE(i))+1.0d-9)
 #endif
 #ifdef ms 
-        enrm_Y0 = abs(e_acc_Y0(i))/(abs(Y0(i))+1.0d-9)
+        do ispec=1,nspec
+           enrm_Yspec(ispec) = abs(e_acc_Yspec(i,ispec))/(abs(Yspec(i,ispec))+1.0d-9)
+        end do
 #endif
      end do
      !$omp end parallel do  
 
      !! Deallocation
-     deallocate(u_W,v_W,lnro_W,roE_W,tmpu,tmpv,tmplnro,tmproE,Y0_W,tmpY0,w_W,tmpw) 
-     deallocate(e_acc_lnro,e_acc_u,e_acc_v,e_acc_E,e_acc_Y0,e_acc_w)
+     deallocate(u_reg1,v_reg1,w_reg1,lnro_reg1,roE_reg1,Yspec_reg1)
+     deallocate(rhs_u,rhs_v,rhs_w,rhs_lnro,rhs_roE,rhs_Yspec) 
+     deallocate(e_acc_lnro,e_acc_u,e_acc_v,e_acc_E,e_acc_Yspec,e_acc_w)
      
      !! Finalise L_infinity error norms: find max and ensure it's >0     
      emax_np1 = max(max(max(enrm_ro,enrm_E),max(max(enrm_u,enrm_v),enrm_w)),1.0d-16)
-     !! TBC: additional dependence on Y0 error norm.
+     !! TBC: additional dependence on Yspec error norm.
 
      !! Set the new time   
      time = time0 + dt
@@ -520,7 +349,7 @@ contains
      
      !! Velocity divergence
      call calc_divergence(u,v,w,divvel(1:npfb))
-     call reapply_mirror_bcs
+     call reapply_mirror_bcs_divvel_only
      call halo_exchange_divvel        
 
      return
@@ -553,7 +382,7 @@ contains
      smin = minval(s(1:npfb))
 
      !! Set time step
-     dt = min(0.3*smin*smin/visc0,1.0*smin/(cmax+umax))
+     dt = min(0.3d0*smin*smin/visc0,one*smin/(cmax+umax))
    
 #ifdef mp     
      !! Find global time-step

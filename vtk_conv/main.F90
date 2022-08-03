@@ -23,7 +23,7 @@ program main
   integer np_all(i_PART_counter_max), IT(i_PART_counter_max)
   integer processor(np_max),node_type(np_max),subset_flag
   real  DT1(i_PART_counter_max),DT2(i_PART_counter_max)  
-  integer :: nprocs,iproc,np_ini,np_end,dummy_int
+  integer :: nprocs,iproc,np_ini,np_end,dummy_int,nspecs
   
   allocate(xp(np_max))
   allocate(zp(np_max))
@@ -40,14 +40,7 @@ program main
   allocate(Y0(np_max))
 
   DQ=CHAR(34)
-  
-  !! How many dimensions
-  write(6,*) "How many dimensions for this simulation?"
-  write(6,*) "Type 3 for 3D, and 2 for 2D"
-  read(*,*) dim_flag
-  dim_flag = dim_flag - 2
-  
-  
+   
   !! Do we want to output all?
   write(6,*) "Do you want to output all or only vorticity"
   write(6,*) "Type 1 for all, and 0 for vorticity only"
@@ -66,7 +59,7 @@ program main
         write(6,*) 'Adjust i_PART_counter_max, i_PART_counter_max = ',i_PART_counter_max
         stop
      endif
-     read(70,*,END = 76)time(i_PART_counter),np_all(i_PART_counter),dummy_int,nprocs
+     read(70,*,END = 76)time(i_PART_counter),dim_flag,np_all(i_PART_counter),dummy_int,nprocs,nspecs
            
      !Determine whether to exit loop
      if(i_loop_finish.eq.0)then
@@ -76,6 +69,10 @@ program main
   end do
   N_start = 1
   Nframes = i_PART_counter-2  !Why -2?
+  
+  !! adjust dim-flag
+  dim_flag = dim_flag - 2
+  
   write(6,*) "There are ",Nframes+1,"frames."
 
   !! JRCK addition...          

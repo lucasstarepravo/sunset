@@ -32,15 +32,13 @@ program sunset
   call adapt_stencils
 #endif  
 
-  !! Calculate all the interparticle weights and any moments we might need
+  !! Calculate LABFM and FD weights for all derivatives and filters
   call calc_labf_weights
   if(nb.ne.0) call calc_boundary_weights
   call calc_labf_sums
 #ifdef dim3
   call calc_fd_weights
 #endif    
-
-  !! Calculate the filter coefficients
   call filter_coefficients   
   
   !! Create initial fields for primary variables
@@ -68,8 +66,6 @@ program sunset
 !     call set_tstep_PID  
 
      !! Perform one time step
-!     call step_rk4
-!     call step_rk3_2N
      call step_rk3_4S_2R
 !     call step_rk3_4S_2R_EE     
 
@@ -97,7 +93,7 @@ subroutine deallocate_weights
   use kind_parameters
   use common_parameter
   use common_2d
-  deallocate(rp,u,v,w,lnro,roE,Y0,s)
+  deallocate(rp,u,v,w,lnro,roE,Yspec,s)
   deallocate(ij_count,ij_link)
   deallocate(irelation,vrelation)
   deallocate(node_type,internal_list)

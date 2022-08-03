@@ -19,12 +19,14 @@ module rhs
   
  
   private
-  public calc_rhs_lnro,calc_rhs_vel,calc_rhs_roE,calc_rhs_Y0,filter_variables,calc_rhs_nscbc
+  public calc_all_rhs,filter_variables
 
   !! Allocatable arrays for 1st and 2nd gradients
-  real(rkind),dimension(:,:),allocatable :: gradu,gradv,gradw,gradlnro,gradp,gradY0
+  real(rkind),dimension(:,:),allocatable :: gradu,gradv,gradw,gradlnro,gradp
   real(rkind),dimension(:,:),allocatable :: graddivvel
-  real(rkind),dimension(:),allocatable :: lapu,lapv,lapw,lapY0
+  real(rkind),dimension(:),allocatable :: lapu,lapv,lapw
+  real(rkind),dimension(:),allocatable :: lapYspec
+  real(rkind),dimension(:,:),allocatable :: gradYspec
   
   real(rkind),dimension(:),allocatable :: store_diff_E
   
@@ -34,21 +36,39 @@ module rhs
 
 contains
 !! ------------------------------------------------------------------------------------------------
-  subroutine calc_rhs_lnro(rhs)
+  subroutine calc_all_rhs
+  
+     !! Some initial allocation of space
+#ifndef ms
+     if(nb.ne.0) allocate(L(nb,5)) 
+#else
+     if(nb.ne.0) allocate(L(nb,5+nspec)) 
+#endif  
+
+     !! Initialise to zero
+     rhs_lnro=zero;rhs_u=zero;rhs_v=zero;rhs_w=zero;rhs_roE=zero;rhs_Yspec=zero
+     
+     !! Call individual rhs routines
+     call calc_rhs_lnro
+     call calc_rhs_vel
+     call calc_rhs_roE
+     call calc_rhs_Yspec
+     if(nb.ne.0) call calc_rhs_nscbc     
+     
+  
+     return
+  end subroutine calc_all_rhs
+!! ------------------------------------------------------------------------------------------------
+  subroutine calc_rhs_lnro
      !! Construct the RHS for lnro-equation
-     real(rkind),dimension(:),intent(out) :: rhs
      integer(ikind) :: i,j
      real(rkind),dimension(dims) :: tmp_vec
      real(rkind) :: tmp_scal
 
+
      segment_tstart = omp_get_wtime()
 
-     !! Allocate NSCBC L arrays
-#ifndef ms
-     if(nb.ne.0) allocate(L(nb,5)) 
-#else
-     if(nb.ne.0) allocate(L(nb,6)) 
-#endif     
+  
 
      !! Allocate some arrays for gradients
      allocate(gradlnro(npfb,dims));gradlnro=zero  
@@ -71,7 +91,7 @@ contains
         tmp_scal = dot_product(tmp_vec,gradlnro(i,:))
 !        divvel(i) = gradu(i,1) + gradv(i,2) + gradw(i,3)
 
-        rhs(i) = -divvel(i) - tmp_scal  
+        rhs_lnro(i) = -divvel(i) - tmp_scal  
      end do
      !$omp end parallel do
 
@@ -87,9 +107,9 @@ contains
               dutdt = -yn*gradu(i,2)+xn*gradv(i,2) !! Transverse derivative of transverse velocity...
               
 
-              rhs(i) = - dutdt - gradw(i,3)
+              rhs_lnro(i) = - dutdt - gradw(i,3)
            else !! In x-y coords for inflow, outflow
-              rhs(i) = -v(i)*gradlnro(i,2) - gradv(i,2) - w(i)*gradlnro(i,3) - gradw(i,3)
+              rhs_lnro(i) = -v(i)*gradlnro(i,2) - gradv(i,2) - w(i)*gradlnro(i,3) - gradw(i,3)
            end if
 #ifndef isoT           
            L(j,2) = tmp_scal*gradlnro(i,1)  !! First bit of L2 (where non-isothermal)          
@@ -109,14 +129,14 @@ contains
      return
   end subroutine calc_rhs_lnro
 !! ------------------------------------------------------------------------------------------------
-  subroutine calc_rhs_vel(rhs_u,rhs_v,rhs_w)
+  subroutine calc_rhs_vel
      !! Construct the RHS for u-equation
-     real(rkind),dimension(:),intent(out) :: rhs_u,rhs_v,rhs_w
      integer(ikind) :: i,j
      real(rkind),dimension(dims) :: tmp_vec
      real(rkind) :: tmp_scal_u,tmp_scal_v,tmp_scal_w,f_visc_u,f_visc_v,f_visc_w
      real(rkind) :: tmpro,body_force_u,body_force_v,body_force_w
      real(rkind) :: c
+
 
      segment_tstart = omp_get_wtime()          
      
@@ -132,7 +152,7 @@ contains
      !! Allocate memory for spatial derivatives and stores
      allocate(lapu(npfb),lapv(npfb),lapw(npfb))
      lapu=zero;lapv=zero;lapw=zero
-     allocate(gradp(npfb,dims))
+     allocate(gradp(npfb,dims));gradp=zero
      allocate(store_diff_E(npfb))
 
      !! Calculate spatial derivatives
@@ -141,6 +161,7 @@ contains
 #ifdef dim3
      call calc_laplacian(w,lapw)          
 #endif     
+
      call calc_gradient(p,gradp)
          
      !! Build RHS for internal nodes
@@ -178,10 +199,10 @@ contains
         rhs_w(i) = -tmp_scal_w - gradp(i,3)/tmpro + body_force_w + f_visc_w/tmpro
 #else
         rhs_w(i) = zero
-#endif                
-        
+#endif                       
      end do
      !$omp end parallel do
+
         
      !! Finalise L2, make L1,L3,L4, and populate viscous + body force part of rhs' and save transverse
      !! parts of convective terms for later...
@@ -228,6 +249,7 @@ contains
               f_visc_u = visc(i)*(lapu(i) + onethird*graddivvel(i,1))
               f_visc_v = visc(i)*(lapv(i) + onethird*graddivvel(i,2))
               f_visc_w = visc(i)*(lapw(i) + onethird*graddivvel(i,3))
+             
      
               !! Body force
               body_force_u = grav(1) + driving_force(1)/tmpro
@@ -242,7 +264,7 @@ contains
               !! Transverse + visc + source terms only
               rhs_u(i) = -v(i)*gradu(i,2) - w(i)*gradu(i,3) + f_visc_u/tmpro + body_force_u  
               rhs_v(i) = -v(i)*gradv(i,2) - w(i)*gradv(i,3) - gradp(i,2)/tmpro + f_visc_v/tmpro + body_force_v
-              rhs_w(i) = -v(i)*gradw(i,2) - w(i)*gradw(i,3) - gradp(i,3)/tmpro + f_visc_w/tmpro + body_force_w
+              rhs_w(i) = -v(i)*gradw(i,2) - w(i)*gradw(i,3) - gradp(i,3)/tmpro + f_visc_w/tmpro + body_force_w              
            end if
         end do
         !$omp end parallel do          
@@ -254,13 +276,13 @@ contains
       
      !! Profiling
      segment_tend = omp_get_wtime()
-     segment_time_local(6) = segment_time_local(6) + segment_tend - segment_tstart      
+     segment_time_local(6) = segment_time_local(6) + segment_tend - segment_tstart
+     
      return
   end subroutine calc_rhs_vel
 !! ------------------------------------------------------------------------------------------------  
-  subroutine calc_rhs_roE(rhs_roE)
-     !! Construct the RHS for energy equation. Do (almost) nothing is isothermal
-     real(rkind),dimension(:),intent(out) :: rhs_roE
+  subroutine calc_rhs_roE
+     !! Construct the RHS for energy equation. Do (almost) nothing if isothermal
 #ifndef isoT     
      integer(ikind) :: i,j
      real(rkind) :: tmp_conv,tmp_visc,tmpro,tmp_p,tmp_E
@@ -361,67 +383,84 @@ contains
      return
   end subroutine calc_rhs_roE
 !! ------------------------------------------------------------------------------------------------
-  subroutine calc_rhs_Y0(rhs_Y0)
-     !! Construct the RHS for species Y0 equation
-     real(rkind),dimension(:),intent(out) :: rhs_Y0     
+  subroutine calc_rhs_Yspec
+     !! Construct the RHS for species Yspec equation
 #ifdef ms
-     real(rkind),dimension(:,:),allocatable :: grad2Y0
-     integer(ikind) :: i,j
+     real(rkind),dimension(:,:),allocatable :: grad2Yspec
+     integer(ikind) :: i,j,ispec
      real(rkind),dimension(dims) :: tmp_vec
-     real(rkind) :: tmp_scal,lapY0_tmp
+     real(rkind) :: tmp_scal,lapYspec_tmp,tmpY
+
+     segment_tstart = omp_get_wtime()     
      
-     allocate(gradY0(npfb,2))
-     allocate(lapY0(npfb))
+     allocate(gradYspec(npfb,dims))
+     allocate(lapYspec(npfb))
      
-     call calc_gradient(Y0,gradY0)
-     call calc_laplacian(Y0,lapY0)
+     do ispec=1,nspec
+     
+        call calc_gradient(Yspec(:,ispec),gradYspec)
+        call calc_laplacian(Yspec(:,ispec),lapYspec)
           
-     !$omp parallel do private(i,tmp_vec,tmp_scal,lapY0)
-     do j=1,npfb-nb
-        i=internal_list(j)
-        tmp_vec(1) = u(i);tmp_vec(2) = v(i);tmp_vec(3) = w(i)
-        tmp_scal = dot_product(tmp_vec,gradY0(i,:))
+        !$omp parallel do private(i,tmp_vec,tmp_scal,tmpY)
+        do j=1,npfb-nb
+           i=internal_list(j)
+           tmp_vec(1) = u(i);tmp_vec(2) = v(i);tmp_vec(3) = w(i)
+           tmp_scal = dot_product(tmp_vec,gradYspec(i,:))
+         
 
-        rhs_Y0(i) = -tmp_scal + MD*(lapY0(i) + dot_product(gradY0(i,:),gradlnro(i,:)))
-     end do
-     !$omp end parallel do
-
-     !! Make L6 and boundary RHS
-     if(nb.ne.0)then
-        allocate(grad2Y0(nb,3))
-        call calc_grad2bound(Y0,grad2Y0)   
-        !$omp parallel do private(i,tmp_scal,xn,yn,un,ut,dutdt,lapY0)
-        do j=1,nb
-           i=boundary_list(j)
-           tmp_scal = exp(lnro(i))
-           if(node_type(i).eq.0)then  !! walls in bound norm coords
-
-              lapY0_tmp = grad2Y0(j,2) + grad2Y0(j,3) !! Transverse terms only (no diffusion of Y0 through walls!)
-
-              rhs_Y0(i) = MD*(lapY0_tmp + dot_product(gradY0(i,:),gradlnro(i,:)))  !! diffusive terms only (u=0 on wall)
-
-              L(j,6) = zero !! No transport through walls 
-           else !! inflow/outflow in x-y coords
-              lapY0_tmp = grad2Y0(j,1) + grad2Y0(j,2) + grad2Y0(j,3)
-
-              rhs_Y0(i) = -v(i)*gradY0(i,2) - w(i)*gradY0(i,3) &
-                        + MD*(lapY0_tmp + dot_product(gradY0(i,:),gradlnro(i,:))) !! Transverse and diffusive only
-
-              L(j,6) = u(i)*gradY0(i,1)                
-           end if       
+           rhs_Yspec(i,ispec) = -tmp_scal + MD*(lapYspec(i) + dot_product(gradYspec(i,:),gradlnro(i,:)))
         end do
-        !$omp end parallel do 
-        deallocate(grad2Y0)
-     end if       
+        !$omp end parallel do
+
+        !! Make L5+ispec and boundary RHS
+        if(nb.ne.0)then
+           allocate(grad2Yspec(nb,dims))
+           call calc_grad2bound(Yspec(:,ispec),grad2Yspec)
+
+           !$omp parallel do private(i,tmp_scal,xn,yn,un,ut,dutdt,lapYspec_tmp,tmpY)
+           do j=1,nb
+              i=boundary_list(j)
+              tmp_scal = exp(lnro(i))
+                        
+              if(node_type(i).eq.0)then  !! walls in bound norm coords
+
+                 lapYspec_tmp = grad2Yspec(j,2) + grad2Yspec(j,3) !! Transverse terms only (no diffusion of Yspec through walls!)
+
+                 !! diffusive terms only (u=0 on wall)
+                 rhs_Yspec(i,ispec) = MD*(lapYspec_tmp + dot_product(gradYspec(i,2:3),gradlnro(i,2:3)))
+
+                 L(j,5+ispec) = zero !! No transport through walls 
+              else !! inflow/outflow in x-y coords
+                 lapYspec_tmp = grad2Yspec(j,1) + grad2Yspec(j,2) + grad2Yspec(j,3)
+
+                 rhs_Yspec(i,ispec) = -v(i)*gradYspec(i,2) - w(i)*gradYspec(i,3) &
+                           + MD*(lapYspec_tmp + dot_product(gradYspec(i,:),gradlnro(i,:))) !! Transverse and diffusive only
+
+
+                 L(j,5+ispec) = u(i)*gradYspec(i,1)                
+
+              end if       
+           end do
+           !$omp end parallel do 
+           deallocate(grad2Yspec)
+        end if       
+
+
+     end do
+  
 
      !! Deallocate any stores no longer required    
-     deallocate(gradY0,lapY0)
-     if(nb.eq.0) deallocate(gradlnro)          
+     deallocate(gradYspec,lapYspec)
+     if(nb.eq.0) deallocate(gradlnro)    
+
+     !! Profiling
+     segment_tend = omp_get_wtime()
+     segment_time_local(8) = segment_time_local(8) + segment_tend - segment_tstart              
 #endif          
      return
-  end subroutine calc_rhs_Y0  
+  end subroutine calc_rhs_Yspec  
 !! ------------------------------------------------------------------------------------------------
-  subroutine calc_rhs_nscbc(rhslnro,rhsu,rhsv,rhsw,rhsroE,rhsY0)
+  subroutine calc_rhs_nscbc
     !! This routine asks boundaries module to prescribe L as required, then builds the final 
     !! rhs for each equation. It should only be called if nb.ne.0
     
@@ -429,56 +468,59 @@ contains
     !! Sutherland & Kennedy (2003)
     !! Yoo & Im (2007)
     !! Coussement et al. (2012)    
-    real(rkind),dimension(:),intent(inout) :: rhslnro,rhsu,rhsv,rhsw,rhsroE,rhsY0
-    integer(ikind) :: i,j
+    integer(ikind) :: i,j,ispec
     real(rkind) :: tmpro,c,tmp_scal,cv
     
     segment_tstart = omp_get_wtime()
        
-    !! Call a routine in boundaries to prescribe L as required. (IN DUE COURSE...)
-    !$omp parallel do private(i,tmpro,c)
+    !! Loop over boundary nodes and specify L as required
+    !$omp parallel do private(i,tmpro,c,ispec)
     do j=1,nb
        i=boundary_list(j)
        tmpro = exp(lnro(i))
        c=calc_sound_speed(p(i),tmpro)   
        
-       !! Wall boundary conditions 
+       !! WALL BOUNDARY +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
        if(node_type(i).eq.0) then 
           L(j,5)=L(j,1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro) 
           L(j,3) = zero
           L(j,4) = zero
        
-          !! ISOTHERMAL FLOWS
+!! ISOTHERMAL FLOWS =================================================
 #ifdef isoT
           L(j,2) = zero
           
-          !! THERMAL FLOWS
+!! THERMAL FLOWS ====================================================
 #else          
 #ifdef wall_isoT
-          !! ISOTHERMAL WALL
+   !! ISOTHERMAL WALL =====================================
           L(j,2) = gammagasm1*(L(j,5)+L(j,1))/c/c &
                  - gammagasm1*tmpro*gradv(i,2) - gammagasm1*tmpro*gradw(i,3) !! Compatible with fixing dT/dt=0?  
 #else          
-          !! IMPOSED HEAT FLUX WALL
+   !! IMPOSED HEAT FLUX WALL ==============================
           L(j,2) = zero
 #endif                             
 #endif          
 #ifdef ms
-          L(j,6) = 0.0d0
+          do ispec=1,nspec
+             L(j,5+ispec) = zero
+          end do
 #endif          
-
-       !! (partially) non-reflecting inflow condition
+!! ==================================================================
+       !! INFLOW BOUNDARY +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
        else if(node_type(i).eq.1) then 
-          !! ISOTHERMAL FLOWS
+!! ISOTHERMAL FLOWS =================================================
 #ifdef isoT
+   !! (Partially-) NON-REFLECTING INFLOW ==================
 #ifndef hardinf
           L(j,5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/(xmax-xmin) &      !! Track u_inflow
                  - half*(v(i)*gradp(i,2)+p(i)*gradv(i,2)+tmpro*c*v(i)*gradu(i,2)) &    !! transverse 1 conv. terms
                  - half*(w(i)*gradp(i,3)+p(i)*gradw(i,3)+tmpro*c*w(i)*gradu(i,3))      !! transverse 2 conv. terms 
           L(j,3) = v(i)*0.278d0*c/(xmax-xmin) &             !! track v=zero
-                   + rhsv(i)                                !! rhsv contains transverse and visc terms needed
+                   + rhs_v(i)                                !! rhs_v contains transverse and visc terms needed
           L(j,4) = w(i)*0.278d0*c/(xmax-xmin) &             !! track w=zero
-                   + rhsw(i)                                !! rhsw contains transverse and visc terms needed
+                   + rhs_w(i)                                !! rhs_w contains transverse and visc terms needed
+   !! HARD INFLOW =========================================          
 #else
           L(j,5) = L(j,1)
           L(j,3) = zero        
@@ -486,22 +528,24 @@ contains
 #endif
           L(j,2) = zero
           
-          !! THERMAL FLOWS
+!! THERMAL FLOWS ====================================================
 #else
+
+   !! (Partially-) NON-REFLECTING INFLOW ==================
 #ifndef hardinf
           L(j,5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/(xmax-xmin) &      !! Track u_inflow
                  - half*(v(i)*gradp(i,2)+gammagas*p(i)*gradv(i,2)+tmpro*c*v(i)*gradu(i,2))  & !! transverse 1 conv. terms
                  - half*(w(i)*gradp(i,3)+gammagas*p(i)*gradw(i,3)+tmpro*c*w(i)*gradu(i,3))    !! transverse 2 conv. terms  
           L(j,3) = v(i)*0.278d0*c/(xmax-xmin) &             !! track v=zero
-                   + rhsv(i)                                !! rhsv contains transverse and visc terms needed
+                   + rhs_v(i)                                !! rhs_v contains transverse and visc terms needed
           L(j,4) = w(i)*0.278d0*c/(xmax-xmin) &             !! track w=zero
-                   + rhsw(i)                                !! rhsw contains transverse and visc terms needed
+                   + rhs_w(i)                                !! rhs_w contains transverse and visc terms needed
 
           L(j,2) = (T0-T(i))*c*0.278d0/(xmax-xmin)/gammagas &
                  - (v(i)*gradlnro(i,2)*tmpro + tmpro*gradv(i,2) + v(i)*gradp(i,2)/c/c + gammagas*p(i)*gradv(i,2)/c/c) &
                  - (w(i)*gradlnro(i,3)*tmpro + tmpro*gradw(i,3) + w(i)*gradp(i,3)/c/c + gammagas*p(i)*gradw(i,3)/c/c)
                  !! Need to add on visc+source terms
-          
+   !! HARD INFLOW =========================================          
 #else
           L(j,5) = L(j,1)
           L(j,3) = zero        
@@ -512,13 +556,16 @@ contains
                  ! + dT/dy term?
 #endif
 #endif     
-     
+!! ==================================================================     
 #ifdef ms
-          L(j,6) = zero
+          do ispec=1,nspec
+             L(j,5+ispec) = zero
+          end do
 #endif
 
-       !! (partially) non-reflecting outflow
-       else if(node_type(i).eq.2) then   !! L1 incoming, L2,L3,L4,L5 outgoing from definition
+       !! OUTFLOW BOUNDARY ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+       else if(node_type(i).eq.2) then   !! L1 incoming, L2,L3,L4,L5,L5+ispec outgoing from definition
+!! ISOTHERMAL FLOWS =================================================
 #ifdef isoT
           L(j,2) = zero
           if(u(i).le.c) then !! Subsonic. If supersonic, just use L1 from definition...
@@ -530,6 +577,7 @@ contains
              L(j,3)=zero !! no incoming shear if outflow velocity is zero...
              L(j,4)=zero
           end if
+!! THERMAL FLOWS ====================================================
 #else
           if(u(i).le.c) then !! Subsonic. If supersonic, just use L1 from definition...
              L(j,1) = (p(i)-p_infinity)*0.278d0*c*(one)/two/(xmax-xmin) &               !! track p_infinity
@@ -540,15 +588,21 @@ contains
              L(j,3)=zero !! no incoming shear if outflow velocity is zero...
              L(j,4)=zero
           end if
-#endif             
+#endif            
+!! ==================================================================
           !! Want reflecting, set L1=-L5
 !          L(j,1) = -L(j,5) !! Reflecting!!
        end if          
     end do
     !$omp end parallel do
+    
+    !! Deallocate remaining gradient arrays
+    deallocate(gradp,gradu,gradv,gradw,gradlnro)    
 
+
+    !! ==================================================================================
     !! Use L to update the rhs on boundary nodes
-    !$omp parallel do private(i,tmpro,c,xn,yn,un,ut,tmp_scal,cv)
+    !$omp parallel do private(i,tmpro,c,xn,yn,un,ut,tmp_scal,cv,ispec)
     do j=1,nb
        i=boundary_list(j)
        tmpro = exp(lnro(i))
@@ -556,71 +610,76 @@ contains
        xn=rnorm(i,1);yn=rnorm(i,2)  !! Bound normals
        un = u(i)*xn + v(i)*yn; ut = -u(i)*yn + v(i)*xn  !! Normal and transverse components of velocity
 
-       !! This quantity appears in rhslnro and rhsroE, so save in tmp_scal
+       !! This quantity appears in rhs_lnro and rhs_roE, so save in tmp_scal
        tmp_scal = (c*c*L(j,2) + L(j,5) + L(j,1))/c/c
        
        !! The RHS of the density equation. Independent of BC type
-       rhslnro(i) = rhslnro(i) - tmp_scal/tmpro
+       rhs_lnro(i) = rhs_lnro(i) - tmp_scal/tmpro
        
-       !! Walls
+       !! WALL BOUNDARY +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
        if(node_type(i).eq.0)then      
-          rhsu(i) = zero
-          rhsv(i) = zero
-          rhsw(i) = zero
+          rhs_u(i) = zero
+          rhs_v(i) = zero
+          rhs_w(i) = zero
 #ifdef isoT          
-          rhsroE(i) = zero
+          rhs_roE(i) = zero
 #else          
 #ifdef wall_isoT
-          rhsroE(i) = rhslnro(i)*roE(i)  !! This if isothermal wall...
+          rhs_roE(i) = rhs_lnro(i)*roE(i)  !! This if isothermal wall...
 #else
-          rhsroE(i) = rhsroE(i) - (L(j,5)+L(j,1))/gammagasm1 !This if adiabatic wall
+          rhs_roE(i) = rhs_roE(i) - (L(j,5)+L(j,1))/gammagasm1 !This if adiabatic wall
 #endif
 #endif
-
-!          rhsY0(i) = zero          
-
-       !! Inflow
+#ifdef ms
+          do ispec=1,nspec
+             rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) - L(j,5+ispec)
+          end do
+#endif          
+       !! INFLOW BOUNDARY +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
        else if(node_type(i).eq.1)then 
-          rhsu(i) = rhsu(i) - (L(j,5)-L(j,1))/(tmpro*c)       
-          rhsv(i) = rhsv(i) - L(j,3)
-          rhsw(i) = rhsw(i) - L(j,4)
+          rhs_u(i) = rhs_u(i) - (L(j,5)-L(j,1))/(tmpro*c)       
+          rhs_v(i) = rhs_v(i) - L(j,3)
+          rhs_w(i) = rhs_w(i) - L(j,4)
 
           cv = Rs0/gammagasm1
-          rhsroE(i) = rhsroE(i) - u(i)*(L(j,5)-L(j,1))/c - tmpro*v(i)*L(j,3) - tmpro*w(i)*L(j,4) &
+          rhs_roE(i) = rhs_roE(i) - u(i)*(L(j,5)-L(j,1))/c - tmpro*v(i)*L(j,3) - tmpro*w(i)*L(j,4) &
                                 - (roE(i)/tmpro - cv*T(i))*tmp_scal - (L(j,5)+L(j,1))/gammagasm1         
 
 
 #ifdef hardinf
-          rhsu(i) = zero
-          rhsv(i) = zero
-          rhsw(i) = zero
+          rhs_u(i) = zero
+          rhs_v(i) = zero
+          rhs_w(i) = zero
 #endif
 #ifdef ms
-          rhsY0(i) = rhsY0(i) - L(j,6)
+          do ispec=1,nspec
+             rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) - L(j,5+ispec) 
+          end do
 #endif          
-       !! Outflow
+       !! OUTFLOW BOUNDARY ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
        else if(node_type(i).eq.2)then    
-          rhsu(i) = rhsu(i) - (L(j,5)-L(j,1))/(tmpro*c)       
-          rhsv(i) = rhsv(i) - L(j,3)
-          rhsw(i) = rhsw(i) - L(j,4)
+          rhs_u(i) = rhs_u(i) - (L(j,5)-L(j,1))/(tmpro*c)       
+          rhs_v(i) = rhs_v(i) - L(j,3)
+          rhs_w(i) = rhs_w(i) - L(j,4)
 #ifdef isoT
-          rhsroE(i) = zero
+          rhs_roE(i) = zero
 #else                    
           cv = Rs0/gammagasm1
-          rhsroE(i) = rhsroE(i) - u(i)*(L(j,5)-L(j,1))/c - tmpro*v(i)*L(j,3) -tmpro*w(i)*L(j,4) &
+          rhs_roE(i) = rhs_roE(i) - u(i)*(L(j,5)-L(j,1))/c - tmpro*v(i)*L(j,3) -tmpro*w(i)*L(j,4) &
                                 - (roE(i)/tmpro - cv*T(i))*tmp_scal - (L(j,5)+L(j,1))/gammagasm1
 #endif           
 #ifdef ms
-          rhsY0(i) = rhsY0(i) - L(j,6)
-#endif   
+          do ispec=1,nspec
+             rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) - L(j,5+ispec) 
+          end do
+#endif          
        end if
     end do
     !$omp end parallel do
   
-    !! Final de-allocation of gradients, L and secondary properties
+    !! De-allocate Secondary properties and L
     deallocate(T,p)
     deallocate(L)
-    deallocate(gradp,gradu,gradv,gradw,gradlnro)    
     
     !! Profiling
     segment_tend = omp_get_wtime()
@@ -629,7 +688,9 @@ contains
   end subroutine calc_rhs_nscbc
 !! ------------------------------------------------------------------------------------------------  
   subroutine filter_variables
-     integer(ikind) :: i,j
+     !! This routine calls the specific filtering routine (within derivatives module) for each
+     !! variable - lnro,u,v,w,roE,Yspec - and forces certain values on boundaries as required.
+     integer(ikind) :: i,j,ispec
      real(rkind) :: tmp
       
      segment_tstart = omp_get_wtime()
@@ -645,7 +706,9 @@ contains
      call calc_filtered_var(roE)       
 #endif     
 #ifdef ms
-     call calc_filtered_var(Y0)
+     do ispec=1,nspec
+       call calc_filtered_var(Yspec(:,ispec))
+     end do
 #endif   
 
      !! Reset values (velocity and sometimes Energy) on boundaries as required...  

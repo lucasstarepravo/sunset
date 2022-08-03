@@ -29,7 +29,7 @@ contains
 
      !! Time begins at zero
      time = zero;itime=0
-     dt_out = 0.1d0         !! Frequency to output fields
+     dt_out = 0.05d0         !! Frequency to output fields
      dt_mout = 0.01d0       !! Frequency to output mean stats
      time_end = 1.0d2
   
@@ -62,6 +62,7 @@ contains
      open(unit=196,file='data_out/statistics/l2.out')
      open(unit=197,file='data_out/statistics/energy_mean.out')  
      open(unit=198,file='data_out/statistics/intenergy_mean.out')
+     open(unit=199,file='data_out/statistics/species.out')
   
      !! Profiling:
      segment_time_local = zero
@@ -204,7 +205,6 @@ contains
      dz = h0/hovs  
      nz=1    
      nz_global = 1
-     Lz=one 
 #endif     
 
      !! STEP 2: build mirrors, halos and neighbours
@@ -212,6 +212,9 @@ contains
      call create_mirror_particles
 
 #ifdef mp
+     ZF_thisproc = maxval(rp(1:npfb,3))
+     ZB_thisproc = minval(rp(1:npfb,3))
+  
      !! Initial halo build - much too big (based on kernel size x 1.2?)
      call build_halos
 
@@ -227,8 +230,10 @@ contains
      !! Refine halos: compile lists of halo nodes which are used, and send them back to originator
      !! processors, then re-build halos
      call find_neighbours
-
      call refine_halos
+
+     !! Shrink arrays to fit number of nodes
+     call reduce_arrays
 
      deallocate(ij_link,ij_count)
      
@@ -250,8 +255,9 @@ contains
 #endif     
 
      !! Allocate arrays for properties
-     allocate(u(np),v(np),w(np),lnro(np),roE(np),Y0(np),divvel(np))
-     u=zero;v=zero;w=zero;lnro=zero;roE=one;Y0=zero;divvel=zero
+     allocate(u(np),v(np),w(np),lnro(np),roE(np),divvel(np))
+     allocate(Yspec(np,nspec))
+     u=zero;v=zero;w=zero;lnro=zero;roE=one;Yspec=zero;divvel=zero
 
 #ifdef mp
      call halo_exchanges_all
@@ -278,6 +284,7 @@ contains
 #ifdef mp
      call MPI_ALLREDUCE(nb,nb_global,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD,ierror)               
      call MPI_ALLREDUCE(np,np_global,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD,ierror)                    
+     call MPI_ALLREDUCE(npfb,npfb_global,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD,ierror)                         
 #else
      nb_global = nb
 #endif
@@ -298,7 +305,9 @@ contains
      sum_eflow = zero   
        
            
-write(6,*) "sizes",iproc,npfb,np_nohalo,np                    
+write(6,*) "sizes",iproc,npfb,np_nohalo,np   
+         
+                 
      return
   end subroutine setup_domain
 !! ------------------------------------------------------------------------------------------------
@@ -306,7 +315,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      use boundaries
      use derivatives
      !! Temporary subroutine whilst developing. Initialises all fields
-     integer(ikind) :: i,j,k,n_restart
+     integer(ikind) :: i,j,k,n_restart,ispec
      real(rkind) :: x,y,z,tmp,tmpro
      character(70) :: fname
      
@@ -315,17 +324,28 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 
 #ifndef restart     
      !! Values within domain
-     !$OMP PARALLEL DO PRIVATE(x,y,z,tmp)
+     !$OMP PARALLEL DO PRIVATE(x,y,z,tmp,ispec)
      do i=1,npfb
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
-        u(i) = u_char!-cos(two*pi*x)*sin(two*pi*y)*cos(two*pi*z/Lz)!*oosqrt2
-        v(i) = zero!sin(two*pi*x)*cos(two*pi*y)*cos(two*pi*z/Lz)    !!c c
+        u(i) = zero!-cos(two*pi*x)*sin(two*pi*y)!*cos(two*pi*z/Lz)!*oosqrt2
+        v(i) = zero!sin(two*pi*x)*cos(two*pi*y)!*cos(two*pi*z/Lz)    !!c c
         w(i) = zero!u(i);u(i)=zero
         tmp = -half*half*(cos(4.0d0*pi*x) + cos(4.0d0*pi*y))/csq
         lnro(i) = log(rho_char)!log(rho_char + tmp)!log(rho_char)       
 
         tmp = T0!*(one + 0.01*sin(two*pi*z/Lz)) !! z-variation of temperature...
         roE(i) = exp(lnro(i))*(tmp*Rs0/gammagasm1 + half*u(i)*u(i) + half*v(i)*v(i) + half*w(i)*w(i))
+              
+#ifdef ms    
+!        do ispec=1,nspec      
+           tmp = 20.0d0*((x-1.03095d0)**two + (y-0.0d0)**two)
+           z=20.0d0*((x+1.03095d0)**two + (y-0.0d0)**two)
+           tmp = exp(-tmp**4.0d0) + exp(-z**4.0d0)
+!tmp = exp(-tmp**4.0d0)
+           Yspec(i,1) = tmp!log(max(verysmall,tmp)) - log(max(verysmall,one-tmp))
+           Yspec(i,2) = one - tmp
+!        end do
+#endif         
                 
 !        call evaluate_grf(x,y,z,tmp)
 !        if(tmp.le.zero) then 
@@ -346,8 +366,6 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 !        v(i) = -tmp*two*x*exp(-(x*x+y*y)/0.02d0)/0.02
 !        tmp = -tmp*tmp*exp(-(x*x+y*y)/0.01d0)/0.01/csq
 !        lnro(i) = log(one+tmp)         
-!         Y0(i) = exp(-100.0d0*((x+0.3d0)**two + y*y))!verysmall
-!         Y0(i) = half*erf(-200.0d0*y) + half
      end do
      !$OMP END PARALLEL DO
      
@@ -434,7 +452,11 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      
      !! Set the initial forcing to zero. It will only be changed if PID controller in velcheck is used.
      driving_force(:) = zero
-     
+
+     !! Profiling - re-zero time accumulators
+     segment_time_local = zero
+     cputimecheck = zero        
+         
      return
   end subroutine initial_solution   
 !! ------------------------------------------------------------------------------------------------
@@ -455,8 +477,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      dz = dz_local
 #endif     
 
-     !! Extent of domain in Z dimension = L_char
-     Lz = L_char
+     !! Extent of domain in Z dimension = Lz
      nz = ceiling(Lz/dz/dble(nprocsZ))
      dz = Lz/dble(nz)/dble(nprocsZ)
      nz_global = nz*nprocsZ
@@ -523,6 +544,60 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
   
      return
   end subroutine build_3rd_dimension  
+!! ------------------------------------------------------------------------------------------------
+  subroutine reduce_arrays
+     !! Reduces the sizes of arrays for position,s,h,node_type,fd_parent,zlayer_index_global,ilayer_index
+     integer(ikind) :: newsize
+     real(rkind),dimension(:),allocatable :: tmp_array_real
+     real(rkind),dimension(:,:),allocatable :: tmp_array2_real
+     integer(ikind),dimension(:),allocatable :: tmp_array_int
+     
+     !! Set the new-size and allocate temporary arrays
+     newsize = np     
+     allocate(tmp_array_real(newsize),tmp_array_int(newsize))
+     allocate(tmp_array2_real(newsize,dims))
+     
+     !! Copy position
+     tmp_array2_real(1:newsize,1:dims)=rp(1:newsize,1:dims)
+     deallocate(rp);allocate(rp(newsize,dims))
+     rp = tmp_array2_real
+
+     !! Copy normals
+     tmp_array2_real(1:newsize,1:dims)=rnorm(1:newsize,1:dims)
+     deallocate(rnorm);allocate(rnorm(newsize,dims))
+     rnorm = tmp_array2_real
+
+     !! Copy s
+     tmp_array_real(1:newsize)=s(1:newsize)
+     deallocate(s);allocate(s(newsize))
+     s = tmp_array_real
+
+     !! Copy h
+     tmp_array_real(1:newsize)=h(1:newsize)
+     deallocate(h);allocate(h(newsize))
+     h = tmp_array_real
+     
+     !! Copy fd_parent
+     tmp_array_int(1:newsize)=fd_parent(1:newsize)
+     deallocate(fd_parent);allocate(fd_parent(newsize))
+     fd_parent = tmp_array_int
+     
+#ifdef dim3     
+     !! Copy zlayer_index_global
+     tmp_array_int(1:newsize)=zlayer_index_global(1:newsize)
+     deallocate(zlayer_index_global);allocate(zlayer_index_global(newsize))
+     zlayer_index_global = tmp_array_int     
+
+     !! Copy ilayer_index
+     tmp_array_int(1:newsize)=ilayer_index(1:newsize)
+     deallocate(ilayer_index);allocate(ilayer_index(newsize))
+     ilayer_index = tmp_array_int
+#endif
+
+     deallocate(tmp_array_real,tmp_array_int,tmp_array2_real)
+     
+     return
+  end subroutine reduce_arrays
 !! ------------------------------------------------------------------------------------------------
   subroutine initialise_grf
      integer(ikind) :: i,j,k

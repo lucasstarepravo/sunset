@@ -7,11 +7,19 @@ module common_2d
   implicit none
 
   !! Evolved fluid properties
-  real(rkind), dimension(:), allocatable, target :: u,v,w,lnro,roE,Y0  
-  
+  real(rkind), dimension(:), allocatable, target :: u,v,w,lnro,roE
+  real(rkind), dimension(:,:), allocatable :: Yspec  
+     
   !! Secondary fluid properties
   real(rkind), dimension(:), allocatable, target :: p,visc,T
   real(rkind), dimension(:), allocatable :: divvel  
+  
+  !! Right-hand-sides
+  real(rkind),dimension(:),allocatable :: rhs_lnro,rhs_u,rhs_v,rhs_w,rhs_roE
+  real(rkind),dimension(:,:),allocatable :: rhs_Yspec
+  
+  !! Characteristic boundary condition formulation
+  real(rkind),dimension(:,:),allocatable :: L  !! The "L" in NSCBC formulation  
   
   !! Discretisation properties
   real(rkind), dimension(:,:), allocatable, target :: rp,rnorm
@@ -19,13 +27,13 @@ module common_2d
   integer(ikind),dimension(:),allocatable :: node_type !! Identify whether node is boundary, fluid etc...
   integer(ikind),dimension(:),allocatable :: zlayer_index_global,ilayer_index !! Identify where in the z-stack the node is
   integer(ikind),dimension(:),allocatable :: boundary_list,internal_list !! Lists for quick looping
-  real(rkind) :: dz,Lz   !! FD spacing in third dimension
+  real(rkind) :: dz   !! FD spacing in third dimension
   integer(ikind) :: nz,nz_global
   
   !! Numbers of nodes and neighbour lists
-  integer(ikind) :: np,npfb,nb,nplink  !! THESE ARE ALL LOCAL!!
+  integer(ikind) :: np,npfb,nb,nplink  !! THESE ARE ALL LOCAL
   integer(ikind) :: np_global,npfb_global,nb_global !! THESE ARE GLOBAL
-  integer(ikind) :: npfb_layer  !! THESE ARE ALL LOCAL!!
+  integer(ikind) :: npfb_layer  !! THESE ARE ALL LOCAL
   integer(ikind) :: npfb_layer_global !! THESE ARE GLOBAL
 
 
@@ -72,7 +80,6 @@ module common_2d
   integer(ikind),dimension(:),allocatable :: irelation,vrelation  ! used for periodic and symmetric boundaries
   real(rkind) :: xmin,xmax,ymin,ymax  !! Global domain size (required for NRBCs)
   integer(ikind) :: xbcond,ybcond !! BC flags for "simple" geometries without boundary nodes...
-  real(rkind),dimension(:,:),allocatable :: L  !! The "L" in NSCBC formulation
   integer(ikind),dimension(:),allocatable :: btype !! What type of BC is node i?
   integer(ikind),dimension(:),allocatable :: fd_parent !! pointer to the boundary node which is parent 
   real(rkind),dimension(:),allocatable :: T_bound
@@ -88,7 +95,8 @@ module common_2d
   integer(ikind) :: nprocs,iproc,ierror,iproc_in_sheet  !! processes, this process id, error int,process id in sheet
   integer(ikind) :: nprocsX,nprocsY,nprocsZ,iprocX,iprocY,iprocZ     !! decomposition grid sizes, and indices
   integer(ikind) :: np_nohalo !! nodes with no halos  
-  real(rkind) :: XL_thisproc,XR_thisproc,YU_thisproc,YD_thisproc
+  real(rkind) :: XL_thisproc,XR_thisproc,YU_thisproc,YD_thisproc,ZF_thisproc,ZB_thisproc
+  real(rkind),dimension(:),allocatable :: XL,XR,YU,YD,ZF,ZB
   integer(ikind),dimension(:),allocatable :: iproc_S_LR,iproc_R_LR,iproc_S_UD,iproc_R_UD !! Neighbouring processors
   integer(ikind),dimension(:),allocatable :: iproc_S_FB,iproc_R_FB 
   integer(ikind),dimension(:,:),allocatable :: halo_lists_LR,halo_lists_UD,halo_lists_FB  !! Lists of halo nodes 

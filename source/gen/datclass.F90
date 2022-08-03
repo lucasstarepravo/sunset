@@ -4,13 +4,16 @@ program datgen
   use global_variables 
   implicit none
 
+  !! xbcond/ybcond = 0,1,2 for none, periodic or symmetric BCs respectively.
+  !! btype = 0,1,2,3 for wall, inflow, outflow or periodic/symmetric respectively
+
   real(rkind) :: x,y
 
   integer ipart,itest
   integer i,j,icha,nn,ve_model,ii,jj
   double precision h0,r_mag,yl,D_cyl,S_cyl
   double precision areafluid,ns,varresratio
-  integer nfluid
+  integer xbcond,ybcond
   
   double precision :: a0,a1,a2,a3,a4,a5 !! NACA coefficients
   double precision :: dydx,temp,tmp2,tmp,xtec,rtec,atec,thtec
@@ -53,12 +56,13 @@ case(1) !! Box for Rayleigh Taylor
      yl=1.0d0;h0=0.125*yl
      xl=1.0d0
      dx0=yl/75.0!0.025d0
+     xbcond=1;ybcond=1
 
      !   JRCK boundary conditions
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
      allocate(b_type(nb_patches))
-     b_type(:) = (/ 0, 3, 0, 3/)  
+     b_type(:) = (/ 3, 3, 3, 3/)  
      b_node(1,:) = (/-0.5d0*xl,-0.5d0*yl /)
      b_node(2,:) = (/ 0.5d0*xl,-0.5d0*yl /)
      b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
@@ -177,7 +181,8 @@ case(1) !! Box for Rayleigh Taylor
 
      yl=1.0d0;h0=yl
      xl=1.0d0*yl
-     dx0=yl/50.0!0.025d0
+     dx0=yl/100.0!0.025d0
+     xbcond=1;ybcond=1     
 
      !   JRCK boundary conditions
      nb_patches = 4
@@ -222,6 +227,7 @@ case(4) !! A sort of porous media... for porous Rayleigh-Taylor stuff
      yl=S_cyl*sqrt(3.0d0)*2.0d0  ! height
      xl=2.0*S_cyl ! width
      dx0=h0/30.0       !15
+     xbcond=1;ybcond=1     
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -456,6 +462,7 @@ case(5) !! NACA 0012
      h0=0.125d0       !cylinder radius
      yl=0.5d0  ! channel width
      xl=4.0d0 ! channel length
+     xbcond=1;ybcond=1
 
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -601,31 +608,32 @@ case(5) !! NACA 0012
 case(6) !! Channel flows, propagating front
 
      h0=0.5d0       !cylinder radius
-     yl=8.0d0*h0  ! channel width
-     xl=16.0d0*h0 ! channel length
+     yl=4.0d0*h0  ! channel width
+     xl=8.0d0*h0 ! channel length
      dx0=h0/100.0       !15
+     xbcond=0;ybcond=1     
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
      allocate(b_type(nb_patches))
      b_type(:) = (/ 3, 2, 3, 1/)  
-     b_node(1,:) = (/ -0.25d0*xl, -0.5d0*yl /)
-     b_node(2,:) = (/ 0.75d0*xl, -0.5d0*yl /)
-     b_node(3,:) = (/ 0.75d0*xl, 0.5d0*yl /)
-     b_node(4,:) = (/ -0.25d0*xl, 0.5d0*yl /)
-     nb_blobs = 1
-     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,6),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
-     b0=2.5d0*h0;b1=b0*sqrt(3.0d0)/2.0d0;b2=b0/2.0d0
-     blob_centre(1,:)=(/0.d0,0.d0/); !! Central
-     do i=1,nb_blobs
-        blob_coeffs(i,:)=h0*(/1.0d0,0.2d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0;blob_ellipse(i)=1
-     end do
+     b_node(1,:) = (/ -0.5d0*xl, -0.5d0*yl /)
+     b_node(2,:) = (/ 0.5d0*xl, -0.5d0*yl /)
+     b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
+     b_node(4,:) = (/ -0.5d0*xl, 0.5d0*yl /)
+     nb_blobs = 0
+!     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,6),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
+!     b0=2.5d0*h0;b1=b0*sqrt(3.0d0)/2.0d0;b2=b0/2.0d0
+!     blob_centre(1,:)=(/0.d0,0.d0/); !! Central
+!     do i=1,nb_blobs
+!        blob_coeffs(i,:)=h0*(/1.0d0,0.4d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0;blob_ellipse(i)=1
+!     end do
 
      call make_boundary_edge_vectors
 
      xb_min = minval(b_node(:,1));xb_max = maxval(b_node(:,1));yb_min = minval(b_node(:,2));yb_max = maxval(b_node(:,2))
 
-     varresratio = 6.0d0  !! Ratio for scaling near the solid objects
+     varresratio = 3.0d0  !! Ratio for scaling near the solid objects
      dxmax = dx0  
      dxmin = dx0/varresratio
      dxb=dx0/varresratio;dxio=4.0d0*dxmax  !! dx for solids and in/outs...!! Ratio for scaling far field...
@@ -824,6 +832,7 @@ case(7) !! Something periodic
      yl=2.0d0*S_cyl ! box height
      xl=sqrt(3.0d0)*S_cyl ! channel length
      dx0=D_cyl/50.0       !75
+     xbcond=1;ybcond=1     
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -833,15 +842,15 @@ case(7) !! Something periodic
      b_node(2,:) = (/0.5d0*xl, -0.5d0*yl /)
      b_node(3,:) = (/0.5d0*xl, 0.5d0*yl /)
      b_node(4,:) = (/-0.5d0*xl, 0.5d0*yl /)
-     nb_blobs = 1
+     nb_blobs = 7
      allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,6),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
      blob_centre(1,:) = (/0.0d0,0.0d0/)   !! Row 0
-!     blob_centre(2,:) = (/0.0d0,-S_cyl/)
-!     blob_centre(3,:) = (/0.0d0,S_cyl/)
-!     blob_centre(4,:) = (/S_cyl*sqrt(3.0d0)/2.0d0,-0.5d0*S_cyl/) !! Row 1/2
-!     blob_centre(5,:) = (/S_cyl*sqrt(3.0d0)/2.0d0,0.5d0*S_cyl/)
-!     blob_centre(6,:) = (/-S_cyl*sqrt(3.0d0)/2.0d0,-0.5d0*S_cyl/) !! Row -1/2
-!     blob_centre(7,:) = (/-S_cyl*sqrt(3.0d0)/2.0d0,0.5d0*S_cyl/)
+     blob_centre(2,:) = (/0.0d0,-S_cyl/)
+     blob_centre(3,:) = (/0.0d0,S_cyl/)
+     blob_centre(4,:) = (/S_cyl*sqrt(3.0d0)/2.0d0,-0.5d0*S_cyl/) !! Row 1/2
+     blob_centre(5,:) = (/S_cyl*sqrt(3.0d0)/2.0d0,0.5d0*S_cyl/)
+     blob_centre(6,:) = (/-S_cyl*sqrt(3.0d0)/2.0d0,-0.5d0*S_cyl/) !! Row -1/2
+     blob_centre(7,:) = (/-S_cyl*sqrt(3.0d0)/2.0d0,0.5d0*S_cyl/)
                           
      
      do i=1,nb_blobs
@@ -1050,6 +1059,7 @@ case(7) !! Something periodic
      yl=4.0d0*S_cyl ! box height
      xl=3.0d0*sqrt(3.0d0)*S_cyl ! channel length
      dx0=D_cyl/100.0       !75
+     xbcond=1;ybcond=1     
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -1315,6 +1325,7 @@ case(7) !! Something periodic
   open(13,file='./IPART')
   write(13,*) nb,npfb,dx0
   write(13,*) xb_min,xb_max,yb_min,yb_max
+  write(13,*) xbcond,ybcond
   do i=1,npfb
      if(node_type(i).ge.0.and.node_type(i).le.2) then
         write(13,*) xp(i), yp(i),node_type(i),xnorm(i),ynorm(i),dxp(i)

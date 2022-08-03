@@ -12,26 +12,29 @@ contains
 !! ------------------------------------------------------------------------------------------------
   subroutine pressure_from_primary_vars
      integer(ikind) :: i
-     real(rkind) :: tmp_kinetic
+     real(rkind) :: tmp_kinetic,tmpro
      
      allocate(p(np))
 
 #ifdef isoT    
      !! Isothermal, calculate pressure from density
-     !$omp parallel do 
+     !$omp parallel do private(tmpro)
      do i=1,np    !! N.B. this is over ALL particles incl. ghosts
-        p(i) = csq*exp(lnro(i))
+        tmpro = exp(lnro(i))
+        p(i) = csq*tmpro
      end do
      !$omp end parallel do      
 #else
      !! Thermally perfect gas, calculate pressure from energy, density, velocity     
-     !$omp parallel do private(tmp_kinetic)
+     !$omp parallel do private(tmp_kinetic,tmpro)
      do i=1,np         !! N.B. this is over ALL particles incl. ghosts
-        tmp_kinetic = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))*exp(lnro(i))
-        p(i) = (roE(i) - tmp_kinetic)*gammagasm1
+        tmpro = exp(lnro(i))
+        tmp_kinetic = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))
+        p(i) = (roE(i) - tmpro*tmp_kinetic)*gammagasm1
      end do
      !$omp end parallel do  
 #endif     
+
   end subroutine pressure_from_primary_vars
 !! ------------------------------------------------------------------------------------------------
   subroutine temp_from_primary_vars

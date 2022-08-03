@@ -124,6 +124,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      open(13,file='../gen/IPART')
      read(13,*) nb,npfb,dummy      !! dummy is largest s(i) in domain...
      read(13,*) xmin,xmax,ymin,ymax
+     read(13,*) xbcond,ybcond
      !! Calculate some useful constants
      smax = dummy;h0 = hovs*dummy;sup_size = ss*h0;h2=h0*h0;h3=h2*h0
         

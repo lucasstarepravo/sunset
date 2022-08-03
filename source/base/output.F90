@@ -19,10 +19,13 @@ contains
      !! This routine writes information about the simulation to screen in a fairly easy to read
      !! format. For this to work (nicely) terminal window should be 24 lines tall.
      integer(ikind) :: scr_freq=100
-     real(rkind),dimension(6) :: maxphi,minphi
+     real(rkind),dimension(:),allocatable :: maxphi,minphi
      integer(ikind) :: n_threads_global
      real(rkind) :: t_per_dt_global,t_last_x_global,t_run_global
      real(rkind) :: cput,cput_global
+     
+     allocate(maxphi(5+nspec),minphi(5+nspec))
+     
     
      ts_end=omp_get_wtime()
      t_run = t_run + ts_end - ts_start
@@ -67,6 +70,7 @@ contains
            write(6,*) "Max |w|:",max(maxphi(3),abs(minphi(3)))
            write(6,*) "max/min ro:",maxphi(4),minphi(4)
            write(6,*) "max/min ro*E:",maxphi(5),minphi(5)
+           write(6,*) "max/min Y0:",maxphi(6),minphi(6)
     
            write(6,*) "There are",n_threads_global,"threads spread over ",nprocs,"MPI tasks"
            write(6,*) "Wall clock run time=",t_run_global
@@ -75,17 +79,21 @@ contains
            !! Profiling
            write(6,*) "  "
            write(6,*) "Profiling:::"
-           write(6,*) "MPI transfers    :",segment_time_global(1)/sum(segment_time_global(1:7))
-           write(6,*) "Mirror boundaries:",segment_time_global(2)/sum(segment_time_global(1:7))
-           write(6,*) "Filtering        :",segment_time_global(3)/sum(segment_time_global(1:7))
-           write(6,*) "RHS boundaries   :",segment_time_global(4)/sum(segment_time_global(1:7))
-           write(6,*) "RHS energy       :",segment_time_global(5)/sum(segment_time_global(1:7))
-           write(6,*) "RHS velocity     :",segment_time_global(6)/sum(segment_time_global(1:7))
-           write(6,*) "RHS Density      :",segment_time_global(7)/sum(segment_time_global(1:7))
-           write(6,*) "  "
-           write(6,'(/,/,/,A)') "  "
+           write(6,*) "MPI transfers    :",segment_time_global(1)/sum(segment_time_global(1:8))
+           write(6,*) "Mirror boundaries:",segment_time_global(2)/sum(segment_time_global(1:8))
+           write(6,*) "Filtering        :",segment_time_global(3)/sum(segment_time_global(1:8))
+           write(6,*) "RHS boundaries   :",segment_time_global(4)/sum(segment_time_global(1:8))
+           write(6,*) "RHS energy       :",segment_time_global(5)/sum(segment_time_global(1:8))
+           write(6,*) "RHS velocity     :",segment_time_global(6)/sum(segment_time_global(1:8))
+           write(6,*) "RHS Density      :",segment_time_global(7)/sum(segment_time_global(1:8))
+           write(6,*) "RHS Species      :",segment_time_global(8)/sum(segment_time_global(1:8))           
+           write(6,'(/,/,A)') "  "
+                    
+           
+           
 !        write(6,'(/,/,/,/,/,/,/,/,/,/,/,/,/,A)') "  "
         end if
+
         t_last_X = 0.0d0
 #else
         !! Single processor
@@ -101,36 +109,38 @@ contains
         !! Profiling
         write(6,*) "  "
         write(6,*) "Profiling:::"
-        write(6,*) "MPI transfers    :",segment_time_local(1)/sum(segment_time_local(1:7))
-        write(6,*) "Mirror boundaries:",segment_time_local(2)/sum(segment_time_local(1:7))
-        write(6,*) "Filtering        :",segment_time_local(3)/sum(segment_time_local(1:7))
-        write(6,*) "RHS boundaries   :",segment_time_local(4)/sum(segment_time_local(1:7))
-        write(6,*) "RHS energy       :",segment_time_local(5)/sum(segment_time_local(1:7))
-        write(6,*) "RHS velocity     :",segment_time_local(6)/sum(segment_time_local(1:7))
-        write(6,*) "RHS Density      :",segment_time_local(7)/sum(segment_time_local(1:7))
-        write(6,*) "  "                       
+        write(6,*) "MPI transfers    :",segment_time_local(1)/sum(segment_time_local(1:8))
+        write(6,*) "Mirror boundaries:",segment_time_local(2)/sum(segment_time_local(1:8))
+        write(6,*) "Filtering        :",segment_time_local(3)/sum(segment_time_local(1:8))
+        write(6,*) "RHS boundaries   :",segment_time_local(4)/sum(segment_time_local(1:8))
+        write(6,*) "RHS energy       :",segment_time_local(5)/sum(segment_time_local(1:8))
+        write(6,*) "RHS velocity     :",segment_time_local(6)/sum(segment_time_local(1:8))
+        write(6,*) "RHS Density      :",segment_time_local(7)/sum(segment_time_local(1:8))
+        write(6,*) "RHS Species      :",segment_time_local(8)/sum(segment_time_local(1:8))        
         write(6,'(/,/,/,/,/,A)') "  "                  
 #endif          
      
      end if
+     
    
      ts_start=omp_get_wtime()
      return
   end subroutine output_to_screen    
-!! ------------------------------------------------------------------------------------------------  
+!! ------------------------------------------------------------------------------------------------
   subroutine output_layer(n_out)
      !! Little subroutine to write out field variables. 
      !! Can be converted to vtk and read into paraview.
      use derivatives
      integer(ikind),intent(in) :: n_out
-     integer(ikind) :: i,j,k,np_out_local
+     integer(ikind) :: i,j,k,np_out_local,dimsout,nspec_out
      character(70) :: fname
      real(rkind),dimension(:),allocatable :: vort,testout
      real(rkind),dimension(:,:),allocatable :: testoutv
-     real(rkind) :: tmpT,xn,yn
+     real(rkind) :: tmpT,xn,yn,tmpro
 
      !! Only output from the first sheet
-     if(iprocZ.eq.0)then     
+!     if(iprocZ.eq.0)then     
+if(.true.)then     
 
         !! Calculate the vorticity 
         allocate(gradu(npfb,dims),gradv(npfb,dims),gradw(npfb,dims));gradw=zero
@@ -202,59 +212,82 @@ contains
            write(fname,'(A17,I5,A1,I4)') './data_out/layer_',k,'_',n_out        
         end if 
      
-        !! Local number out
+        !! Local number nodes output
         np_out_local = npfb_layer 
+        
+        !! N species output
+        nspec_out = nspec
 
 
         !! Write the main dump files
         open(unit = 20,file=fname)  
         write(20,*) np_out_local
         do i=1,np_out_local
+           tmpro = exp(lnro(i))
 #ifdef isoT
-           tmpT = csq*(exp(lnro(i))-one) !! if isoT, output |u| in E and pressure in tmpT. N.B. p_out=p-csq*rho0
-           roE(i) = exp(lnro(i))*sqrt(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))             
+           tmpT = csq*(tmpro-one) !! if isoT, output |u| in E and pressure in tmpT. N.B. p_out=p-csq*rho0
+           roE(i) = tmpro*sqrt(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))             
 #else
-           tmpT=(roE(i)/exp(lnro(i))-0.5*(u(i)*u(i)+v(i)*v(i) + w(i)*w(i)))*gammagasm1/Rs0 !! The temperature  
+           tmpT=(roE(i)/tmpro-0.5*(u(i)*u(i)+v(i)*v(i) + w(i)*w(i)))*gammagasm1/Rs0 !! The temperature  
 #endif        
 #ifdef dim3
-           write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),node_type(i),exp(lnro(i)), &
-                       u(i),v(i),w(i),vort(i),roE(i)/exp(lnro(i)),tmpT,Y0(i)
-#else
-           write(20,*) rp(i,1),rp(i,2),s(i),node_type(i),exp(lnro(i)),u(i),v(i),vort(i), &
-                       roE(i)/exp(lnro(i)),tmpT,Y0(i)
-!if(.false.)then
+           write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),node_type(i),tmpro, &
+                       u(i),v(i),w(i),vort(i),roE(i)/tmpro,tmpT,Yspec(i,1)
 !if(i.le.npfb) then        
-!           write(20,*) rp(i,1)+0.0*iprocX,rp(i,2)+0.0*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),dble(ij_count(i)) &
-!                  ,roE(i)/exp(lnro(i)),zero,Y0(i)  !! Diagnostic/debugging output
+!           write(20,*) rp(i,1)+0.5*iprocX,rp(i,2)+2.0*iprocY,rp(i,3)+0.5*iprocZ,s(i),node_type(i) &
+!                       ,tmpro,u(i),v(i),w(i),dble(ij_count(i)) &
+!                       ,roE(i)/tmpro,zero,divvel(i)  !! Diagnostic/debugging output
 !else if(i.le.np_nohalo) then        
-!           write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+2.2*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),zero &
-!                  ,roE(i)/exp(lnro(i)),one,Y0(i)  !! Diagnostic/debugging output
+!           write(20,*) rp(i,1)+0.5*iprocX,rp(i,2)+2.0*iprocY,rp(i,3)+0.5*iprocZ,s(i),node_type(i) &
+!                       ,tmpro,u(i),v(i),w(i),zero &
+!                       ,roE(i)/tmpro,one,divvel(i)  !! Diagnostic/debugging output
 !else 
-!           write(20,*) rp(i,1)+0.2*iprocX,rp(i,2)+2.2*iprocY,h(i),node_type(i),exp(lnro(i)),u(i),v(i),zero &
-!                  ,roE(i)/exp(lnro(i)),two,Y0(i)  !! Diagnostic/debugging output               
+!           write(20,*) rp(i,1)+0.5*iprocX,rp(i,2)+2.0*iprocY,rp(i,3)+0.5*iprocZ,s(i),node_type(i) &
+!                       ,tmpro,u(i),v(i),w(i),zero &
+!                       ,roE(i)/tmpro,two,divvel(i)  !! Diagnostic/debugging output
 !end if             
-!endif
+
+#else
+           tmpT=divvel(i)
+           write(20,*) rp(i,1),rp(i,2),s(i),node_type(i),tmpro,u(i),v(i),vort(i), &
+                       roE(i)/tmpro,tmpT,Yspec(i,1)
+!if(i.le.npfb) then        
+!           write(20,*) rp(i,1)+0.4*iprocX,rp(i,2)+4.4*iprocY,h(i),node_type(i),tmpro,u(i),v(i),dble(ij_count(i)) &
+!                  ,roE(i)/tmpro,zero,Yspec(i,1)  !! Diagnostic/debugging output
+!else if(i.le.np_nohalo) then        
+!           write(20,*) rp(i,1)+0.4*iprocX,rp(i,2)+4.4*iprocY,h(i),node_type(i),tmpro,u(i),v(i),zero &
+!                  ,roE(i)/tmpro,one,Yspec(i,1)  !! Diagnostic/debugging output
+!else 
+!           write(20,*) rp(i,1)+0.4*iprocX,rp(i,2)+4.4*iprocY,h(i),node_type(i),tmpro,u(i),v(i),zero &
+!                  ,roE(i)/tmpro,two,Yspec(i,1)  !! Diagnostic/debugging output               
+!end if             
+
 
 #endif
         end do
 
         flush(20)
         close(20)
-     
+        if(allocated(vort)) deallocate(vort)     
      end if
 
      !! Write the time,dump number and # nodes to file
+#ifdef dim3
+     dimsout = 3
+#else
+     dimsout = 2
+#endif    
 #ifdef mp  
 !     call MPI_ALLREDUCE(np_out_local,np_global,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD,ierror)     
      if(iproc.eq.0) then 
-        write(21,*) time,npfb_global,n_out,nprocsX*nprocsY
+        write(21,*) time,dimsout,npfb_global,n_out,nprocsX*nprocsY*nprocsZ,nspec_out
         flush(21)
      end if
 #else
-     write(21,*) time,npfb,n_out,nb,1
+     write(21,*) time,dimsout,npfb,n_out,1,nspec_out
      flush(21)
 #endif     
-     if(allocated(vort)) deallocate(vort)
+
 
      return
   end subroutine output_layer
@@ -279,8 +312,46 @@ contains
      !! Calculate the lift and drag on all solid obstacles
 !     call liftdrag
 
+     !! Calculate how well balanced the MPI decomposition is
+!     call check_load_balance
+
+     !! Check the conservation of the species equations
+     call species_check
+
      return
   end subroutine statistics  
+!! ------------------------------------------------------------------------------------------------   
+  subroutine check_load_balance  
+     real(rkind),dimension(:),allocatable :: prof_tmp,prof_tmp_local,load_n_n
+     integer(ikind),dimension(:),allocatable :: sum_n_n,sum_n_n_local
+     integer(ikind) :: sum_sum_n_n
+#ifdef mp     
+     !! Calculate relative amounts of work being done by each processor
+     allocate(prof_tmp_local(nprocs),prof_tmp(nprocs));prof_tmp_local=zero
+     prof_tmp_local(iproc+1) = sum(segment_time_local(5:7))
+     call MPI_ALLREDUCE(prof_tmp_local,prof_tmp,nprocs,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
+     
+     !! Sum of the total neighbours of all nodes on each processor
+     allocate(sum_n_n(nprocs),sum_n_n_local(nprocs));sum_n_n_local=0
+     sum_n_n_local(iproc+1) = sum(ij_count(1:npfb))
+     call MPI_ALLREDUCE(sum_n_n_local,sum_n_n,nprocs,MPI_INT,MPI_SUM,MPI_COMM_WORLD,ierror)
+     sum_sum_n_n = sum(sum_n_n(:))
+     allocate(load_n_n(nprocs))
+     load_n_n = sum_n_n/dble(npfb)!dble(nprocs)*dble(sum_n_n(:))/dble(sum_sum_n_n)
+     
+     
+     !! Output the amounts of work being done
+     if(iproc.eq.0) write(6,*) dble(nprocs)*prof_tmp(:)/sum(prof_tmp(:))
+
+     !! Output the expected load (nodes*neighbours)
+     if(iproc.eq.0) write(6,*) load_n_n       
+     
+     deallocate(prof_tmp_local,prof_tmp)
+     deallocate(sum_n_n,sum_n_n_local,load_n_n)
+#endif
+  
+     return
+  end subroutine check_load_balance   
 !! ------------------------------------------------------------------------------------------------
   subroutine liftdrag
      !! TO DO: Update for 3 dimensional simulations  
@@ -376,7 +447,7 @@ contains
      !! If we want to P.I.D. control over the mean velocity
 #ifdef pgrad     
      !! New error     
-     eflow_n = u_char - tot_vel
+     eflow_n = u_char - tot_u(1)!tot_vel
           
      !! Integral term
      sum_eflow = sum_eflow + eflow_n*dt
@@ -461,7 +532,53 @@ contains
 #endif
 
      return
-  end subroutine mass_and_energy_check  
+  end subroutine mass_and_energy_check 
+!! ------------------------------------------------------------------------------------------------   
+  subroutine species_check
+     !! This subroutine calculates total quantity of each species in the domain
+     integer(ikind) :: i,ispec
+     real(rkind) :: tot_vol,tmpro,dVi,tot_vol_tmp,tmpY
+     real(rkind),dimension(:),allocatable :: tot_Yspec,tot_Yspec_tmp
+#ifdef ms     
+     
+     !! Allocate and zero accumulators
+     allocate(tot_Yspec(nspec),tot_Yspec_tmp(nspec))   
+     tot_Yspec = zero;tot_vol = zero
+     
+     !$omp parallel do private(tmpro,dVi,ispec,tmpY) reduction(+:tot_Yspec,tot_vol)
+     do i=1,npfb
+        tmpro = exp(lnro(i))
+        dVi = s(i)*s(i) !! assume square nodes for now...
+#ifdef dim3
+        dVi = dVi*dz
+#endif        
+
+        do ispec=1,nspec
+           tmpY = Yspec(i,ispec)
+           tot_Yspec(ispec) = tot_Yspec(ispec) + dVi*tmpY*tmpro
+        end do
+!        tot_vol = tot_vol + dVi
+     end do
+     !$omp end parallel do
+     
+#ifdef mp
+     tot_Yspec_tmp = tot_Yspec
+     tot_vol_tmp = tot_vol;
+     call MPI_ALLREDUCE(tot_Yspec_tmp,tot_Yspec,nspec,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
+!    call MPI_ALLREDUCE(tot_vol_tmp,tot_vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
+     if(iproc.eq.0)then
+        write(199,*) time,tot_Yspec(:)
+        flush(199)
+     end if
+#else
+     write(199,*) time,tot_Yspec(:)
+     flush(199)
+#endif
+
+#endif
+
+     return
+  end subroutine species_check    
 !! ------------------------------------------------------------------------------------------------
   subroutine int_energy_control
      !! Output the mean internal energy over the domain

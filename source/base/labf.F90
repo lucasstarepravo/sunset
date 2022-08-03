@@ -139,6 +139,15 @@ contains
               amatx(i1,i1)=one
            end do
         end if
+!        if(node_type(i).eq.-1) then !! for row 1 drop hyperviscosity to 4th order
+!            do i1=1,nsizeG
+!              amathyp(i1,15:nsizeG)=zero        
+!           end do
+!           do i1=15,nsizeG
+!              amathyp(i1,1:nsizeG)=zero
+!              amathyp(i1,i1)=one
+!           end do
+!        end if       
 #endif        
  
         !! Copy remaining LHSs
@@ -268,9 +277,10 @@ contains
            ij_w_hyp_sum(i) = ij_w_hyp_sum(i) + ij_w_hyp(k,i)  
 
         end do
+        
      end do
      !$OMP END PARALLEL DO
-          
+             
      return
   end subroutine calc_labf_sums
 !! ------------------------------------------------------------------------------------------------
@@ -687,7 +697,7 @@ contains
      bvecL=zero;bvecX=zero;bvecY=zero;gvec=zero;xvec=zero
 
      !! No parallelism for individual linear system solving...
-!     call openblas_set_num_threads(1)
+     call openblas_set_num_threads(1)
      
      !! Temporary neighbour lists...
      allocate(full_j_link_i(nplink));full_j_link_i=0
@@ -996,7 +1006,7 @@ contains
         if(node_type(i).eq.-2) filter_coeff(i) = filter_coeff(i)*half*oosqrt2
         if(node_type(i).eq.-3) filter_coeff(i) = filter_coeff(i)*half
         if(node_type(i).eq.-4) filter_coeff(i) = filter_coeff(i)*half                        
-        
+
      end do
      !$omp end parallel do
 
@@ -1015,11 +1025,15 @@ contains
         lsum = zero
         do k=1,ij_count(i)
            j = ij_link(k,i)
-           rij = rp(j,:)-rp(i,:);x=rij(1);y=rij(2)           
-           fji = one - cos(tmp*x)*cos(tmp*y) 
+           rij = rp(j,:)-rp(i,:)
+           x=rij(1);y=rij(2)     
+  
+           fji = one - cos(tmp*y)*cos(tmp*x)
            lsum = lsum + fji*ij_w_hyp(k,i)
         end do
-        filter_coeff(i) = (two/3.0d0)/lsum
+        filter_coeff(i) = (one/3.0d0)/lsum  !(two/3.0d0)
+        
+        filter_coeff(i) = filter_coeff(i)*half
      end do
      !$omp end parallel do
     

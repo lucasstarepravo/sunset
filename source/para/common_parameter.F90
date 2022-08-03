@@ -50,6 +50,7 @@ module common_parameter
   
   !! Primary domain parameters --------------------------------------------------------------------
   real(rkind), parameter :: L_char = one !! Characteristic lengthscale
+  real(rkind), parameter :: Lz = half*L_char  !! Domain length-scale in third dimension
   real(rkind), parameter :: u_char = one !! Characteristic velocity
   real(rkind), parameter :: u_inflow = u_char !! Inflow velocity (occasionally differs from u_char)
   real(rkind), parameter :: rho_char = one !! Characteristic density
@@ -59,11 +60,18 @@ module common_parameter
   real(rkind), parameter :: Pr = one !! Prandtl number
   real(rkind), parameter :: Re = 1000.0d0 !! Reynolds number
   real(rkind), parameter :: Ma = 0.1d0 !! Mach number
-  real(rkind), parameter :: Sc = 100.0d0 !! Schmidt number (higher Sc reduces importance of MD)
+  real(rkind), parameter :: Sc = one !! Schmidt number (higher Sc reduces importance of MD)
 
   !! Primary material parameters ------------------------------------------------------------------
   real(rkind), parameter :: gammagas = 1.4d0
   real(rkind), parameter :: Rs0 = one !287.058d0 !! Reference specific gas constant
+  
+  !! Multi-species parameters ---------------------------------------------------------------------
+#ifdef ms
+  integer(ikind), parameter :: nspec = 2
+#else
+  integer(ikind), parameter :: nspec = 1
+#endif  
    
   !! Secondary physical parameters ----------------------------------------------------------------
   real(rkind), parameter :: visc0 = rho_char*u_char*L_char/Re
@@ -76,6 +84,6 @@ module common_parameter
 #ifdef isoT
   real(rkind), parameter :: p_infinity = csq    !! Reference pressure
 #else
-  real(rkind), parameter :: p_infinity = (Rs0*T0/gammagasm1 - half*u_char*u_char)*gammagasm1*one
+  real(rkind), parameter :: p_infinity = rho_char*Rs0*T0
 #endif
 end module common_parameter

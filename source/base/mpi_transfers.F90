@@ -45,8 +45,8 @@ module mpi_transfers
   !!
   !!
   !! Transfers are SEND-RECEIVE for ODD processors, and RECEIVE-SEND for EVEN processors in EACH
-  !! direction. Hence, if any periodic boundaries are required, need either 1 or EVEN number of 
-  !! processors in periodic direction.
+  !! direction. We therefore need either 1 or an EVEN number of processors each direction with
+  !! the exception of the streamwise (X) direction ONLY when using inflow/outflow BCs.
   !!
   !! UP-DOWN transfers are ALWAYS cyclic (in new framework...)
   !!  
@@ -59,12 +59,14 @@ module mpi_transfers
   use mpi
 #endif 
   implicit none
+  
 
 contains
 !! ------------------------------------------------------------------------------------------------  
   subroutine halo_exchanges_all  
      !! If using mpi, this calls routines to transfer all properties between halos. If not using
      !! mpi, it does nothing
+     integer(ikind) :: ispec
      segment_tstart = omp_get_wtime()
 
 #ifdef mp 
@@ -88,7 +90,9 @@ contains
 #endif
 #ifdef ms     
      !! Species
-     call halo_exchange(Y0)
+     do ispec=1,nspec 
+        call halo_exchange(Yspec(:,ispec))
+     end do
 #endif     
 
 #endif     
@@ -140,6 +144,7 @@ contains
      iproc_in_sheet = iproc - iprocZ*(nprocsY*nprocsX)
      iprocX=iproc_in_sheet/nprocsY   
      iprocY=mod(iproc_in_sheet,nprocsY)
+         
      
      !! Build a list of the indices of the processors in this column
      allocate(iproc_thiscolumn(nprocsY))
@@ -290,12 +295,31 @@ contains
   end subroutine processor_mapping
 !! ------------------------------------------------------------------------------------------------
   subroutine build_halos
-     integer(ikind) :: i,nstart,nend,maxhalo,suminhalo,is,ie,k,half_fd_stencil
+     integer(ikind) :: i,nstart,nend,maxhalo,suminhalo,is,ie,k,half_fd_stencil,jproc,jproc_cycle
      integer(ikind) :: maxhalo_UD,maxhalo_LR,maxhalo_FB
      real(rkind) :: x,y,ss_local,halo_fac
      integer(ikind),dimension(:,:),allocatable :: halo_lists_tmp
      integer(ikind),dimension(:,:),allocatable :: halo_lists_tmp_LR,halo_lists_tmp_UD,halo_lists_tmp_FB
+     real(rkind),dimension(:),allocatable :: XL_tmp,XR_tmp,YU_tmp,YD_tmp,ZF_tmp,ZB_tmp
      !! Routine builds a list of nodes which are to be exported as halos for adjacent processors
+
+
+     !! Create global arrays of processor spatial limits (XL,XR,YU,YD,ZF,ZB)
+     allocate(XL(nprocs),XR(nprocs),YU(nprocs),YD(nprocs),ZF(nprocs),ZB(nprocs))
+     allocate(XL_tmp(nprocs),XR_tmp(nprocs),YU_tmp(nprocs),YD_tmp(nprocs),ZF_tmp(nprocs),ZB_tmp(nprocs))     
+     XL_tmp=zero;XR_tmp=zero;YU_tmp=zero;YD_tmp=zero;ZF_tmp=zero;ZB_tmp=zero
+     XL_tmp(iproc+1)=XL_thisproc;XR_tmp(iproc+1)=XR_thisproc
+     YU_tmp(iproc+1)=YU_thisproc;YD_tmp(iproc+1)=YD_thisproc     
+     ZF_tmp(iproc+1)=ZF_thisproc;ZB_tmp(iproc+1)=ZB_thisproc              
+     call MPI_ALLREDUCE(XL_tmp,XL,nprocs,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(XR_tmp,XR,nprocs,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)               
+     call MPI_ALLREDUCE(YU_tmp,YU,nprocs,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)               
+     call MPI_ALLREDUCE(YD_tmp,YD,nprocs,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)               
+     call MPI_ALLREDUCE(ZF_tmp,ZF,nprocs,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)               
+     call MPI_ALLREDUCE(ZB_tmp,ZB,nprocs,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)               
+     deallocate(XL_tmp,XR_tmp,YU_tmp,YD_tmp,ZF_tmp,ZB_tmp)
+                  
+
 
      !! How much extra?
      halo_fac = 2.0d0
@@ -335,12 +359,23 @@ contains
 
      !! Build halos LEFT
      do k=1,nprocsY
-        if(iproc_S_LR(k).ge.0) then           
+        if(iproc_S_LR(k).ge.0) then         
+           jproc = iproc_S_LR(k);jproc_cycle=0            !! Index of neighbouring processor
+           if(YU(jproc+1).lt.YD(jproc+1)) jproc_cycle=1   !! Neighbouring processor is bottom of its column
            do i=1,np
-              x=rp(i,1);ss_local = halo_fac*ss*h(i)      
-              if(abs(x-XL_thisproc).le.ss_local) then     
-                 nhalo_LR(k) = nhalo_LR(k) + 1
-                 halo_lists_tmp_LR(nhalo_LR(k),k) = i
+              x=rp(i,1);y=rp(i,2);ss_local = halo_fac*ss*h(i)      
+              if(abs(x-XL_thisproc).le.ss_local) then   !! If at left side
+                 if(jproc_cycle.eq.0) then 
+                    if(y.le.YU(jproc+1)+ss_local.and.y.ge.YD(jproc+1)-ss_local)then  !! AND for normal proc
+                       nhalo_LR(k) = nhalo_LR(k) + 1
+                       halo_lists_tmp_LR(nhalo_LR(k),k) = i
+                    end if
+                 else
+                    if(y.le.YU(jproc+1)+ss_local.or.y.ge.YD(jproc+1)-ss_local)then  !! OR for cyclic proc
+                       nhalo_LR(k) = nhalo_LR(k) + 1
+                       halo_lists_tmp_LR(nhalo_LR(k),k) = i                      
+                    end if
+                 end if
               end if
            end do
         end if
@@ -349,11 +384,22 @@ contains
      !! Build halos RIGHT
      do k=nprocsY+1,2*nprocsY
         if(iproc_S_LR(k).ge.0) then           
+           jproc = iproc_S_LR(k);jproc_cycle=0 !! Index of neighbouring processor
+           if(YU(jproc+1).lt.YD(jproc+1)) jproc_cycle=1 !! Neighbouring processor is bottom of its column
            do i=1,np
-              x=rp(i,1);ss_local = halo_fac*ss*h(i)      
-              if(abs(x-XR_thisproc).le.ss_local) then     
-                 nhalo_LR(k) = nhalo_LR(k) + 1
-                 halo_lists_tmp_LR(nhalo_LR(k),k) = i
+              x=rp(i,1);y=rp(i,2);ss_local = halo_fac*ss*h(i)      
+              if(abs(x-XR_thisproc).le.ss_local) then    !! If at left side
+                 if(jproc_cycle.eq.0) then
+                    if(y.le.YU(jproc+1)+ss_local.and.y.ge.YD(jproc+1)-ss_local)then !! AND for normal proc
+                       nhalo_LR(k) = nhalo_LR(k) + 1
+                       halo_lists_tmp_LR(nhalo_LR(k),k) = i
+                    end if
+                 else
+                    if(y.le.YU(jproc+1)+ss_local.or.y.ge.YD(jproc+1)-ss_local)then !! OR for cyclic proc
+                       nhalo_LR(k) = nhalo_LR(k) + 1
+                       halo_lists_tmp_LR(nhalo_LR(k),k) = i
+                    end if                 
+                 end if
               end if
            end do
         end if
@@ -414,7 +460,7 @@ contains
   end subroutine build_halos  
 !! ------------------------------------------------------------------------------------------------  
   subroutine halo_exchange(phi)    
-     !! This routine does halo exchanges for phi= u,v,lnro,E,Y0
+     !! This routine does halo exchanges for phi= u,v,lnro,E,Yspec
      real(rkind),dimension(:),intent(inout) :: phi     
      real(rkind),dimension(:),allocatable :: halo_phi
      integer(ikind) :: i,j,k,tag
@@ -744,6 +790,7 @@ contains
   subroutine reduce_for_screen_output(maxphi,minphi)  
      !! Find the maximum and minimum values for output to screen
      real(rkind),dimension(:),intent(out) :: maxphi,minphi
+     integer(ikind) :: ispec
      
      
      
@@ -752,15 +799,18 @@ contains
      call MPI_ALLREDUCE(maxval(w(1:np)),maxphi(3),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
      call MPI_ALLREDUCE(maxval(lnro(1:np)),maxphi(4),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
      call MPI_ALLREDUCE(maxval(roE(1:np)),maxphi(5),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(maxval(Y0(1:np)),maxphi(6),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)                    
+     do ispec=1,nspec
+        call MPI_ALLREDUCE(maxval(Yspec(1:np,ispec)),maxphi(5+ispec),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
+     end do
   
      call MPI_ALLREDUCE(minval(u(1:np)),minphi(1),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
      call MPI_ALLREDUCE(minval(v(1:np)),minphi(2),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)               
      call MPI_ALLREDUCE(minval(w(1:np)),minphi(3),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
      call MPI_ALLREDUCE(minval(lnro(1:np)),minphi(4),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
      call MPI_ALLREDUCE(minval(roE(1:np)),minphi(5),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(minval(Y0(1:np)),minphi(6),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)                    
-  
+     do ispec=1,nspec
+        call MPI_ALLREDUCE(minval(Yspec(1:np,ispec)),minphi(5+ispec),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror) 
+     end do
      !! Density from density logarithm
      maxphi(4) = exp(maxphi(4));minphi(4)=exp(minphi(4))
   

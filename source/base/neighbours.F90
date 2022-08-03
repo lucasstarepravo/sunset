@@ -56,6 +56,8 @@ contains
     deallocate(nc)
     deallocate(ip)
     deallocate(cellpart)
+    
+    write(6,*) iproc,"neighbours found"
 
   end subroutine find_neighbours
 !! ------------------------------------------------------------------------------------------------
