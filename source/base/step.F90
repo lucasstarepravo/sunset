@@ -379,7 +379,7 @@ contains
 #endif          
      
      !! Find smallest node spacing
-     smin = minval(s(1:npfb))
+     smin = minval(s(1:npfb))*L_char
 
      !! Set time step
      dt = min(0.3d0*smin*smin/visc0,one*smin/(cmax+umax))

@@ -138,16 +138,7 @@ contains
               amatx(i1,1:nsizeG)=zero
               amatx(i1,i1)=one
            end do
-        end if
-!        if(node_type(i).eq.-1) then !! for row 1 drop hyperviscosity to 4th order
-!            do i1=1,nsizeG
-!              amathyp(i1,15:nsizeG)=zero        
-!           end do
-!           do i1=15,nsizeG
-!              amathyp(i1,1:nsizeG)=zero
-!              amathyp(i1,i1)=one
-!           end do
-!        end if       
+        end if     
 #endif        
  
         !! Copy remaining LHSs
@@ -261,7 +252,7 @@ contains
   subroutine calc_labf_sums
      !! Subroutine to evaluate LABF sums, enabling faster computation.
  
-     integer(ikind) :: i,j,k
+     integer(ikind) :: i,j,k,jj
 
      allocate(ij_w_grad_sum(2,npfb),ij_w_lap_sum(npfb),ij_w_hyp_sum(npfb))
      ij_w_grad_sum=zero;ij_w_hyp_sum=zero;ij_w_lap_sum=zero
@@ -277,9 +268,42 @@ contains
            ij_w_hyp_sum(i) = ij_w_hyp_sum(i) + ij_w_hyp(k,i)  
 
         end do
+
+        !! Scale gradients by the domain length-scale
+        ij_w_grad_sum(:,i) = ij_w_grad_sum(:,i)/L_char
+        ij_w_grad(:,:,i) = ij_w_grad(:,:,i)/L_char
         
+        !! Scale Laplacians by length-scale squared
+        ij_w_lap_sum(i) = ij_w_lap_sum(i)/L_char/L_char
+        ij_w_lap(:,i) = ij_w_lap(:,i)/L_char/L_char
+                 
      end do
      !$OMP END PARALLEL DO
+
+     !! Second derivatives on boundary
+     if(nb.ne.0) then
+
+        allocate(ij_wb_grad2_sum(dims,nb));ij_wb_grad2_sum=zero     
+     
+        !$omp parallel do private(k,j)
+        do jj=1,nb     
+           i=boundary_list(jj)
+        
+           !! Build grad2 sum
+           do k=1,ij_count(i)
+              j = ij_link(k,i)         
+        
+              ij_wb_grad2_sum(:,jj) = ij_wb_grad2_sum(:,jj) + ij_wb_grad2(:,k,jj)        
+           end do
+           
+           !! Scale by length-scale squared
+           ij_wb_grad2_sum(:,jj) = ij_wb_grad2_sum(:,jj)/L_char/L_char
+           ij_wb_grad2(:,:,jj) = ij_wb_grad2(:,:,jj)/L_char/L_char
+           
+        end do
+        !$omp end parallel do
+     end if  
+     
              
      return
   end subroutine calc_labf_sums
@@ -306,7 +330,6 @@ contains
      
      !! Space for boundary weights for grad2. N.B. they are indexed only over [1..nb]
      allocate(ij_wb_grad2(dims,nplink,nb));ij_wb_grad2=zero
-     allocate(ij_wb_grad2_sum(dims,nb));ij_wb_grad2_sum=zero
 
      !! Preface: remove neighbours from the boundary nodes, to save costs later
      allocate(ijlink_tmp(nplink))
@@ -545,13 +568,7 @@ contains
            end if    
            
         end do
-
-        !! Build grad2 sum
-        do k=1,ij_count(i)
-           j = ij_link(k,i)         
-        
-           ij_wb_grad2_sum(:,jj) = ij_wb_grad2_sum(:,jj) + ij_wb_grad2(:,k,jj)        
-        end do
+               
      end do        
         
         
@@ -1002,10 +1019,10 @@ contains
         filter_coeff(i) = (two/3.0d0)/lsum   !2/3
 
         !! Reduce the filter coefficient near boundaries
-        if(node_type(i).eq.-1) filter_coeff(i) = filter_coeff(i)*half*half
-        if(node_type(i).eq.-2) filter_coeff(i) = filter_coeff(i)*half*oosqrt2
-        if(node_type(i).eq.-3) filter_coeff(i) = filter_coeff(i)*half
-        if(node_type(i).eq.-4) filter_coeff(i) = filter_coeff(i)*half                        
+        if(node_type(i).eq.-1) filter_coeff(i) = filter_coeff(i)*half*oosqrt2!*half*half
+        if(node_type(i).eq.-2) filter_coeff(i) = filter_coeff(i)*half!*half*oosqrt2
+        if(node_type(i).eq.-3) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half
+        if(node_type(i).eq.-4) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half                        
 
      end do
      !$omp end parallel do

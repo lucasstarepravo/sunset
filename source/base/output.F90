@@ -65,7 +65,7 @@ contains
         if(iproc.eq.0) then
  
            write(6,*)"itime,time,dt=", itime,time,dt
-           write(6,*) "npfb,np",npfb_global,np_global
+           write(6,*) "npfb,np",npfb_global,np_global,"n_out real",time/dt_out
            write(6,*) "Max |u|,|v|:",max(maxphi(1),abs(minphi(1))),max(maxphi(2),abs(minphi(2)))
            write(6,*) "Max |w|:",max(maxphi(3),abs(minphi(3)))
            write(6,*) "max/min ro:",maxphi(4),minphi(4)
@@ -98,7 +98,7 @@ contains
 #else
         !! Single processor
         write(6,*)"itime,time,dt=", itime,time,dt
-        write(6,*) "np,npfb",np,npfb
+        write(6,*) "np,npfb",np,npfb,"n_out real",time/dt_out
         write(6,*) "Max |u|,|v|:",max(maxval(u(1:npfb)),abs(minval(u(1:npfb)))),max(maxval(v(1:npfb)),abs(minval(v(1:npfb))))
         write(6,*) "Max |w|:",max(maxval(w(1:npfb)),abs(minval(w(1:npfb))))
         write(6,*) "max/min ro:",exp(maxval(lnro(1:npfb))),exp(minval(lnro(1:npfb)))   
@@ -248,7 +248,7 @@ if(.true.)then
 !end if             
 
 #else
-           tmpT=divvel(i)
+!           tmpT=divvel(i)
            write(20,*) rp(i,1),rp(i,2),s(i),node_type(i),tmpro,u(i),v(i),vort(i), &
                        roE(i)/tmpro,tmpT,Yspec(i,1)
 !if(i.le.npfb) then        
@@ -303,9 +303,6 @@ if(.true.)then
      !! Check conservation of mass and energy
      call mass_and_energy_check
      
-     !! Check mean internal energy and use PID controller and heat-sink if required
-     call int_energy_control
-
      !! Error evaluation for Taylor Green vortices?
      call error_TG
 
@@ -387,7 +384,7 @@ if(.true.)then
           
            Fn(:) = matmul(sigma,rnorm(i,:))   !! Force on surface (sigma.n)
                      
-           force(:) = force(:) + Fn(:)*s(i)  !! Integrate over surface... s(i) is node spacing
+           force(:) = force(:) + Fn(:)*s(i)*L_char  !! Integrate over surface... s(i) is dimensionless node spacing
         end if
      end do
      !$omp end parallel do
@@ -397,11 +394,11 @@ if(.true.)then
      force_tmp = force
      call MPI_ALLREDUCE(force_tmp,force,dims,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)     
      if(iproc.eq.0)then
-        write(194,*) time,force
+        write(194,*) time/Time_char,force
         flush(194)
      end if        
 #else
-     write(194,*) time,force
+     write(194,*) time/Time_char,force
      flush(194)
 #endif     
      
@@ -473,11 +470,11 @@ if(.true.)then
       
 #ifdef mp
      if(iproc.eq.0)then
-        write(195,*) time,tot_vel,tot_u,driving_force(1)
+        write(195,*) time/Time_char,tot_vel,tot_u,driving_force(1)
         flush(195)
      end if
 #else
-     write(195,*) time,tot_vel,tot_u,driving_force(1)    
+     write(195,*) time/Time_char,tot_vel,tot_u,driving_force(1)    
      flush(195)
 #endif       
      
@@ -519,15 +516,15 @@ if(.true.)then
          
 #ifdef mp
      if(iproc.eq.0)then
-        write(193,*) time,tot_mass
+        write(193,*) time/Time_char,tot_mass
         flush(193)
-        write(197,*) time,tot_roE
+        write(197,*) time/Time_char,tot_roE
         flush(197)
      end if
 #else
-     write(193,*) time,tot_mass
+     write(193,*) time/Time_char,tot_mass
      flush(193)
-     write(197,*) time,tot_roE
+     write(197,*) time/Time_char,tot_roE
      flush(197)
 #endif
 
@@ -548,9 +545,9 @@ if(.true.)then
      !$omp parallel do private(tmpro,dVi,ispec,tmpY) reduction(+:tot_Yspec,tot_vol)
      do i=1,npfb
         tmpro = exp(lnro(i))
-        dVi = s(i)*s(i) !! assume square nodes for now...
+        dVi = s(i)*s(i)*L_char*L_char !! assume square nodes for now...
 #ifdef dim3
-        dVi = dVi*dz
+        dVi = dVi*dz*L_char
 #endif        
 
         do ispec=1,nspec
@@ -567,11 +564,11 @@ if(.true.)then
      call MPI_ALLREDUCE(tot_Yspec_tmp,tot_Yspec,nspec,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
 !    call MPI_ALLREDUCE(tot_vol_tmp,tot_vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
      if(iproc.eq.0)then
-        write(199,*) time,tot_Yspec(:)
+        write(199,*) time/Time_char,tot_Yspec(:)
         flush(199)
      end if
 #else
-     write(199,*) time,tot_Yspec(:)
+     write(199,*) time/Time_char,tot_Yspec(:)
      flush(199)
 #endif
 
@@ -579,55 +576,6 @@ if(.true.)then
 
      return
   end subroutine species_check    
-!! ------------------------------------------------------------------------------------------------
-  subroutine int_energy_control
-     !! Output the mean internal energy over the domain
-     !! also set heat_sink_mag via a P.I.D. controller if required.
-     integer(ikind) :: i
-     real(rkind) :: tot_int_e,tot_vol,tmpro,dVi,tmpvel,tmp_int_e
-     real(rkind) :: tot_int_e_tmp,tot_vol_tmp
-       
-     tot_int_e = zero
-     tot_vol = zero
-     !$omp parallel do private(tmpro,tmpvel,dVi,tmp_int_e) reduction(+:tot_int_e,tot_vol)
-     do i=1,npfb
-        tmpro = exp(lnro(i))
-        dVi = s(i)*s(i) !! assume square nodes for now...
-#ifdef dim3
-        dVi = dVi*dz
-#endif               
-        tmpvel = (u(i)*u(i)+v(i)*v(i)+w(i)*w(i))
-        tmp_int_e = roE(i)/tmpro - half*tmpvel  !! internal energy
-        tot_int_e = tot_int_e + tmp_int_e*dVi
-        tot_vol = tot_vol + dVi
-     end do
-     !$omp end parallel do
-
-#ifdef mp
-     tot_int_e_tmp = tot_int_e;tot_vol_tmp = tot_vol
-     call MPI_ALLREDUCE(tot_int_e_tmp,tot_int_e,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(tot_vol_tmp,tot_vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
-#endif         
-
-     !! Normalise over volume
-     tot_int_e = (tot_int_e/tot_vol)
-
-     !! Set the initial (and henceforwards target) value:
-     if(itime.eq.1) mean_int_energy0 = tot_int_e
-        
-#ifdef mp
-     if(iproc.eq.0)then
-        write(198,*) time,tot_int_e
-        flush(198)
-     end if
-#else
-     write(198,*) time,tot_int_e
-     flush(198)
-#endif       
-     
-     
-     return
-  end subroutine int_energy_control 
 !! ------------------------------------------------------------------------------------------------    
   subroutine poiseuille_l2norm
      !! Output the L2norm of the velocity compared with Poiseuille flow
@@ -652,7 +600,7 @@ if(.true.)then
         do j=1,jj
            N=(2*j-1)*pi
            X1 = sin(N*y1)/N**3.0d0
-           X2 = exp(-N*N*visc0*time)
+           X2 = exp(-N*N*visc0*time/Time_char)
            uexact = uexact - 32.0d0*X1*X2
         end do       
         
@@ -665,7 +613,7 @@ if(.true.)then
      !$omp end parallel do
      sum_e = dsqrt(sum_e/sum_exact)
 
-     write(196,*) time,sum_e
+     write(196,*) time/Time_char,sum_e
      flush(196)  
      return
   end subroutine poiseuille_l2norm  
@@ -685,7 +633,7 @@ if(.true.)then
     do i=1,npfb
        x=rp(i,1)
        y=rp(i,2)
-       expo = exp(-8.0d0*pi*pi*time/Re)
+       expo = exp(-8.0d0*pi*pi*time/time_char/Re)
        u_exact = -expo*cos(2.0*pi*x)*sin(2.0*pi*y)
        v_exact = expo*sin(2.0*pi*x)*cos(2.0*pi*y)
        U_ex = dsqrt(u_exact**2. + v_exact**2.)
@@ -708,7 +656,7 @@ if(.true.)then
 #else   
     L2error = dsqrt(error_sum/Ex_sum)
 !    write(6,*) time,L2error,expo,maxval(u(1:npfb))
-    write(196,*) time,L2error
+    write(196,*) time/Time_char,L2error
     flush(196) 
 #endif    
   

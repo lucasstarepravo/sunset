@@ -42,6 +42,7 @@ module common_2d
 
   !! Parameters related to time and some forces etc
   real(rkind) :: time,dt,time_end,dt_out,dt_mout
+  real(rkind) :: time_star !! Dimensionless time (for outputs...)
   real(rkind) :: umax,smax                    !! maximum velocity and node spacing   
   integer(ikind) :: itime
   real(rkind) :: emax_nm1,emax_n,emax_np1  !! errors for PID controller
@@ -79,6 +80,7 @@ module common_2d
   !! Parents and boundaries... 
   integer(ikind),dimension(:),allocatable :: irelation,vrelation  ! used for periodic and symmetric boundaries
   real(rkind) :: xmin,xmax,ymin,ymax  !! Global domain size (required for NRBCs)
+  real(rkind) :: L_domain_x,L_domain_y
   integer(ikind) :: xbcond,ybcond !! BC flags for "simple" geometries without boundary nodes...
   integer(ikind),dimension(:),allocatable :: btype !! What type of BC is node i?
   integer(ikind),dimension(:),allocatable :: fd_parent !! pointer to the boundary node which is parent 

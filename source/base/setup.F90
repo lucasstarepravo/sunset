@@ -29,9 +29,9 @@ contains
 
      !! Time begins at zero
      time = zero;itime=0
-     dt_out = 0.05d0         !! Frequency to output fields
-     dt_mout = 0.01d0       !! Frequency to output mean stats
-     time_end = 1.0d2
+     dt_out = 0.01d0*Time_char         !! Frequency to output fields
+     dt_mout = 0.01d0*Time_char       !! Frequency to output mean stats
+     time_end = 1.0d2*Time_char
   
      !! Particles per smoothing length and supportsize/h
      hovs = 2.7   !! 2.4 for 6th order, 2.7 for 8th?
@@ -61,7 +61,6 @@ contains
      open(unit=195,file='data_out/statistics/velcheck.out')  
      open(unit=196,file='data_out/statistics/l2.out')
      open(unit=197,file='data_out/statistics/energy_mean.out')  
-     open(unit=198,file='data_out/statistics/intenergy_mean.out')
      open(unit=199,file='data_out/statistics/species.out')
   
      !! Profiling:
@@ -74,8 +73,8 @@ contains
      !! Reads in boundary patches, builds domain, calls decomposition and 
      !! boundary setup routines
      use boundaries
-     integer(ikind) i,j,ii,jj,npfb_tmp,k,dummy_int,dummy_int2,nblock,nblock0,nm
-     real(rkind) :: ns,dummy,prox,rad,radmin,xmin_local,xmax_local,x,y,xn,yn
+     integer(ikind) i,j,ii,jj,npfb_tmp,k,dummy_int,dummy_int2,nm
+     real(rkind) :: ns,dummy,rad,x,y,xn,yn
      real(rkind),dimension(dims) :: rij
      real(rkind),dimension(:,:),allocatable :: tmp_vec
      integer(ikind) :: nl_ini,nl_end,nl_iniC,nl_endC,nl_ini2,nl_end2
@@ -85,6 +84,10 @@ contains
      open(13,file='IPART')
      read(13,*) nb,npfb,dummy      !! dummy is largest s(i) in domain...
      read(13,*) xmin,xmax,ymin,ymax
+     !! Set the domain lengths
+     L_domain_x = (xmax - xmin)*L_char
+     L_domain_y = (ymax - ymin)*L_char
+     
      read(13,*) xbcond,ybcond
      !! Calculate some useful constants
      h0 = hovs*dummy;sup_size = ss*h0;h2=h0*h0;h3=h2*h0
@@ -327,7 +330,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      !$OMP PARALLEL DO PRIVATE(x,y,z,tmp,ispec)
      do i=1,npfb
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
-        u(i) = zero!-cos(two*pi*x)*sin(two*pi*y)!*cos(two*pi*z/Lz)!*oosqrt2
+        u(i) = u_char!-cos(two*pi*x)*sin(two*pi*y)!*cos(two*pi*z/Lz)!*oosqrt2
         v(i) = zero!sin(two*pi*x)*cos(two*pi*y)!*cos(two*pi*z/Lz)    !!c c
         w(i) = zero!u(i);u(i)=zero
         tmp = -half*half*(cos(4.0d0*pi*x) + cos(4.0d0*pi*y))/csq
@@ -462,7 +465,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 !! ------------------------------------------------------------------------------------------------
   subroutine build_3rd_dimension
      integer(ikind) :: nm,i,k,iz,ilayerm1
-     real(rkind) :: dz_local
+     real(rkind) :: dz_local,Lz_dimensionless
      real(rkind),dimension(:,:),allocatable :: rptmp,rnormtmp
      real(rkind),dimension(:),allocatable :: htmp,stmp
      integer(ikind),dimension(:),allocatable :: node_typetmp,fd_parenttmp
@@ -477,15 +480,18 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      dz = dz_local
 #endif     
 
+     !! Set the dimensionless extent of the z-domain
+     Lz_dimensionless = Lz/L_char
+
      !! Extent of domain in Z dimension = Lz
-     nz = ceiling(Lz/dz/dble(nprocsZ))
-     dz = Lz/dble(nz)/dble(nprocsZ)
+     nz = ceiling(Lz_dimensionless/dz/dble(nprocsZ))
+     dz = Lz_dimensionless/dble(nz)/dble(nprocsZ)
      nz_global = nz*nprocsZ
                         
      !! Minimum number in z is ij_count_fd/2 + 2
      if(nz.lt.ij_count_fd/2 + 2) then
         nz = ij_count_fd/2 + 2
-        dz = L_char/dble(ij_count_fd/2 + 2)
+        dz = Lz_dimensionless/dble(ij_count_fd/2 + 2)
      end if
      
      write(6,*) "iproc",iproc,"Z-domain number and spacing",nz_global,dz
@@ -613,8 +619,8 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         end do
      end do
      
-     wn_max = 5.0d0*two*pi/(xmax-xmin)
-     wn_min = 1.0d0*two*pi/(xmax-xmin)
+     wn_max = 5.0d0*two*pi/L_domain_x
+     wn_min = 1.0d0*two*pi/L_domain_x
           
      return
   end subroutine initialise_grf
@@ -627,9 +633,9 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
          
      grf = zero
      do i=1,n_wvnmbrs
-        wn_i = dble(i)*two*pi/(xmax-xmin)!wn_min + dble(i)*(wn_max-wn_min)/dble(n_wvnmbrs)
+        wn_i = dble(i)*two*pi/L_domain_x!wn_min + dble(i)*(wn_max-wn_min)/dble(n_wvnmbrs)
         do j=1,n_wvnmbrs
-           wn_j = dble(j)*two*pi/(xmax-xmin)!wn_min + dble(j)*(wn_max-wn_min)/dble(n_wvnmbrs)
+           wn_j = dble(j)*two*pi/L_domain_x!wn_min + dble(j)*(wn_max-wn_min)/dble(n_wvnmbrs)
            grf = grf + cos(wn_i*x + rndshift_x(i,j))* &
                        cos(wn_j*y + rndshift_y(i,j))
         end do

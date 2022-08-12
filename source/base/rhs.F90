@@ -513,12 +513,12 @@ contains
 #ifdef isoT
    !! (Partially-) NON-REFLECTING INFLOW ==================
 #ifndef hardinf
-          L(j,5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/(xmax-xmin) &      !! Track u_inflow
+          L(j,5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &      !! Track u_inflow
                  - half*(v(i)*gradp(i,2)+p(i)*gradv(i,2)+tmpro*c*v(i)*gradu(i,2)) &    !! transverse 1 conv. terms
                  - half*(w(i)*gradp(i,3)+p(i)*gradw(i,3)+tmpro*c*w(i)*gradu(i,3))      !! transverse 2 conv. terms 
-          L(j,3) = v(i)*0.278d0*c/(xmax-xmin) &             !! track v=zero
+          L(j,3) = v(i)*0.278d0*c/L_domain_x &             !! track v=zero
                    + rhs_v(i)                                !! rhs_v contains transverse and visc terms needed
-          L(j,4) = w(i)*0.278d0*c/(xmax-xmin) &             !! track w=zero
+          L(j,4) = w(i)*0.278d0*c/L_domain_x &             !! track w=zero
                    + rhs_w(i)                                !! rhs_w contains transverse and visc terms needed
    !! HARD INFLOW =========================================          
 #else
@@ -533,15 +533,15 @@ contains
 
    !! (Partially-) NON-REFLECTING INFLOW ==================
 #ifndef hardinf
-          L(j,5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/(xmax-xmin) &      !! Track u_inflow
+          L(j,5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &      !! Track u_inflow
                  - half*(v(i)*gradp(i,2)+gammagas*p(i)*gradv(i,2)+tmpro*c*v(i)*gradu(i,2))  & !! transverse 1 conv. terms
                  - half*(w(i)*gradp(i,3)+gammagas*p(i)*gradw(i,3)+tmpro*c*w(i)*gradu(i,3))    !! transverse 2 conv. terms  
-          L(j,3) = v(i)*0.278d0*c/(xmax-xmin) &             !! track v=zero
+          L(j,3) = v(i)*0.278d0*c/L_domain_x &             !! track v=zero
                    + rhs_v(i)                                !! rhs_v contains transverse and visc terms needed
-          L(j,4) = w(i)*0.278d0*c/(xmax-xmin) &             !! track w=zero
+          L(j,4) = w(i)*0.278d0*c/L_domain_x &             !! track w=zero
                    + rhs_w(i)                                !! rhs_w contains transverse and visc terms needed
 
-          L(j,2) = (T0-T(i))*c*0.278d0/(xmax-xmin)/gammagas &
+          L(j,2) = (T0-T(i))*c*0.278d0/L_domain_x/gammagas &
                  - (v(i)*gradlnro(i,2)*tmpro + tmpro*gradv(i,2) + v(i)*gradp(i,2)/c/c + gammagas*p(i)*gradv(i,2)/c/c) &
                  - (w(i)*gradlnro(i,3)*tmpro + tmpro*gradw(i,3) + w(i)*gradp(i,3)/c/c + gammagas*p(i)*gradw(i,3)/c/c)
                  !! Need to add on visc+source terms
@@ -569,7 +569,7 @@ contains
 #ifdef isoT
           L(j,2) = zero
           if(u(i).le.c) then !! Subsonic. If supersonic, just use L1 from definition...
-             L(j,1) = (p(i)-p_infinity)*0.278d0*c*(one)/two/(xmax-xmin) &               !! track p_infinity
+             L(j,1) = (p(i)-p_infinity)*0.278d0*c*(one)/two/L_domain_x &               !! track p_infinity
                     - (one-u(i)/c)*half*(v(i)*gradp(i,2)+p(i)*gradv(i,2)-tmpro*c*v(i)*gradu(i,2)) & !!transverse 1 conv. terms
                     - (one-u(i)/c)*half*(w(i)*gradp(i,3)+p(i)*gradw(i,3)-tmpro*c*w(i)*gradu(i,3)) !! transverse 2 conv. terms
           end if
@@ -580,7 +580,7 @@ contains
 !! THERMAL FLOWS ====================================================
 #else
           if(u(i).le.c) then !! Subsonic. If supersonic, just use L1 from definition...
-             L(j,1) = (p(i)-p_infinity)*0.278d0*c*(one)/two/(xmax-xmin) &               !! track p_infinity
+             L(j,1) = (p(i)-p_infinity)*0.278d0*c*(one)/two/L_domain_x &               !! track p_infinity
                     - (one-u(i)/c)*half*(v(i)*gradp(i,2)+gammagas*p(i)*gradv(i,2)-tmpro*c*v(i)*gradu(i,2)) &!!trans1 conv.
                     - (one-u(i)/c)*half*(w(i)*gradp(i,3)+gammagas*p(i)*gradw(i,3)-tmpro*c*w(i)*gradu(i,3)) !! trasn2 conv.
           end if

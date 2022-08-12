@@ -621,13 +621,13 @@ case(6) !! Channel flows, propagating front
      b_node(2,:) = (/ 0.5d0*xl, -0.5d0*yl /)
      b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
      b_node(4,:) = (/ -0.5d0*xl, 0.5d0*yl /)
-     nb_blobs = 0
-!     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,6),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
-!     b0=2.5d0*h0;b1=b0*sqrt(3.0d0)/2.0d0;b2=b0/2.0d0
-!     blob_centre(1,:)=(/0.d0,0.d0/); !! Central
-!     do i=1,nb_blobs
-!        blob_coeffs(i,:)=h0*(/1.0d0,0.4d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0;blob_ellipse(i)=1
-!     end do
+     nb_blobs = 1
+     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,6),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
+     b0=2.5d0*h0;b1=b0*sqrt(3.0d0)/2.0d0;b2=b0/2.0d0
+     blob_centre(1,:)=(/0.d0,0.d0/); !! Central
+     do i=1,nb_blobs
+        blob_coeffs(i,:)=h0*(/1.0d0,0.4d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0;blob_ellipse(i)=1
+     end do
 
      call make_boundary_edge_vectors
 

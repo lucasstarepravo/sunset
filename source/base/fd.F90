@@ -240,6 +240,10 @@ contains
         ij_fd_hyp(13)= -one/4096.0d0
      end if
 
+     !! Scale ij_fd_weights by length-scale
+     ij_fd_grad(:) = ij_fd_grad(:)/L_char
+     ij_fd_grad2(:) = ij_fd_grad2(:)/L_char/L_char
+
      write(6,*) "iproc",iproc,"FD system built"    
                                                                                                                 
      return
