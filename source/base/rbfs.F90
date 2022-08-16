@@ -1,6 +1,6 @@
 module rbfs
   use kind_parameters
-  use common_2d
+  use common_vars
   implicit none
   
   private

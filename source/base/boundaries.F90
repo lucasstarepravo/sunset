@@ -1,7 +1,7 @@
 module boundaries
   use kind_parameters
   use common_parameter
-  use common_2d
+  use common_vars
 
   implicit none
   
@@ -251,7 +251,7 @@ contains
         
         !! Calculate hydrostatic energy gradient
         rij = rp(j,:)-rp(i,:)
-        delta_roE = exp(lnro(i))*dot_product(grav,rij)/gammagasm1
+        delta_roE = exp(lnro(i))*dot_product(grav,rij)!/gammagasm1  MODIFY
          
         roE(j) = roE(i) + delta_roE
 #ifdef ms

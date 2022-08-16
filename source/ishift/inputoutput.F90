@@ -3,7 +3,7 @@ module inputoutput
   !! pre-process to obtain boundary normal vectors, and write field data out to file.
   use kind_parameters
   use common_parameter
-  use common_2d
+  use common_vars
   use omp_lib
   use neighbours
   implicit none

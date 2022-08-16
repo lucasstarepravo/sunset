@@ -1,7 +1,7 @@
 program main
   use kind_parameters
   use common_parameter
-  use common_2d
+  use common_vars
   use inputoutput 
   use neighbours
   use omp_lib
@@ -58,7 +58,7 @@ end program main
 subroutine initial_setup  
   use kind_parameters
   use common_parameter
-  use common_2d
+  use common_vars
   use omp_lib
   
   !! Particles per smoothing length and supportsize/h

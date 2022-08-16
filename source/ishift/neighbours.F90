@@ -1,7 +1,7 @@
 module neighbours
   use kind_parameters
   use common_parameter
-  use common_2d
+  use common_vars
   use omp_lib
   implicit none
 
@@ -70,7 +70,6 @@ contains
   end subroutine cell_generator
 !! ------------------------------------------------------------------------------------------------
   subroutine neighbour_cells
-    use common_2d
     integer(ikind) :: ic,icx,icy,jc,nsheet
    
     nsheet = ncx*ncy

@@ -5,7 +5,7 @@ module step
 
   use kind_parameters
   use common_parameter
-  use common_2d
+  use common_vars
   use boundaries
   use rhs
   use mpi_transfers
@@ -20,7 +20,7 @@ module step
   
   !! Error norms for RK3(2)4S[2R+]C scheme
   real(rkind) :: enrm_ro,enrm_u,enrm_v,enrm_E,enrm_w
-  real(rkind),dimension(nspec) :: enrm_Yspec
+  real(rkind),dimension(nspec_max) :: enrm_Yspec
 
 contains
 !! ------------------------------------------------------------------------------------------------  
@@ -358,25 +358,31 @@ contains
   subroutine set_tstep
      use thermodynamics
      integer(ikind) :: i
-     real(rkind) :: cmax,umag,smin,dt_local
+     real(rkind) :: umag,smin,dt_local
     
      !! Find maximum velocity magnitude
-     umax = 1.0d-8;cmax = 1.0d-8
-     !$OMP PARALLEL DO PRIVATE(umag) REDUCTION(max:umax,cmax)
+     umax = 1.0d-8;!cmax = 1.0d-8
+     !$OMP PARALLEL DO PRIVATE(umag) REDUCTION(max:umax)
      do i=1,npfb
         umag = u(i)*u(i) + v(i)*v(i) + w(i)*w(i)
         umax = umag
+
 #ifndef isoT        
-        cmax = (roE(i)/exp(lnro(i))-half*umag)
-#endif        
+!        cmax = (roE(i)/exp(lnro(i))-half*umag)
+#endif       
+   
      end do
      !$OMP END PARALLEL DO
      umax = sqrt(umax)
+     
 #ifndef isoT
-     cmax = sqrt(cmax*gammagasm1*gammagas)     
+!     cmax = sqrt(cmax*gammagas_m1*gammagas)     
 #else
-     cmax = sqrt(csq)
-#endif          
+!     cmax = sqrt(csq)
+#endif            
+     
+     
+     
      
      !! Find smallest node spacing
      smin = minval(s(1:npfb))*L_char
@@ -406,25 +412,21 @@ contains
      real(rkind) :: facA,facB,facC
      real(rkind) :: kappa,alph,beta,gamm,eps
      real(rkind) :: tratio_min,tratio_max
-     real(rkind) :: umag2,smin
+     real(rkind) :: umag2,smin,umag
      real(rkind) :: dtmax,c,dt_local
      
      !! Use CFL to set an upper limit to dt
      smin = minval(s(1:npfb))     
-     dtmax = 1.0d10
-     !$omp parallel do private(umag2,c) reduction(min:dtmax)
+     umax = 1.0d-8;cmax = 1.0d-8
+     !$OMP PARALLEL DO PRIVATE(umag) REDUCTION(max:umax,cmax)
      do i=1,npfb
-        umag2 = u(i)*u(i) + v(i)*v(i) + w(i)*w(i)
-#ifndef isoT        
-        c = sqrt(gammagas*gammagasm1*(roE(i)/exp(lnro(i))-half*umag2))
-#else
-        c = sqrt(csq)        
-#endif    
-        dtmax = smin/(c+sqrt(umag2))  !! using smallest h and biggest speeds (not local)
+        umag = u(i)*u(i) + v(i)*v(i) + w(i)*w(i)
+        umax = umag  
      end do
-     !$omp end parallel do
-
-     dtmax = 0.8d0*dtmax
+     !$OMP END PARALLEL DO
+     umax = sqrt(umax)
+     
+     dtmax = 0.8d0*smin/(umax+cmax)
 !     dtmax = min(dtmax,0.1*smin*smin/visc0) !! Viscous constraint...
      
      !! PID parameters...

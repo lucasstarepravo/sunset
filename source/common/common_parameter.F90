@@ -49,20 +49,28 @@ module common_parameter
    
   !! SIMULATION PARAMETERS ========================================================================
   !! Primary domain parameters (i.e. those we can specify) ----------------------------------------
-  real(rkind), parameter :: L_char = half*half*half*half*half !! Characteristic lengthscale
+  real(rkind), parameter :: L_char = one !! Characteristic lengthscale
   real(rkind), dimension(dims), parameter :: grav = (/zero,zero,zero/) !! Gravity  
   
   !! Primary physical fluid properties ------------------------------------------------------------
-  real(rkind), parameter :: visc0 = 1.8d-5
   real(rkind), parameter :: rho_char = one
-  real(rkind), parameter :: gammagas = 1.4d0
-  real(rkind), parameter :: Rs0 = 287.058d0 !! Reference specific gas constant  
+  real(rkind), parameter :: Rgas_universal = 8.3144626181d0
+
   
   !! Primary dimensionless groups -----------------------------------------------------------------
   real(rkind), parameter :: Re = 1000.0d0 !! Reynolds number
   real(rkind), parameter :: Sc = one !! Schmidt number (higher Sc reduces importance of MD)  
   real(rkind), parameter :: Pr = one !! Prandtl number
-  real(rkind), parameter :: Ma = 0.0016d0 !! Mach number  
+  real(rkind), parameter :: Ma = 0.1d0 !! Mach number  
+
+  !! Temporary (fixed) values of perfect gases and transport properties (whilst T-dependence is being developed)
+  real(rkind), parameter :: gammagas = 1.4d0
+  real(rkind), parameter :: Rs0 = 287.058d0   !! Reference specific gas constant  
+  real(rkind), parameter :: gammagas_m1 = gammagas - one
+  real(rkind), parameter :: visc0 = 1.0d-3!1.8d-5
+  real(rkind), parameter :: lambda_th0 = visc0*Rs0*gammagas/gammagas_m1/Pr
+  real(rkind), parameter :: Mdiff0 = lambda_th0*gammagas_m1/rho_char/Rs0/gammagas/one !! one is Lewis #
+
   
   !! Secondary domain parameters ------------------------------------------------------------------
   real(rkind), parameter :: Lz = half*L_char  !! Domain length-scale in third dimension
@@ -71,24 +79,22 @@ module common_parameter
   real(rkind), parameter :: Time_char= L_char/u_char            !! Characteristic time-scale
     
   !! Secondary fluid parameters -------------------------------------------------------------------
-  real(rkind), parameter :: gammagasm1 = gammagas - one
   real(rkind), parameter :: csq = (u_char/Ma)**two  !! Reference sound speed   
   real(rkind), parameter :: T0 = csq/gammagas/Rs0   !! Reference temperature 
   real(rkind), parameter :: MD = visc0/rho_char/Sc !! Mass/molecular diffusivity   
-  real(rkind), parameter :: lambda_cond = Rs0*gammagas*visc0/gammagasm1/Pr  
+  
+  !! Parameters for temperature dependence of thermal conductivity
+  real(rkind), parameter :: Alambda = 2.58d-5
+  real(rkind), parameter :: rlambda = 7.0d-1
+  real(rkind), parameter :: Tlambda = 2.98d2
+  
 #ifdef isoT
   real(rkind), parameter :: p_infinity = csq    !! Reference pressure
 #else
   real(rkind), parameter :: p_infinity = rho_char*Rs0*T0
 #endif
 
-
-  !! Multi-species parameters ---------------------------------------------------------------------
-#ifdef ms
-  integer(ikind), parameter :: nspec = 2
-#else
-  integer(ikind), parameter :: nspec = 1
-#endif  
-   
+  !! Maximum possible number of species
+  integer(ikind), parameter :: nspec_max = 20   
 
 end module common_parameter

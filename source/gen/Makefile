@@ -12,7 +12,7 @@ FC=gfortran
 FCFLAGS=-W -O3 -m64 -g -fbounds-check
 FCA = -m64
 
-VPATH =../para  
+VPATH =../common  
 
 OBJS= kind_parameters.o common_parameter.o global_variables.o datclass.o
 

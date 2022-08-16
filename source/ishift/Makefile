@@ -11,9 +11,9 @@ FC=gfortran
 FCFLAGS=-W -O3 -m64 -g -fbounds-check -fopenmp
 FCA = -m64 -fopenmp
 
-VPATH =../para  
+VPATH =../common  
 
-OBJS := kind_parameters.o common_parameter.o common_2d.o 
+OBJS := kind_parameters.o common_parameter.o common_vars.o 
 OBJS += neighbours.o boundaries.o 
 OBJS += inputoutput.o 
 OBJS += main.o

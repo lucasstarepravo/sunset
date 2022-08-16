@@ -1,4 +1,4 @@
-module common_2d
+module common_vars
 
   use iso_c_binding
   use common_parameter
@@ -6,21 +6,26 @@ module common_2d
 
   implicit none
 
-  !! Evolved fluid properties
+  !! Evolved fluid quantities
   real(rkind), dimension(:), allocatable, target :: u,v,w,lnro,roE
   real(rkind), dimension(:,:), allocatable :: Yspec  
+  
+  !! Number of species
+  integer(ikind) :: nspec
      
-  !! Secondary fluid properties
-  real(rkind), dimension(:), allocatable, target :: p,visc,T
+  !! Secondary fluid quantities
+  real(rkind), dimension(:), allocatable, target :: p,T
   real(rkind), dimension(:), allocatable :: divvel  
+  
+  !! Transport properties
+  real(rkind), dimension(:), allocatable :: Rgas_mix,cp,visc,lambda_th
+  real(rkind), dimension(:,:), allocatable :: Mdiff
+  real(rkind), dimension(:), allocatable :: molar_mass,Lewis_number
   
   !! Right-hand-sides
   real(rkind),dimension(:),allocatable :: rhs_lnro,rhs_u,rhs_v,rhs_w,rhs_roE
   real(rkind),dimension(:,:),allocatable :: rhs_Yspec
-  
-  !! Characteristic boundary condition formulation
-  real(rkind),dimension(:,:),allocatable :: L  !! The "L" in NSCBC formulation  
-  
+    
   !! Discretisation properties
   real(rkind), dimension(:,:), allocatable, target :: rp,rnorm
   real(rkind), dimension(:), allocatable, target   :: h,filter_coeff,s
@@ -43,7 +48,7 @@ module common_2d
   !! Parameters related to time and some forces etc
   real(rkind) :: time,dt,time_end,dt_out,dt_mout
   real(rkind) :: time_star !! Dimensionless time (for outputs...)
-  real(rkind) :: umax,smax                    !! maximum velocity and node spacing   
+  real(rkind) :: umax,smax,cmax                  !! maximum velocity,node-spacing,sound speed
   integer(ikind) :: itime
   real(rkind) :: emax_nm1,emax_n,emax_np1  !! errors for PID controller
   real(rkind) :: eflow_nm1,eflow_n,sum_eflow !! errors for PID to control <u> (constant-ish flow rate)
@@ -108,4 +113,4 @@ module common_2d
   
   
           
-end module common_2d
+end module common_vars

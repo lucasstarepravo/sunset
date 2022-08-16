@@ -12,6 +12,7 @@
 # wisot      Adiabatic/prescribed heat flux (0) or isothermal (1) walls   (default: 0)
 # dim3       Two (0) or three (1) dimensional simulation                  (default: 0)
 # pgrad      Drive the flow with a pressure gradient and P.I.D control    (default: 0)
+# pgl        Perfect gas law (0) or ideal (semi-perfect) (1)              (default: 1)
 # ------------------------------------------------------------------------------------
 #
 # EXAMPLE USAGE:
@@ -56,15 +57,18 @@ endif
 ifeq ($(pgrad),1)
 FFLAGS += -Dpgrad
 endif
+ifeq ($(pgl),0)
+FFLAGS += -Dpgl
+endif
 LDFLAGS := -fopenmp -m64 -lopenblas 
 
 # Identify directories
-SUB_DIRS := para base
+SUB_DIRS := common base
 SRC_DIR  := $(addprefix source/,$(SUB_DIRS))
 
 # identify object files
 #parameters come first, as almost everything depends on them.
-OBJ_FILES := obj/kind_parameters.o obj/common_parameter.o obj/common_2d.o
+OBJ_FILES := obj/kind_parameters.o obj/common_parameter.o obj/common_vars.o
 OBJ_FILES += obj/rbfs.o obj/boundaries.o obj/derivatives.o 
 OBJ_FILES += obj/mpi_transfers.o 
 OBJ_FILES += obj/neighbours.o obj/output.o obj/setup.o

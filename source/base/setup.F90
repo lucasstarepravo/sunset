@@ -3,7 +3,7 @@ module setup
   !! pre-process to obtain boundary normal vectors, and write field data out to file.
   use kind_parameters
   use common_parameter
-  use common_2d
+  use common_vars
   use omp_lib
   use neighbours
   use output
@@ -29,7 +29,7 @@ contains
 
      !! Time begins at zero
      time = zero;itime=0
-     dt_out = 0.01d0*Time_char         !! Frequency to output fields
+     dt_out = 0.05d0*Time_char         !! Frequency to output fields
      dt_mout = 0.01d0*Time_char       !! Frequency to output mean stats
      time_end = 1.0d2*Time_char
   
@@ -282,6 +282,7 @@ contains
            boundary_list(jj) = i
         end if
      end do    
+             
 
      !! Set the global number of boundary nodes
 #ifdef mp
@@ -314,6 +315,25 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      return
   end subroutine setup_domain
 !! ------------------------------------------------------------------------------------------------
+  subroutine load_chemistry_data
+     
+     !! Hard-coded for now...
+#ifdef ms
+     nspec = 2
+#else
+     nspec = 1
+#endif     
+     allocate(molar_mass(nspec),Lewis_number(nspec))
+     molar_mass(1) = 2.897d-2  !! N.B. molar mass is in kg/mol
+     Lewis_number(1) = one
+     molar_mass(2) = 2.897d-2
+     Lewis_number(2) = one
+     
+
+     
+     return
+  end subroutine load_chemistry_data  
+!! ------------------------------------------------------------------------------------------------
   subroutine initial_solution
      use boundaries
      use derivatives
@@ -336,19 +356,21 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         tmp = -half*half*(cos(4.0d0*pi*x) + cos(4.0d0*pi*y))/csq
         lnro(i) = log(rho_char)!log(rho_char + tmp)!log(rho_char)       
 
-        tmp = T0!*(one + 0.01*sin(two*pi*z/Lz)) !! z-variation of temperature...
-        roE(i) = exp(lnro(i))*(tmp*Rs0/gammagasm1 + half*u(i)*u(i) + half*v(i)*v(i) + half*w(i)*w(i))
               
 #ifdef ms    
 !        do ispec=1,nspec      
-           tmp = 20.0d0*((x-1.03095d0)**two + (y-0.0d0)**two)
-           z=20.0d0*((x+1.03095d0)**two + (y-0.0d0)**two)
-           tmp = exp(-tmp**4.0d0) + exp(-z**4.0d0)
+           tmp = 20.0d0*((x-one)**two + (y-half)**two)
+           tmp = 20.0d0*(y**two)
+           tmp = exp(-tmp**4.0d0)
 !tmp = exp(-tmp**4.0d0)
            Yspec(i,1) = tmp!log(max(verysmall,tmp)) - log(max(verysmall,one-tmp))
            Yspec(i,2) = one - tmp
 !        end do
 #endif         
+
+        tmp = T0!*(one + 0.01*sin(two*pi*z/Lz)) !! z-variation of temperature...
+        roE(i) = exp(lnro(i))*(tmp*287.0025/0.4 + half*u(i)*u(i) + half*v(i)*v(i) + half*w(i)*w(i))
+
                 
 !        call evaluate_grf(x,y,z,tmp)
 !        if(tmp.le.zero) then 
@@ -384,7 +406,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
                  tmp = T0*(one + 0.01*sin(two*pi*rp(i,3)/Lz))
                  T_bound(j) = tmp*rho_char/exp(lnro(i)) + dot_product(grav,rp(i,:))/Rs0                
 !                 T_bound(j) = (rho_char/exp(lnro(i)))*T0
-                 tmp = T_bound(j)*Rs0/gammagasm1
+                 tmp = T_bound(j)*287.0025/0.4
                  roE(i) = tmp*exp(lnro(i)) 
               end if                 
               if(node_type(i).eq.1) then !! inflow initial conditions
@@ -458,7 +480,10 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 
      !! Profiling - re-zero time accumulators
      segment_time_local = zero
-     cputimecheck = zero        
+     cputimecheck = zero    
+     
+     !! Initialise the max sound speed
+     cmax = sqrt(csq)    
          
      return
   end subroutine initial_solution   

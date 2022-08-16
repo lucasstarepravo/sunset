@@ -3,7 +3,7 @@ module output
   !! pre-process to obtain boundary normal vectors, and write field data out to file.
   use kind_parameters
   use common_parameter
-  use common_2d
+  use common_vars
   use omp_lib
   use neighbours
 #ifdef mp
@@ -224,12 +224,8 @@ if(.true.)then
         write(20,*) np_out_local
         do i=1,np_out_local
            tmpro = exp(lnro(i))
-#ifdef isoT
-           tmpT = csq*(tmpro-one) !! if isoT, output |u| in E and pressure in tmpT. N.B. p_out=p-csq*rho0
-           roE(i) = tmpro*sqrt(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))             
-#else
-           tmpT=(roE(i)/tmpro-0.5*(u(i)*u(i)+v(i)*v(i) + w(i)*w(i)))*gammagasm1/Rs0 !! The temperature  
-#endif        
+           tmpT = zero
+
 #ifdef dim3
            write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),node_type(i),tmpro, &
                        u(i),v(i),w(i),vort(i),roE(i)/tmpro,tmpT,Yspec(i,1)
@@ -248,7 +244,6 @@ if(.true.)then
 !end if             
 
 #else
-!           tmpT=divvel(i)
            write(20,*) rp(i,1),rp(i,2),s(i),node_type(i),tmpro,u(i),v(i),vort(i), &
                        roE(i)/tmpro,tmpT,Yspec(i,1)
 !if(i.le.npfb) then        
@@ -620,9 +615,6 @@ if(.true.)then
 !! ------------------------------------------------------------------------------------------------
   subroutine error_TG
     !! N.B. This routine needs updating for multiprocessor simulations
-    use kind_parameters
-    use common_parameter
-    use common_2d
     implicit none
     integer(ikind) :: i
     real(rkind) :: u_exact,v_exact,x,y,expo

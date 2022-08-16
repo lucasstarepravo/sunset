@@ -1,7 +1,7 @@
 module boundaries
   use kind_parameters
   use common_parameter
-  use common_2d
+  use common_vars
 
   implicit none
   

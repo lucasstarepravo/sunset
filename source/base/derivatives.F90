@@ -7,7 +7,7 @@ module derivatives
   !! used within inner loops.
   use kind_parameters
   use common_parameter
-  use common_2d
+  use common_vars
   use omp_lib
   implicit none
 

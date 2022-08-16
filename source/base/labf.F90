@@ -4,7 +4,7 @@ module labf
 
   use kind_parameters
   use common_parameter
-  use common_2d
+  use common_vars
   use rbfs
   use omp_lib
 #ifdef mp
