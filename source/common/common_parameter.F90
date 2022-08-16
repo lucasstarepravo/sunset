@@ -49,7 +49,7 @@ module common_parameter
    
   !! SIMULATION PARAMETERS ========================================================================
   !! Primary domain parameters (i.e. those we can specify) ----------------------------------------
-  real(rkind), parameter :: L_char = one !! Characteristic lengthscale
+  real(rkind), parameter :: L_char = half !! Characteristic lengthscale
   real(rkind), dimension(dims), parameter :: grav = (/zero,zero,zero/) !! Gravity  
   
   !! Primary physical fluid properties ------------------------------------------------------------
@@ -58,7 +58,7 @@ module common_parameter
 
   
   !! Primary dimensionless groups -----------------------------------------------------------------
-  real(rkind), parameter :: Re = 1000.0d0 !! Reynolds number
+  real(rkind), parameter :: Re = 500.0d0 !! Reynolds number
   real(rkind), parameter :: Sc = one !! Schmidt number (higher Sc reduces importance of MD)  
   real(rkind), parameter :: Pr = one !! Prandtl number
   real(rkind), parameter :: Ma = 0.1d0 !! Mach number  

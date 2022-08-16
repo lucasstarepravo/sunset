@@ -700,8 +700,20 @@ contains
      !! variable - lnro,u,v,w,roE,Yspec - and forces certain values on boundaries as required.
      integer(ikind) :: i,j,ispec
      real(rkind) :: tmp
+     real(rkind), dimension(:), allocatable :: store_E
       
      segment_tstart = omp_get_wtime()
+     
+     !! Store boundary values of energy before filtering
+     if(nb.ne.0)then
+        allocate(store_E(nb))
+        !$omp parallel do private(i)
+        do j=1,nb
+           i=boundary_list(j)
+           store_E(j) = roE(i)/exp(lnro(i))
+        end do
+        !$omp end parallel do
+     end if
         
      !! Filter variables
      call calc_filtered_var(lnro)
@@ -728,12 +740,12 @@ contains
            if(node_type(i).eq.0)then       !! Walls
               u(i)=zero;v(i)=zero;w(i)=zero
 #ifdef wall_isoT
-              roE(i)=exp(lnro(i))*T_bound(j)*287.0025/0.4   !! Keep roE such that T=T_bound
+              roE(i)=exp(lnro(i))*store_E(j) !! Needs to be modified to account for possible variation in composition
 #endif
            else if(node_type(i).eq.1)then  !! Inflow   
 #ifdef hardinf
               u(i)=u_inflow;v(i)=zero;w(i)=zero
-              roE(i)=exp(lnro(i))*T_bound(j)*287.0025/0.4   !! Keep roE such that T=T_bound
+!              roE(i)=exp(lnro(i))*store_E(j)
 #else
               !! DO NOTHING              
 #endif                            
@@ -742,7 +754,9 @@ contains
            end if
         end do
         !$omp end parallel do
+        deallocate(store_E)
      end if
+     
      
      !! Profiling
      segment_tend = omp_get_wtime()

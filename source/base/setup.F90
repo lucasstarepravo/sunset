@@ -369,8 +369,8 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 #endif         
 
         tmp = T0!*(one + 0.01*sin(two*pi*z/Lz)) !! z-variation of temperature...
-        roE(i) = exp(lnro(i))*(tmp*287.0025/0.4 + half*u(i)*u(i) + half*v(i)*v(i) + half*w(i)*w(i))
 
+        roE(i) = exp(lnro(i))*(tmp*287.0025/0.4 + half*u(i)*u(i) + half*v(i)*v(i) + half*w(i)*w(i))
                 
 !        call evaluate_grf(x,y,z,tmp)
 !        if(tmp.le.zero) then 
