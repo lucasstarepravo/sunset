@@ -1,7 +1,15 @@
 module neighbours
+  !! ----------------------------------------------------------------------------------------------
+  !! SUNSET CODE: Scalable Unstructured Node-SET code for DNS.
+  !! 
+  !! Author             |Date             |Contributions
+  !! --------------------------------------------------------------------------
+  !! JRCK               |2019 onwards     |Main developer                     
+  !!
+  !! ----------------------------------------------------------------------------------------------
   !! This module finds neighbours for LABFM calculations.
   !! It is currently constructed to look in two dimensional "layers" or "sheets"
-  !! as the third dimension is expected to use finite differences.
+  !! as the third dimension uses finite differences.
 
   use kind_parameters
   use common_parameter

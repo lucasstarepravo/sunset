@@ -1,6 +1,14 @@
 module fd
-!! This module constructs weights for centred finite differences in the 3rd dimension
-!! 8th order, with built in periodicity
+  !! ----------------------------------------------------------------------------------------------
+  !! SUNSET CODE: Scalable Unstructured Node-SET code for DNS.
+  !! 
+  !! Author             |Date             |Contributions
+  !! --------------------------------------------------------------------------
+  !! JRCK               |2021             |Main developer                     
+  !!
+  !! ----------------------------------------------------------------------------------------------
+  !! This module constructs weights for centred finite differences in the 3rd dimension
+  !! 8th order, with built in periodicity
 
   use kind_parameters
   use common_parameter

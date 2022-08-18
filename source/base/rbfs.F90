@@ -1,4 +1,13 @@
 module rbfs
+  !! ----------------------------------------------------------------------------------------------
+  !! SUNSET CODE: Scalable Unstructured Node-SET code for DNS.
+  !! 
+  !! Author             |Date             |Contributions
+  !! --------------------------------------------------------------------------
+  !! JRCK               |2019 onwards     |Main developer                     
+  !!
+  !! ----------------------------------------------------------------------------------------------
+  !! This module contains radial basis functions.
   use kind_parameters
   use common_vars
   implicit none

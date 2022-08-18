@@ -1,6 +1,14 @@
 module setup
-  !! This module contains routines to read in node distributions, modify them with shifting 
-  !! pre-process to obtain boundary normal vectors, and write field data out to file.
+  !! ----------------------------------------------------------------------------------------------
+  !! SUNSET CODE: Scalable Unstructured Node-SET code for DNS.
+  !! 
+  !! Author             |Date             |Contributions
+  !! --------------------------------------------------------------------------
+  !! JRCK               |2019 onwards     |Main developer                     
+  !!
+  !! ----------------------------------------------------------------------------------------------
+  !! This module contains routines to read in node distributions, calls to MPI domain decomposion
+  !! routines, read in chemistry, and specify initial conditions.
   use kind_parameters
   use common_parameter
   use common_vars
@@ -72,7 +80,7 @@ contains
   subroutine setup_domain
      !! Reads in boundary patches, builds domain, calls decomposition and 
      !! boundary setup routines
-     use boundaries
+     use mirror_boundaries
      integer(ikind) i,j,ii,jj,npfb_tmp,k,dummy_int,dummy_int2,nm
      real(rkind) :: ns,dummy,rad,x,y,xn,yn
      real(rkind),dimension(dims) :: rij
@@ -316,7 +324,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
   end subroutine setup_domain
 !! ------------------------------------------------------------------------------------------------
   subroutine load_chemistry_data
-     
+     integer(ikind) :: ispec
      !! Hard-coded for now...
 #ifdef ms
      nspec = 2
@@ -324,10 +332,13 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      nspec = 1
 #endif     
      allocate(molar_mass(nspec),Lewis_number(nspec))
-     molar_mass(1) = 2.897d-2  !! N.B. molar mass is in kg/mol
-     Lewis_number(1) = one
-     molar_mass(2) = 2.897d-2
-     Lewis_number(2) = one
+     allocate(cp0_molar(nspec))
+
+     do ispec = 1,nspec
+        molar_mass(ispec) = 2.897d-2  !! N.B. molar mass is in kg/mol
+        Lewis_number(ispec) = one
+        cp0_molar(ispec) = 1004.5*molar_mass(ispec)/Rgas_universal
+     end do
      
 
      
@@ -335,7 +346,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
   end subroutine load_chemistry_data  
 !! ------------------------------------------------------------------------------------------------
   subroutine initial_solution
-     use boundaries
+     use mirror_boundaries
      use derivatives
      !! Temporary subroutine whilst developing. Initialises all fields
      integer(ikind) :: i,j,k,n_restart,ispec
@@ -355,7 +366,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         w(i) = zero!u(i);u(i)=zero
         tmp = -half*half*(cos(4.0d0*pi*x) + cos(4.0d0*pi*y))/csq
         lnro(i) = log(rho_char)!log(rho_char + tmp)!log(rho_char)       
-
+!if(x.le.zero) lnro(i) = log(1.2*rho_char)
               
 #ifdef ms    
 !        do ispec=1,nspec      

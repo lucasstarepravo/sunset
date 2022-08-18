@@ -1,4 +1,12 @@
 module mpi_transfers
+  !! ----------------------------------------------------------------------------------------------
+  !! SUNSET CODE: Scalable Unstructured Node-SET code for DNS.
+  !! 
+  !! Author             |Date             |Contributions
+  !! --------------------------------------------------------------------------
+  !! JRCK               |2022 onwards     |Main developer                     
+  !!
+  !! ----------------------------------------------------------------------------------------------
   !! This module contains routines to construct halos and do parallel data transfers
   !! ----------------------------------------------------------------------------------------------
   !! 2D DOMAIN DECOMPOSITION in x-y. Each processor has up to 8 neighbour processors

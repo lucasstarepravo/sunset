@@ -1,4 +1,12 @@
 module step
+  !! ----------------------------------------------------------------------------------------------
+  !! SUNSET CODE: Scalable Unstructured Node-SET code for DNS.
+  !! 
+  !! Author             |Date             |Contributions
+  !! --------------------------------------------------------------------------
+  !! JRCK               |2019 onwards     |Main developer                     
+  !!
+  !! ----------------------------------------------------------------------------------------------
   !! This module contains time-stepping routines, and a routine to set the time-step.
   !! Time-stepping routines start with "step_" and perform one time step. They are
   !! called from the main loop, and they themselves call routines in the rhs module.
@@ -6,7 +14,7 @@ module step
   use kind_parameters
   use common_parameter
   use common_vars
-  use boundaries
+  use mirror_boundaries
   use rhs
   use mpi_transfers
 #ifdef mp  
@@ -358,37 +366,61 @@ contains
   subroutine set_tstep
      use thermodynamics
      integer(ikind) :: i
-     real(rkind) :: umag,smin,dt_local
-    
-     !! Find maximum velocity magnitude
-     umax = 1.0d-8;!cmax = 1.0d-8
-     !$OMP PARALLEL DO PRIVATE(umag) REDUCTION(max:umax)
+     real(rkind) :: umag,dt_local
+     real(rkind) :: dt_visc,dt_therm,dt_spec,dt_cfl,dt_parabolic     
+     real(rkind) :: c,uplusc
+     
+     call evaluate_mixture_gas_constant
+     call evaluate_temperature_and_cp
+     call evaluate_transport_properties   
+     
+     !! Find minimum values for cfl, visc, thermal, and molecular diffusive steps
+     dt_cfl = 1.0d10;dt_visc = 1.0d10;dt_therm=1.0d10;dt_spec=1.0d10
+     cmax = zero;umax = zero
+     !$omp parallel do private(c,uplusc) reduction(min:dt_cfl,dt_visc,dt_therm,dt_spec) &
+     !$omp reduction(max:cmax,umax)
      do i=1,npfb
-        umag = u(i)*u(i) + v(i)*v(i) + w(i)*w(i)
-        umax = umag
+#ifdef isoT
+        c = sqrt(csq)
+#else             
+        c = sqrt(cp(i)*Rgas_mix(i)*T(i)/(cp(i)-Rgas_mix(i)))
+#endif        
+ 
+        !! Max velocity and sound speed
+        umax = sqrt(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))
+        cmax = c
+        
+        uplusc = umax + c
+        
+        !! Acoustic:: s/(u+c)
+        dt_cfl = s(i)/uplusc
 
-#ifndef isoT        
-!        cmax = (roE(i)/exp(lnro(i))-half*umag)
-#endif       
-   
+        !! Viscous:: s*s*ro/visc
+        dt_visc = s(i)*s(i)*exp(lnro(i))/visc(i)
+        
+        !! Thermal:: s*s*ro*cp/lambda_th
+        dt_therm = s(i)*s(i)*exp(lnro(i))*cp(i)/lambda_th(i)
+        
+        !! Molecular diffusivity::  s*s*ro/Mdiff
+        dt_spec = s(i)*s(i)*exp(lnro(i))/maxval(Mdiff(i,1:nspec))
      end do
-     !$OMP END PARALLEL DO
-     umax = sqrt(umax)
-     
-#ifndef isoT
-!     cmax = sqrt(cmax*gammagas_m1*gammagas)     
-#else
-!     cmax = sqrt(csq)
-#endif            
-     
-     
-     
-     
+     !$omp end parallel do
+
+     !! Scale by characteristic lengths
+     dt_cfl = dt_cfl*L_char
+     dt_visc = dt_visc*L_char*L_char
+     dt_therm = dt_therm*L_char*L_char
+     dt_spec = dt_spec*L_char*L_char          
+
+                           
      !! Find smallest node spacing
      smin = minval(s(1:npfb))*L_char
 
      !! Set time step
-     dt = min(0.3d0*smin*smin/visc0,one*smin/(cmax+umax))
+     dt_parabolic = 0.3d0*min(dt_visc,min(dt_therm,dt_spec)) !! Parabolic (2nd order)
+     dt = min(dt_parabolic,one*dt_cfl)
+
+
    
 #ifdef mp     
      !! Find global time-step
@@ -412,22 +444,11 @@ contains
      real(rkind) :: facA,facB,facC
      real(rkind) :: kappa,alph,beta,gamm,eps
      real(rkind) :: tratio_min,tratio_max
-     real(rkind) :: umag2,smin,umag
+     real(rkind) :: umag2,umag
      real(rkind) :: dtmax,c,dt_local
      
-     !! Use CFL to set an upper limit to dt
-     smin = minval(s(1:npfb))     
-     umax = 1.0d-8;cmax = 1.0d-8
-     !$OMP PARALLEL DO PRIVATE(umag) REDUCTION(max:umax,cmax)
-     do i=1,npfb
-        umag = u(i)*u(i) + v(i)*v(i) + w(i)*w(i)
-        umax = umag  
-     end do
-     !$OMP END PARALLEL DO
-     umax = sqrt(umax)
-     
-     dtmax = 0.8d0*smin/(umax+cmax)
-!     dtmax = min(dtmax,0.1*smin*smin/visc0) !! Viscous constraint...
+     !! Set the upper limit of dt to the recently calculated dt based on CFL-type conditions.
+     dtmax = dt
      
      !! PID parameters...
      kappa=0.9

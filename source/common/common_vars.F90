@@ -1,4 +1,13 @@
 module common_vars
+  !! ----------------------------------------------------------------------------------------------
+  !! SUNSET CODE: Scalable Unstructured Node-SET code for DNS.
+  !! 
+  !! Author             |Date             |Contributions
+  !! --------------------------------------------------------------------------
+  !! JRCK               |2019 onwards     |Main developer                     
+  !!
+  !! ----------------------------------------------------------------------------------------------
+  !! This module contains variables common to all modules within the sunset code
 
   use iso_c_binding
   use common_parameter
@@ -20,7 +29,9 @@ module common_vars
   !! Transport properties
   real(rkind), dimension(:), allocatable :: Rgas_mix,cp,visc,lambda_th
   real(rkind), dimension(:,:), allocatable :: Mdiff
-  real(rkind), dimension(:), allocatable :: molar_mass,Lewis_number
+  
+  !! Transport properties - arrays covering the species
+  real(rkind), dimension(:), allocatable :: molar_mass,Lewis_number,cp0_molar
   
   !! Right-hand-sides
   real(rkind),dimension(:),allocatable :: rhs_lnro,rhs_u,rhs_v,rhs_w,rhs_roE
@@ -48,7 +59,7 @@ module common_vars
   !! Parameters related to time and some forces etc
   real(rkind) :: time,dt,time_end,dt_out,dt_mout
   real(rkind) :: time_star !! Dimensionless time (for outputs...)
-  real(rkind) :: umax,smax,cmax                  !! maximum velocity,node-spacing,sound speed
+  real(rkind) :: umax,smax,cmax,smin                  !! maximum velocity,node-spacing,sound speed
   integer(ikind) :: itime
   real(rkind) :: emax_nm1,emax_n,emax_np1  !! errors for PID controller
   real(rkind) :: eflow_nm1,eflow_n,sum_eflow !! errors for PID to control <u> (constant-ish flow rate)

@@ -1,5 +1,13 @@
 program sunset
-  !! This is the main program of the sunset code.
+  !! ----------------------------------------------------------------------------------------------
+  !! SUNSET CODE: Scalable Unstructured Node-SET code for DNS.
+  !! 
+  !! Author             |Date             |Contributions
+  !! --------------------------------------------------------------------------
+  !! JRCK               |2019 onwards     |Main developer                     
+  !!
+  !! ----------------------------------------------------------------------------------------------
+  !! This is the main program of the sunset code. 
   use kind_parameters
   use common_parameter
   use common_vars
@@ -45,9 +53,6 @@ program sunset
   !! Create initial fields for primary variables
   call initial_solution
 
-  !! Initialise the time-step (to something small to be safe...)
-  call set_tstep;dt=0.0001*dt  
-
   !! Initialise time profiling and output counter...
   n_out = 0;ts_start = omp_get_wtime()
   m_out = 0
@@ -55,6 +60,12 @@ program sunset
   !! MAIN TIME LOOP ---------------------------------------------------
   do while (time.le.time_end)
     
+     !! Set the time step
+     call set_tstep     
+     
+     !! Additional constraints based on error estimation: essential for reacting flows
+!     call set_tstep_PID  
+
      !! Output, conditionally: at start, subsequently every dt_out
      if(itime.eq.0.or.time.gt.n_out*dt_out) then 
 !     if(itime.eq.0.or.mod(itime,1).eq.0)then
@@ -62,10 +73,6 @@ program sunset
         call output_layer(n_out)
      end if        
     
-     !! Set the time step
-     call set_tstep     
-!     call set_tstep_PID  
-
      !! Perform one time step
      call step_rk3_4S_2R
 !     call step_rk3_4S_2R_EE     
@@ -81,7 +88,7 @@ program sunset
   !! END MAIN TIME LOOP -----------------------------------------------
   
   !! Deallocate particle properties and neighbour lists
-  call deallocate_weights
+  call deallocate_everything
 #ifdef mp    
 !  call MPI_FINALIZE(ierror)
   call MPI_Abort(MPI_COMM_WORLD, n_out, ierror)       
@@ -90,7 +97,7 @@ program sunset
 #endif  
 end program sunset
 !! ------------------------------------------------------------------------------------------------
-subroutine deallocate_weights
+subroutine deallocate_everything
   use kind_parameters
   use common_parameter
   use common_vars
@@ -120,4 +127,4 @@ subroutine deallocate_weights
   
   
   return
-end subroutine deallocate_weights
+end subroutine deallocate_everything

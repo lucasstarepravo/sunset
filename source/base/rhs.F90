@@ -1,4 +1,12 @@
 module rhs
+  !! ----------------------------------------------------------------------------------------------
+  !! SUNSET CODE: Scalable Unstructured Node-SET code for DNS.
+  !! 
+  !! Author             |Date             |Contributions
+  !! --------------------------------------------------------------------------
+  !! JRCK               |2019 onwards     |Main developer                     
+  !!
+  !! ----------------------------------------------------------------------------------------------
   !! This module contains routines to construct the RHS of all evolution equations
   !! These RHS' are built using calls to routines from the derivatives module, and
   !! calls to specific thermodynamics routines.
@@ -14,7 +22,7 @@ module rhs
   use common_vars
   use derivatives
   use thermodynamics
-  use boundaries
+  use characteristic_boundaries
   implicit none
   
  
@@ -23,10 +31,12 @@ module rhs
 
   !! Allocatable arrays for 1st and 2nd gradients
   real(rkind),dimension(:,:),allocatable :: gradu,gradv,gradw,gradlnro,gradp
+  real(rkind),dimension(:,:),allocatable :: gradroE
   real(rkind),dimension(:,:),allocatable :: graddivvel
   real(rkind),dimension(:),allocatable :: lapu,lapv,lapw
   real(rkind),dimension(:),allocatable :: lapYspec
   real(rkind),dimension(:,:),allocatable :: gradYspec
+  real(rkind),dimension(:,:),allocatable :: gradT
   
   real(rkind),dimension(:),allocatable :: store_diff_E
   
@@ -49,15 +59,36 @@ contains
 #endif  
 
      !! Determine secondary thermodynamic quantities and transport properties
-     call evaluate_mixture_gas_constant
-     call evaluate_temperature_and_cp
-     call evaluate_pressure
-     call evaluate_transport_properties
+     !! N.B. These are also calculated when setting time step, so not necessary for the first call
+     !! to calc_all_rhs in the RK scheme.
+     if(.not.(allocated(T))) then
+        call evaluate_mixture_gas_constant
+        call evaluate_temperature_and_cp     
+        call evaluate_transport_properties
+     end if
 
-     !! Initialise to zero
+     call evaluate_pressure
+
+     !! Initialise  right hand sides to zero
      rhs_lnro=zero;rhs_u=zero;rhs_v=zero;rhs_w=zero;rhs_roE=zero;rhs_Yspec=zero
      
-     !! Call individual rhs routines
+     !! Calculate derivatives of primary variables
+     allocate(gradlnro(npfb,dims));gradlnro=zero  
+     allocate(gradu(npfb,dims),gradv(npfb,dims),gradw(npfb,dims));gradw=zero
+     call calc_gradient(lnro,gradlnro)     
+     call calc_gradient(u,gradu)
+     call calc_gradient(v,gradv)     
+#ifdef dim3
+     call calc_gradient(w,gradw)
+#endif    
+#ifndef isoT
+     allocate(gradroE(npfb,dims))
+     call calc_gradient(roE,gradroE)
+#endif          
+          
+     !! Call individual routines to build the RHSs
+     !! N.B. second derivatives and derivatives of secondary variables are calculated within
+     !! these subroutines
      call calc_rhs_lnro
      call calc_rhs_vel
      call calc_rhs_roE
@@ -66,8 +97,14 @@ contains
      
      
      !! Clear space no longer required
-     deallocate(Rgas_mix,cp,visc,lambda_th,Mdiff)
+     deallocate(gradlnro,gradu,gradv,gradw,gradp)
+#ifndef isoT     
+     deallocate(gradroE)
+     deallocate(Rgas_mix,cp)
      deallocate(T)
+#endif     
+     deallocate(p)
+     deallocate(visc,lambda_th,Mdiff)
   
      return
   end subroutine calc_all_rhs
@@ -78,23 +115,7 @@ contains
      real(rkind),dimension(dims) :: tmp_vec
      real(rkind) :: tmp_scal
 
-
-     segment_tstart = omp_get_wtime()
-
-  
-
-     !! Allocate some arrays for gradients
-     allocate(gradlnro(npfb,dims));gradlnro=zero  
-!     allocate(divvel(npfb));divvel=zero
-     allocate(gradu(npfb,dims),gradv(npfb,dims),gradw(npfb,dims));gradw=zero
-      
-     !! Evaluate gradients
-     call calc_gradient(lnro,gradlnro)     
-     call calc_gradient(u,gradu)
-     call calc_gradient(v,gradv)     
-#ifdef dim3
-     call calc_gradient(w,gradw)
-#endif     
+     segment_tstart = omp_get_wtime()  
      
      !! Build RHS for internal nodes
      !$omp parallel do private(i,tmp_vec,tmp_scal)
@@ -131,14 +152,9 @@ contains
         !$omp end parallel do 
      end if       
 
-     !! Deallocate any stores no longer required      
-#ifndef ms     
-     if(nb.eq.0) deallocate(gradlnro)
-#endif
-
      !! Profiling
      segment_tend = omp_get_wtime()
-     segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
+     segment_time_local(8) = segment_time_local(8) + segment_tend - segment_tstart
      return
   end subroutine calc_rhs_lnro
 !! ------------------------------------------------------------------------------------------------
@@ -150,8 +166,6 @@ contains
      real(rkind) :: tmpro,body_force_u,body_force_v,body_force_w
      real(rkind) :: c
 
-
-     segment_tstart = omp_get_wtime()          
      
      !! Gradient of velocity divergence
      allocate(graddivvel(npfb,dims));graddivvel=zero
@@ -171,6 +185,8 @@ contains
 #endif     
 
      call calc_gradient(p,gradp)
+     
+     segment_tstart = omp_get_wtime()  
          
      !! Build RHS for internal nodes
      !$omp parallel do private(i,tmp_vec,tmp_scal_u,tmp_scal_v,tmp_scal_w,f_visc_u,f_visc_v,f_visc_w,tmpro &
@@ -220,7 +236,11 @@ contains
         do j=1,nb
            i=boundary_list(j)
            tmpro = exp(lnro(i))
+#ifndef isoT           
            c=calc_sound_speed(cp(i),Rgas_mix(i),T(i)) 
+#else
+           c=sqrt(csq)
+#endif            
            dpdn = gradp(i,1)
            if(node_type(i).eq.0)then !! walls are in bound norm coords
               xn=rnorm(i,1);yn=rnorm(i,2)  !! Bound normals
@@ -281,11 +301,11 @@ contains
      !! Deallocate any stores no longer required
      deallocate(lapu,lapv,lapw)
      deallocate(graddivvel) 
-      
+         
      !! Profiling
      segment_tend = omp_get_wtime()
-     segment_time_local(6) = segment_time_local(6) + segment_tend - segment_tstart
-     
+     segment_time_local(8) = segment_time_local(8) + segment_tend - segment_tstart
+          
      return
   end subroutine calc_rhs_vel
 !! ------------------------------------------------------------------------------------------------  
@@ -294,18 +314,15 @@ contains
 #ifndef isoT     
      integer(ikind) :: i,j
      real(rkind) :: tmp_conv,tmp_visc,tmpro,tmp_p,tmp_E
-     real(rkind),dimension(:,:),allocatable :: gradroE,grad2T
+     real(rkind),dimension(:,:),allocatable :: grad2T
      real(rkind),dimension(:),allocatable :: lapT
-     
-     segment_tstart = omp_get_wtime()
-     
-     !! Allocation and calculation of gradients     
-     allocate(gradroE(npfb,dims))
+         
+     !! Allocation and calculation of temperature laplacian     
      allocate(lapT(npfb))
-     call calc_gradient(roE,gradroE)
      call calc_laplacian(T,lapT)
      
      
+     segment_tstart = omp_get_wtime()     
      !! Build RHS
      !$omp parallel do private(i,tmpro,tmp_p,tmp_conv,tmp_visc,tmp_E)
      do j=1,npfb-nb
@@ -372,19 +389,17 @@ contains
         !$omp end parallel do
         deallocate(grad2T)
      end if
-     deallocate(gradroE,lapT)
+     deallocate(lapT)
      
      !! Profiling
      segment_tend = omp_get_wtime()
-     segment_time_local(5) = segment_time_local(5) + segment_tend - segment_tstart             
+     segment_time_local(8) = segment_time_local(8) + segment_tend - segment_tstart             
 #else
      rhs_roE(1:npfb) = zero
 #endif
 
      !! Deallocation of spatial derivatives
      deallocate(store_diff_E)
-     if(nb.eq.0) deallocate(p)
-     if(nb.eq.0) deallocate(gradp,gradu,gradv,gradw)
            
      return
   end subroutine calc_rhs_roE
@@ -397,7 +412,6 @@ contains
      real(rkind),dimension(dims) :: tmp_vec
      real(rkind) :: tmp_scal,lapYspec_tmp,tmpY
 
-     segment_tstart = omp_get_wtime()     
      
      allocate(gradYspec(npfb,dims))
      allocate(lapYspec(npfb))
@@ -406,7 +420,8 @@ contains
      
         call calc_gradient(Yspec(:,ispec),gradYspec)
         call calc_laplacian(Yspec(:,ispec),lapYspec)
-          
+
+        segment_tstart = omp_get_wtime()               
         !$omp parallel do private(i,tmp_vec,tmp_scal,tmpY)
         do j=1,npfb-nb
            i=internal_list(j)
@@ -417,12 +432,16 @@ contains
            rhs_Yspec(i,ispec) = -tmp_scal + Mdiff(i,ispec)*(lapYspec(i) + dot_product(gradYspec(i,:),gradlnro(i,:)))
         end do
         !$omp end parallel do
+   
+        !! Profiling
+        segment_tend = omp_get_wtime()
+        segment_time_local(8) = segment_time_local(8) + segment_tend - segment_tstart            
 
         !! Make L5+ispec and boundary RHS
         if(nb.ne.0)then
            allocate(grad2Yspec(nb,dims))
            call calc_grad2bound(Yspec(:,ispec),grad2Yspec)
-
+           segment_tstart = omp_get_wtime()               
            !$omp parallel do private(i,tmp_scal,xn,yn,un,ut,dutdt,lapYspec_tmp,tmpY)
            do j=1,nb
               i=boundary_list(j)
@@ -450,6 +469,10 @@ contains
            end do
            !$omp end parallel do 
            deallocate(grad2Yspec)
+           
+           !! Profiling
+           segment_tend = omp_get_wtime()
+           segment_time_local(8) = segment_time_local(8) + segment_tend - segment_tstart               
         end if       
 
 
@@ -458,169 +481,61 @@ contains
 
      !! Deallocate any stores no longer required    
      deallocate(gradYspec,lapYspec)
-     if(nb.eq.0) deallocate(gradlnro)    
-
-     !! Profiling
-     segment_tend = omp_get_wtime()
-     segment_time_local(8) = segment_time_local(8) + segment_tend - segment_tstart              
+          
 #endif          
+
      return
   end subroutine calc_rhs_Yspec  
 !! ------------------------------------------------------------------------------------------------
   subroutine calc_rhs_nscbc
     !! This routine asks boundaries module to prescribe L as required, then builds the final 
     !! rhs for each equation. It should only be called if nb.ne.0
-    
-    !! Boundary framework follows (with newest taking precedence):: 
-    !! Sutherland & Kennedy (2003)
-    !! Yoo & Im (2007)
-    !! Coussement et al. (2012)    
     integer(ikind) :: i,j,ispec
     real(rkind) :: tmpro,c,tmp_scal,cv,gammagasm1
     
     segment_tstart = omp_get_wtime()
        
     !! Loop over boundary nodes and specify L as required
-    !$omp parallel do private(i,tmpro,c,ispec,gammagasm1)
+    !$omp parallel do private(i)
     do j=1,nb
-       i=boundary_list(j)
-       tmpro = exp(lnro(i))
-       c=calc_sound_speed(cp(i),Rgas_mix(i),T(i)) 
-       gammagasm1 = Rgas_mix(i)/(cp(i)-Rgas_mix(i))
+       i=boundary_list(j)  
        
-       !! WALL BOUNDARY +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+       !! WALL BOUNDARY 
        if(node_type(i).eq.0) then 
-          L(j,5)=L(j,1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro) 
-          L(j,3) = zero
-          L(j,4) = zero
-       
-!! ISOTHERMAL FLOWS =================================================
-#ifdef isoT
-          L(j,2) = zero
-          
-!! THERMAL FLOWS ====================================================
-#else          
-#ifdef wall_isoT
-   !! ISOTHERMAL WALL =====================================
-          L(j,2) = gammagasm1*(L(j,5)+L(j,1))/c/c &
-                 - gammagasm1*tmpro*gradv(i,2) - gammagasm1*tmpro*gradw(i,3) !! Compatible with fixing dT/dt=0?  
-#else          
-   !! IMPOSED HEAT FLUX WALL ==============================
-          L(j,2) = zero
-#endif                             
-#endif          
-#ifdef ms
-          do ispec=1,nspec
-             L(j,5+ispec) = zero
-          end do
-#endif          
-!! ==================================================================
-       !! INFLOW BOUNDARY +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+          call specify_characteristics_wall(j,L(j,:),gradv(i,:),gradw(i,:))
+
+
+       !! INFLOW BOUNDARY
        else if(node_type(i).eq.1) then 
-!! ISOTHERMAL FLOWS =================================================
-#ifdef isoT
-   !! (Partially-) NON-REFLECTING INFLOW ==================
-#ifndef hardinf
-          L(j,5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &      !! Track u_inflow
-                 - half*(v(i)*gradp(i,2)+p(i)*gradv(i,2)+tmpro*c*v(i)*gradu(i,2)) &    !! transverse 1 conv. terms
-                 - half*(w(i)*gradp(i,3)+p(i)*gradw(i,3)+tmpro*c*w(i)*gradu(i,3))      !! transverse 2 conv. terms 
-          L(j,3) = v(i)*0.278d0*c/L_domain_x &             !! track v=zero
-                   + rhs_v(i)                                !! rhs_v contains transverse and visc terms needed
-          L(j,4) = w(i)*0.278d0*c/L_domain_x &             !! track w=zero
-                   + rhs_w(i)                                !! rhs_w contains transverse and visc terms needed
-   !! HARD INFLOW =========================================          
-#else
-          L(j,5) = L(j,1)
-          L(j,3) = zero        
-          L(j,4) = zero
-#endif
-          L(j,2) = zero
-          
-!! THERMAL FLOWS ====================================================
-#else
+          call specify_characteristics_inflow(j,L(j,:),gradlnro(i,:),gradp(i,:),gradu(i,:),gradv(i,:),gradw(i,:))       
 
-   !! (Partially-) NON-REFLECTING INFLOW ==================
-#ifndef hardinf
-          L(j,5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &      !! Track u_inflow
-                 - half*(v(i)*gradp(i,2)+gammagas*p(i)*gradv(i,2)+tmpro*c*v(i)*gradu(i,2))  & !! transverse 1 conv. terms
-                 - half*(w(i)*gradp(i,3)+gammagas*p(i)*gradw(i,3)+tmpro*c*w(i)*gradu(i,3))    !! transverse 2 conv. terms  
-          L(j,3) = v(i)*0.278d0*c/L_domain_x &             !! track v=zero
-                   + rhs_v(i)                                !! rhs_v contains transverse and visc terms needed
-          L(j,4) = w(i)*0.278d0*c/L_domain_x &             !! track w=zero
-                   + rhs_w(i)                                !! rhs_w contains transverse and visc terms needed
+ 
+       !! OUTFLOW BOUNDARY 
+       else if(node_type(i).eq.2) then   
+          call specify_characteristics_outflow(j,L(j,:),gradp(i,:),gradu(i,:),gradv(i,:),gradw(i,:))       
 
-          L(j,2) = (T0-T(i))*c*0.278d0/L_domain_x/gammagas &
-                 - (v(i)*gradlnro(i,2)*tmpro + tmpro*gradv(i,2) + v(i)*gradp(i,2)/c/c + gammagas*p(i)*gradv(i,2)/c/c) &
-                 - (w(i)*gradlnro(i,3)*tmpro + tmpro*gradw(i,3) + w(i)*gradp(i,3)/c/c + gammagas*p(i)*gradw(i,3)/c/c)
-                 !! Need to add on visc+source terms
-   !! HARD INFLOW =========================================          
-#else
-          L(j,5) = L(j,1)
-          L(j,3) = zero        
-          L(j,4) = zero
-          L(j,2) = gammagasm1*(L(j,1)+L(j,5))/c/c &
-                 - gammagasm1*tmpro*gradv(i,2) &   !! trans 1 term
-                 - gammagasm1*tmpro*gradw(i,3)     !! Trans 2 term 
-                 ! + dT/dy term?
-#endif
-#endif     
-!! ==================================================================     
-#ifdef ms
-          do ispec=1,nspec
-             L(j,5+ispec) = zero
-          end do
-#endif
-
-       !! OUTFLOW BOUNDARY ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-       else if(node_type(i).eq.2) then   !! L1 incoming, L2,L3,L4,L5,L5+ispec outgoing from definition
-!! ISOTHERMAL FLOWS =================================================
-#ifdef isoT
-          L(j,2) = zero
-          if(u(i).le.c) then !! Subsonic. If supersonic, just use L1 from definition...
-             L(j,1) = (p(i)-p_infinity)*0.278d0*c*(one)/two/L_domain_x &               !! track p_infinity
-                    - (one-u(i)/c)*half*(v(i)*gradp(i,2)+p(i)*gradv(i,2)-tmpro*c*v(i)*gradu(i,2)) & !!transverse 1 conv. terms
-                    - (one-u(i)/c)*half*(w(i)*gradp(i,3)+p(i)*gradw(i,3)-tmpro*c*w(i)*gradu(i,3)) !! transverse 2 conv. terms
-          end if
-          if(u(i).le.zero) then
-             L(j,3)=zero !! no incoming shear if outflow velocity is zero...
-             L(j,4)=zero
-          end if
-!! THERMAL FLOWS ====================================================
-#else
-          if(u(i).le.c) then !! Subsonic. If supersonic, just use L1 from definition...
-             L(j,1) = (p(i)-p_infinity)*0.278d0*c*(one)/two/L_domain_x &               !! track p_infinity
-                    - (one-u(i)/c)*half*(v(i)*gradp(i,2)+gammagas*p(i)*gradv(i,2)-tmpro*c*v(i)*gradu(i,2)) &!!trans1 conv.
-                    - (one-u(i)/c)*half*(w(i)*gradp(i,3)+gammagas*p(i)*gradw(i,3)-tmpro*c*w(i)*gradu(i,3)) !! trasn2 conv.
-          end if
-          if(u(i).le.zero) then
-             L(j,3)=zero !! no incoming shear if outflow velocity is zero...
-             L(j,4)=zero
-          end if
-#endif            
-!! ==================================================================
-          !! Want reflecting, set L1=-L5
-!          L(j,1) = -L(j,5) !! Reflecting!!
        end if          
     end do
     !$omp end parallel do
     
-    !! Deallocate remaining gradient arrays
-    deallocate(gradp,gradu,gradv,gradw,gradlnro)    
-
-
     !! ==================================================================================
     !! Use L to update the rhs on boundary nodes
     !$omp parallel do private(i,tmpro,c,tmp_scal,cv,ispec,gammagasm1)
     do j=1,nb
        i=boundary_list(j)
        tmpro = exp(lnro(i))
+#ifndef isoT       
        c=calc_sound_speed(cp(i),Rgas_mix(i),T(i)) 
        gammagasm1 = Rgas_mix(i)/(cp(i)-Rgas_mix(i))
+#else
+       c=sqrt(csq)
+#endif       
+
 
        !! This quantity appears in rhs_lnro and rhs_roE, so save in tmp_scal
        tmp_scal = (c*c*L(j,2) + L(j,5) + L(j,1))/c/c
        
-       !! The RHS of the density equation. Independent of BC type
+       !! The RHS of the density equation is independent of BC type
        rhs_lnro(i) = rhs_lnro(i) - tmp_scal/tmpro
        
        !! WALL BOUNDARY +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -628,9 +543,7 @@ contains
           rhs_u(i) = zero
           rhs_v(i) = zero
           rhs_w(i) = zero
-#ifdef isoT          
-          rhs_roE(i) = zero
-#else          
+#ifndef isoT          
 #ifdef wall_isoT
           rhs_roE(i) = rhs_lnro(i)*roE(i)  !! This if isothermal wall...
 #else
@@ -648,10 +561,11 @@ contains
           rhs_v(i) = rhs_v(i) - L(j,3)
           rhs_w(i) = rhs_w(i) - L(j,4)
 
+#ifndef isoT          
           cv = cp(i) - Rgas_mix(i)
           rhs_roE(i) = rhs_roE(i) - u(i)*(L(j,5)-L(j,1))/c - tmpro*v(i)*L(j,3) - tmpro*w(i)*L(j,4) &
                                 - (roE(i)/tmpro - cv*T(i))*tmp_scal - (L(j,5)+L(j,1))/gammagasm1         
-
+#endif
 
 #ifdef hardinf
           rhs_u(i) = zero
@@ -668,9 +582,7 @@ contains
           rhs_u(i) = rhs_u(i) - (L(j,5)-L(j,1))/(tmpro*c)       
           rhs_v(i) = rhs_v(i) - L(j,3)
           rhs_w(i) = rhs_w(i) - L(j,4)
-#ifdef isoT
-          rhs_roE(i) = zero
-#else                    
+#ifndef isoT
           cv = cp(i) - Rgas_mix(i)
           rhs_roE(i) = rhs_roE(i) - u(i)*(L(j,5)-L(j,1))/c - tmpro*v(i)*L(j,3) -tmpro*w(i)*L(j,4) &
                                 - (roE(i)/tmpro - cv*T(i))*tmp_scal - (L(j,5)+L(j,1))/gammagasm1
@@ -684,14 +596,13 @@ contains
     end do
     !$omp end parallel do
   
-    !! De-allocate Secondary properties and L
-    deallocate(p)
+    !! De-allocate L
     deallocate(L)
     
    
     !! Profiling
     segment_tend = omp_get_wtime()
-    segment_time_local(4) = segment_time_local(4) + segment_tend - segment_tstart
+    segment_time_local(8) = segment_time_local(8) + segment_tend - segment_tstart
     return  
   end subroutine calc_rhs_nscbc
 !! ------------------------------------------------------------------------------------------------  

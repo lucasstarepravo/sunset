@@ -1,6 +1,14 @@
 module output
-  !! This module contains routines to read in node distributions, modify them with shifting 
-  !! pre-process to obtain boundary normal vectors, and write field data out to file.
+  !! ----------------------------------------------------------------------------------------------
+  !! SUNSET CODE: Scalable Unstructured Node-SET code for DNS.
+  !! 
+  !! Author             |Date             |Contributions
+  !! --------------------------------------------------------------------------
+  !! JRCK               |2019 onwards     |Main developer                     
+  !!
+  !! ----------------------------------------------------------------------------------------------
+  !! This module contains routines to write main output files (field data), perform reduction 
+  !! calculations to obtain and output global statistics, and write data to standard-out.
   use kind_parameters
   use common_parameter
   use common_vars
@@ -79,14 +87,14 @@ contains
            !! Profiling
            write(6,*) "  "
            write(6,*) "Profiling:::"
-           write(6,*) "MPI transfers    :",segment_time_global(1)/sum(segment_time_global(1:8))
-           write(6,*) "Mirror boundaries:",segment_time_global(2)/sum(segment_time_global(1:8))
-           write(6,*) "Filtering        :",segment_time_global(3)/sum(segment_time_global(1:8))
-           write(6,*) "RHS boundaries   :",segment_time_global(4)/sum(segment_time_global(1:8))
-           write(6,*) "RHS energy       :",segment_time_global(5)/sum(segment_time_global(1:8))
-           write(6,*) "RHS velocity     :",segment_time_global(6)/sum(segment_time_global(1:8))
-           write(6,*) "RHS Density      :",segment_time_global(7)/sum(segment_time_global(1:8))
-           write(6,*) "RHS Species      :",segment_time_global(8)/sum(segment_time_global(1:8))           
+           write(6,*) "MPI transfers             :",segment_time_global(1)/sum(segment_time_global(1:8))
+           write(6,*) "Mirror boundaries         :",segment_time_global(2)/sum(segment_time_global(1:8))
+           write(6,*) "Filtering                 :",segment_time_global(3)/sum(segment_time_global(1:8))
+           write(6,*) "Gradients                 :",segment_time_global(4)/sum(segment_time_global(1:8))
+           write(6,*) "Laplacians                :",segment_time_global(5)/sum(segment_time_global(1:8))
+           write(6,*) "Divergence                :",segment_time_global(6)/sum(segment_time_global(1:8))
+           write(6,*) "Boundary 2nd derivatives  :",segment_time_global(7)/sum(segment_time_global(1:8))
+           write(6,*) "RHS building              :",segment_time_global(8)/sum(segment_time_global(1:8))           
            write(6,'(/,/,A)') "  "
                     
            
@@ -109,14 +117,14 @@ contains
         !! Profiling
         write(6,*) "  "
         write(6,*) "Profiling:::"
-        write(6,*) "MPI transfers    :",segment_time_local(1)/sum(segment_time_local(1:8))
-        write(6,*) "Mirror boundaries:",segment_time_local(2)/sum(segment_time_local(1:8))
-        write(6,*) "Filtering        :",segment_time_local(3)/sum(segment_time_local(1:8))
-        write(6,*) "RHS boundaries   :",segment_time_local(4)/sum(segment_time_local(1:8))
-        write(6,*) "RHS energy       :",segment_time_local(5)/sum(segment_time_local(1:8))
-        write(6,*) "RHS velocity     :",segment_time_local(6)/sum(segment_time_local(1:8))
-        write(6,*) "RHS Density      :",segment_time_local(7)/sum(segment_time_local(1:8))
-        write(6,*) "RHS Species      :",segment_time_local(8)/sum(segment_time_local(1:8))        
+        write(6,*) "MPI transfers             :",segment_time_local(1)/sum(segment_time_local(1:8))
+        write(6,*) "Mirror boundaries         :",segment_time_local(2)/sum(segment_time_local(1:8))
+        write(6,*) "Filtering                 :",segment_time_local(3)/sum(segment_time_local(1:8))
+        write(6,*) "Gradients                 :",segment_time_local(4)/sum(segment_time_local(1:8))
+        write(6,*) "Laplacians                :",segment_time_local(5)/sum(segment_time_local(1:8))
+        write(6,*) "Divergence                :",segment_time_local(6)/sum(segment_time_local(1:8))
+        write(6,*) "Boundary 2nd derivatives  :",segment_time_local(7)/sum(segment_time_local(1:8))
+        write(6,*) "RHS building              :",segment_time_local(8)/sum(segment_time_local(1:8))        
         write(6,'(/,/,/,/,/,A)') "  "                  
 #endif          
      
@@ -224,7 +232,7 @@ if(.true.)then
         write(20,*) np_out_local
         do i=1,np_out_local
            tmpro = exp(lnro(i))
-           tmpT = zero
+           tmpT = T(i)
 
 #ifdef dim3
            write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),node_type(i),tmpro, &
@@ -372,10 +380,10 @@ if(.true.)then
            gradv0(:) = matmul(Jinv,gradv(i,:))           
            
            !! Total stress on surface
-           sigma(1,1) = visc0*(fourthirds*gradu0(1)-twothirds*gradv0(2)) - csq*(exp(lnro(i))-one)
-           sigma(1,2) = visc0*(gradu0(2)+gradv0(1))
-           sigma(2,1) = visc0*(gradu0(2)+gradv0(1))           
-           sigma(2,2) = visc0*(fourthirds*gradv0(2)-twothirds*gradu0(1)) - csq*(exp(lnro(i))-one)
+           sigma(1,1) = visc(i)*(fourthirds*gradu0(1)-twothirds*gradv0(2)) - csq*(exp(lnro(i))-one)
+           sigma(1,2) = visc(i)*(gradu0(2)+gradv0(1))
+           sigma(2,1) = visc(i)*(gradu0(2)+gradv0(1))           
+           sigma(2,2) = visc(i)*(fourthirds*gradv0(2)-twothirds*gradu0(1)) - csq*(exp(lnro(i))-one)
           
            Fn(:) = matmul(sigma,rnorm(i,:))   !! Force on surface (sigma.n)
                      
@@ -595,7 +603,7 @@ if(.true.)then
         do j=1,jj
            N=(2*j-1)*pi
            X1 = sin(N*y1)/N**3.0d0
-           X2 = exp(-N*N*visc0*time/Time_char)
+           X2 = exp(-N*N*visc(i)*time/Time_char)
            uexact = uexact - 32.0d0*X1*X2
         end do       
         

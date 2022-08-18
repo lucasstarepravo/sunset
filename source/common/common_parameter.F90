@@ -1,4 +1,13 @@
 module common_parameter
+  !! ----------------------------------------------------------------------------------------------
+  !! SUNSET CODE: Scalable Unstructured Node-SET code for DNS.
+  !! 
+  !! Author             |Date             |Contributions
+  !! --------------------------------------------------------------------------
+  !! JRCK               |2019 onwards     |Main developer                     
+  !!
+  !! ----------------------------------------------------------------------------------------------
+  !! This module contains parameters for the sunset code
   use kind_parameters
   implicit none 
 
@@ -67,26 +76,24 @@ module common_parameter
   real(rkind), parameter :: gammagas = 1.4d0
   real(rkind), parameter :: Rs0 = 287.058d0   !! Reference specific gas constant  
   real(rkind), parameter :: gammagas_m1 = gammagas - one
-  real(rkind), parameter :: visc0 = 1.0d-3!1.8d-5
-  real(rkind), parameter :: lambda_th0 = visc0*Rs0*gammagas/gammagas_m1/Pr
-  real(rkind), parameter :: Mdiff0 = lambda_th0*gammagas_m1/rho_char/Rs0/gammagas/one !! one is Lewis #
+  real(rkind), parameter :: visc_ref = 1.0d-3!1.8d-5
+  real(rkind), parameter :: lambda_th_ref = visc_ref*Rs0*gammagas/gammagas_m1/Pr
+  real(rkind), parameter :: Mdiff_ref = lambda_th_ref*gammagas_m1/rho_char/Rs0/gammagas/one !! one is Lewis #
 
-  
   !! Secondary domain parameters ------------------------------------------------------------------
   real(rkind), parameter :: Lz = half*L_char  !! Domain length-scale in third dimension
-  real(rkind), parameter :: u_char = Re*visc0/L_char/rho_char  !! Characteristic velocity
+  real(rkind), parameter :: u_char = Re*visc_ref/L_char/rho_char  !! Characteristic velocity
   real(rkind), parameter :: u_inflow = u_char  !! Inflow velocity (occasionally differs from u_char)
   real(rkind), parameter :: Time_char= L_char/u_char            !! Characteristic time-scale
     
   !! Secondary fluid parameters -------------------------------------------------------------------
   real(rkind), parameter :: csq = (u_char/Ma)**two  !! Reference sound speed   
   real(rkind), parameter :: T0 = csq/gammagas/Rs0   !! Reference temperature 
-  real(rkind), parameter :: MD = visc0/rho_char/Sc !! Mass/molecular diffusivity   
   
   !! Parameters for temperature dependence of thermal conductivity
-  real(rkind), parameter :: Alambda = 2.58d-5
-  real(rkind), parameter :: rlambda = 7.0d-1
-  real(rkind), parameter :: Tlambda = 2.98d2
+  real(rkind), parameter :: T_ref = T0
+  real(rkind), parameter :: r_temp_dependence = 7.0d-1
+
   
 #ifdef isoT
   real(rkind), parameter :: p_infinity = csq    !! Reference pressure

@@ -1,19 +1,19 @@
 # Makefile for sunset_code
 #
 #
-# ========================== OPTIONS =================================================
-# ------------------------------------------------------------------------------------
-# thermo     Isothermal (0) or thermal (1) flow                           (default: 1)
-# react      Reacting (1) or inert (0) flow                               (default: 0)
-# restart    Start from initial conditions (0) or restart file (1)        (default: 0)
-# hardinf    Non-reflecting inflow (0) or hard inflow (1)                 (default: 0)
-# multispec  Single (0) or multispecies (1) flow                          (default: 0)
-# mpi        Shared only (0) or distributed-shared (1) acceleration       (default: 0)          
-# wisot      Adiabatic/prescribed heat flux (0) or isothermal (1) walls   (default: 0)
-# dim3       Two (0) or three (1) dimensional simulation                  (default: 0)
-# pgrad      Drive the flow with a pressure gradient and P.I.D control    (default: 0)
-# pgl        Perfect gas law (0) or ideal (semi-perfect) (1)              (default: 1)
-# ------------------------------------------------------------------------------------
+# ========================== OPTIONS ==============================================================
+# -------------------------------------------------------------------------------------------------
+# thermo     Isothermal (0) or thermal (1) flow                                        (default: 1)
+# react      Reacting (1) or inert (0) flow                                            (default: 0)
+# restart    Start from initial conditions (0) or restart file (1)                     (default: 0)
+# hardinf    Non-reflecting inflow (0) or hard inflow (1)                              (default: 0)
+# multispec  Single (0) or multispecies (1) flow                                       (default: 0)
+# mpi        Shared only (0) or distributed-shared (1) acceleration                    (default: 0)          
+# wisot      Adiabatic/prescribed heat flux (0) or isothermal (1) walls                (default: 0)
+# dim3       Two (0) or three (1) dimensional simulation                               (default: 0)
+# pgrad      Drive the flow with a pressure gradient and P.I.D control                 (default: 0)
+# tdtp       Temperature dependent transport properties (1) or constant (0)            (default: 0)
+# -------------------------------------------------------------------------------------------------
 #
 # EXAMPLE USAGE:
 # make thermo=0 react=0 mpi=1 etc...
@@ -57,8 +57,8 @@ endif
 ifeq ($(pgrad),1)
 FFLAGS += -Dpgrad
 endif
-ifeq ($(pgl),0)
-FFLAGS += -Dpgl
+ifeq ($(tdtp),1)
+FFLAGS += -Dtdtp
 endif
 LDFLAGS := -fopenmp -m64 -lopenblas 
 
@@ -69,10 +69,11 @@ SRC_DIR  := $(addprefix source/,$(SUB_DIRS))
 # identify object files
 #parameters come first, as almost everything depends on them.
 OBJ_FILES := obj/kind_parameters.o obj/common_parameter.o obj/common_vars.o
-OBJ_FILES += obj/rbfs.o obj/boundaries.o obj/derivatives.o 
+OBJ_FILES += obj/rbfs.o obj/mirror_boundaries.o obj/derivatives.o 
 OBJ_FILES += obj/mpi_transfers.o 
 OBJ_FILES += obj/neighbours.o obj/output.o obj/setup.o
-OBJ_FILES += obj/labf.o obj/fd.o obj/thermodynamics.o obj/rhs.o
+OBJ_FILES += obj/labf.o obj/fd.o obj/thermodynamics.o 
+OBJ_FILES += obj/characteristic_boundaries.o obj/rhs.o
 OBJ_FILES += obj/step.o
 OBJ_FILES += $(foreach sdir,$(SRC_DIR),$(patsubst $(sdir)/%.F90,obj/%.o,$(wildcard $(sdir)/*.F90)))
 OBJ_FILES += $(foreach sdir,$(SRC_DIR),$(patsubst $(sdir)/%.cpp,obj/%.o,$(wildcard $(sdir)/*.cpp)))

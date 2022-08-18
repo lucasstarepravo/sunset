@@ -1,6 +1,14 @@
 module labf
-!! This module constructs weights based on the Local Anisotropic Basis
-!! Function method (LABFM), King et al. (2020) JCP 415:109549
+  !! ----------------------------------------------------------------------------------------------
+  !! SUNSET CODE: Scalable Unstructured Node-SET code for DNS.
+  !! 
+  !! Author             |Date             |Contributions
+  !! --------------------------------------------------------------------------
+  !! JRCK               |2019 onwards     |Main developer                     
+  !!
+  !! ----------------------------------------------------------------------------------------------
+  !! This module constructs weights based on the Local Anisotropic Basis
+  !! Function method (LABFM), King et al. (2020) JCP 415:109549
 
   use kind_parameters
   use common_parameter

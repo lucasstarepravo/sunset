@@ -1,4 +1,15 @@
-module boundaries
+module mirror_boundaries
+  !! ----------------------------------------------------------------------------------------------
+  !! SUNSET CODE: Scalable Unstructured Node-SET code for DNS.
+  !! 
+  !! Author             |Date             |Contributions
+  !! --------------------------------------------------------------------------
+  !! JRCK               |2019 onwards     |Main developer                     
+  !!
+  !! ----------------------------------------------------------------------------------------------
+  !! This module creates mirror nodes for symmetry and periodic boundaries (only those not 
+  !! achieved through the MPI parallelisation, and copies properties between parent and child
+  !! nodes
   use kind_parameters
   use common_parameter
   use common_vars
@@ -295,4 +306,4 @@ contains
      return
   end subroutine reapply_mirror_bcs_divvel_only
 !! ------------------------------------------------------------------------------------------------ 
-end module boundaries
+end module mirror_boundaries
