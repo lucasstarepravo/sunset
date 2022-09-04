@@ -39,7 +39,8 @@ contains
         stop
 #endif          
      end if
-  
+
+
      !! Build neighbour lists and FD stencils
      allocate(ij_link_fd(ij_count_fd,npfb));ij_link_fd=0
      allocate(ij_fd_grad(ij_count_fd),ij_fd_grad2(ij_count_fd),ij_fd_hyp(ij_count_fd))
@@ -51,13 +52,12 @@ contains
      !$omp parallel do private(ii,jj)
      do i=1,np
         ii=ilayer_index(i)  !! index within layer
-        jj = zlayer_index_global(i)
+        jj = zlayer_index_global(i)    !! Global z-index
         if(ii.ne.0) then !! Exclude local mirrors and UDLR halo nodes
            zrow_indices(ii,jj) = i
         endif
      end do
      !$omp end parallel do
-      
      
      !! Build the neighbour lists 
      !$omp parallel do private(iz,il,jj,j)
@@ -67,12 +67,10 @@ contains
        
         !! Loop over neighbours     
         do jj = 1,ij_count_fd
-           j = iz + jj - ijco2     !! j is the layer of the jj-th FD neighbour of i
-           if(j.le.0) j = j + nz_global           !! Modulations for periodicity
-           if(j.gt.nz_global) j = j - nz_global
-
-           ij_link_fd(jj,i) = zrow_indices(il,j)   !! Take the index of neighbours from zrow_indices
-        end do   
+!           j = iz + jj - ijco2     !! j is the layer of the jj-th FD neighbour of i
+           j = 1 + modulo(iz + jj - ijco2-1,nz_global)  !! Modulation for periodicity
+           ij_link_fd(jj,i) = zrow_indices(il,j)   !! Take the index of neighbours from zrow_indices           
+        end do          
      end do
      !$omp end parallel do     
      deallocate(zrow_indices)

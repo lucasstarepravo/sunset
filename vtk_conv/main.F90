@@ -2,12 +2,13 @@ program main
   use omp_lib 
   implicit none
 
-  integer :: n,i,nthreads,np,npp,ngrab,Nframes,iframe,i_loop_finish,N_start,ii,i_PART_counter
+  integer :: n,i,nthreads,np,npp,ngrab,Nframes,iframe,i_loop_finish,N_start,ii,iii,i_PART_counter
   integer,parameter :: np_max = 1000010
   integer, parameter :: i_PART_counter_max=20000
   character chartemp*40, name_orig*40
   character name_vtu*40, name_vtu2*12, name_vtu3*9
   character np_string3*3, np_string4*4, np_string5*5
+  character ispec_string1*2
   character np_string6*6, np_string7*7, np_string8*8
   character supp*4,supp3*3,supp2*2,supp1*1
   character string1*100,string2*100,string3*100,string4*100
@@ -19,6 +20,7 @@ program main
   real :: dr
       
   real,allocatable,dimension(:):: xp,zp,up,vp,wp,ro,vort,energy,h,Temp,Y0,yp
+  real,allocatable,dimension(:,:) :: Yspec
   real time(i_PART_counter_max), DT(i_PART_counter_max)
   integer np_all(i_PART_counter_max), IT(i_PART_counter_max)
   integer processor(np_max),node_type(np_max),subset_flag
@@ -73,12 +75,11 @@ program main
   !! adjust dim-flag
   dim_flag = dim_flag - 2
   
-  write(6,*) "There are ",Nframes+1,"frames."
-
-  !! JRCK addition...          
+  write(6,*) "There are ",Nframes+1,"frames."   
   write(6,*) "Enter starting frame"
   read(*,*) N_start
-    
+  
+  allocate(Yspec(np_max,nspecs))
   ngrab = N_start-1
         
   !! Loop over each frame   
@@ -131,13 +132,14 @@ program main
            if(dim_flag.eq.1) then 
               do i=np_ini,np_end
                  read(ifi,*,end=300) xp(i),yp(i),zp(i),h(i),node_type(i),ro(i),up(i),vp(i),wp(i), &
-                                     vort(i),energy(i),Temp(i),Y0(i)
+                                     vort(i),energy(i),Temp(i),Yspec(i,1:nspecs)
                  processor(i) = iproc
                  npp=npp+1
               enddo
            else
               do i=np_ini,np_end
-                 read(ifi,*,end=300) xp(i),yp(i),h(i),node_type(i),ro(i),up(i),vp(i),vort(i),energy(i),Temp(i),Y0(i)
+                 read(ifi,*,end=300) xp(i),yp(i),h(i),node_type(i),ro(i),up(i),vp(i),vort(i),energy(i),Temp(i), &
+                                     Yspec(i,1:nspecs)
                  processor(i) = iproc
                  npp=npp+1
               enddo
@@ -247,13 +249,16 @@ program main
         write(ifo,202) string3
         
         !! Y0 mass frac
-        string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'Y0'//DQ//' format='//DQ//'ascii'//DQ//'>'
-        write(ifo,202)string1
-        do ii=1,np
-           write(ifo,*)Y0(ii)
-        enddo
-        string3 = '    </DataArray>'
-        write(ifo,202) string3        
+        do iii=1,nspecs
+           write(ispec_string1,'(A1,i1.1)') 'Y',iii
+           string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//ispec_string1//DQ//' format='//DQ//'ascii'//DQ//'>'
+           write(ifo,202)string1
+           do ii=1,np
+              write(ifo,*)Yspec(ii,iii)
+           enddo
+           string3 = '    </DataArray>'
+           write(ifo,202) string3        
+        end do
 
         !! Temperature
         string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'Temperature'//DQ// &

@@ -55,53 +55,51 @@ module common_parameter
   real(rkind),dimension(4),parameter :: rk3_4s_2r_b=(/rk3_4s_2r_b1,rk3_4s_2r_b2,rk3_4s_2r_b3,rk3_4s_2r_b4/)
   real(rkind),dimension(4),parameter :: rk3_4s_2r_bh=(/rk3_4s_2r_bh1,rk3_4s_2r_bh2,rk3_4s_2r_bh3,rk3_4s_2r_bh4/)
   real(rkind),dimension(4),parameter :: rk3_4s_2r_bmbh = rk3_4s_2r_b - rk3_4s_2r_bh
+
+  !! Maximum possible number of species
+  integer(ikind), parameter :: nspec_max = 20   
    
   !! SIMULATION PARAMETERS ========================================================================
   !! Primary domain parameters (i.e. those we can specify) ----------------------------------------
-  real(rkind), parameter :: L_char = half !! Characteristic lengthscale
+  real(rkind), parameter :: L_char = half*half*half*half*half*half !! Characteristic lengthscale
   real(rkind), dimension(dims), parameter :: grav = (/zero,zero,zero/) !! Gravity  
   
   !! Primary physical fluid properties ------------------------------------------------------------
-  real(rkind), parameter :: rho_char = one
-  real(rkind), parameter :: Rgas_universal = 8.3144626181d0
-
+  real(rkind), parameter :: rho_char = one                               !! Reference density
+  real(rkind), parameter :: Rgas_universal = 8.3144626181d0              !! Universal gas constant
+  
+  real(rkind), parameter :: T_ref = 20.0d0!298.0                                !! Reference temperature
+  real(rkind), parameter :: visc_ref = 1.8d-5                            !! Viscosity at ref T,ro
+  real(rkind), parameter :: r_temp_dependence = 7.0d-1                   !! T-exponent for TDTP
   
   !! Primary dimensionless groups -----------------------------------------------------------------
-  real(rkind), parameter :: Re = 500.0d0 !! Reynolds number
-  real(rkind), parameter :: Sc = one !! Schmidt number (higher Sc reduces importance of MD)  
+  real(rkind), parameter :: Re = 1000.0d0 !! Reynolds number
   real(rkind), parameter :: Pr = one !! Prandtl number
-  real(rkind), parameter :: Ma = 0.1d0 !! Mach number  
+ 
+  !! Secondary properties -------------------------------------------------------------------------
+  real(rkind), parameter :: u_char = Re*visc_ref/L_char/rho_char      !! Reference velocity from Re
+  real(rkind), parameter :: u_inflow = u_char                         !! Inflow velocity 
+  real(rkind), parameter :: Lz = L_char                               !! 3rd dim length-scale
+  real(rkind), parameter :: Time_char= L_char/u_char                  !! reference time-scale
+  real(rkind), parameter :: T_inflow = T_ref                          !! Inflow temperature 
+ 
 
   !! Temporary (fixed) values of perfect gases and transport properties (whilst T-dependence is being developed)
-  real(rkind), parameter :: gammagas = 1.4d0
   real(rkind), parameter :: Rs0 = 287.058d0   !! Reference specific gas constant  
-  real(rkind), parameter :: gammagas_m1 = gammagas - one
-  real(rkind), parameter :: visc_ref = 1.0d-3!1.8d-5
-  real(rkind), parameter :: lambda_th_ref = visc_ref*Rs0*gammagas/gammagas_m1/Pr
-  real(rkind), parameter :: Mdiff_ref = lambda_th_ref*gammagas_m1/rho_char/Rs0/gammagas/one !! one is Lewis #
-
-  !! Secondary domain parameters ------------------------------------------------------------------
-  real(rkind), parameter :: Lz = half*L_char  !! Domain length-scale in third dimension
-  real(rkind), parameter :: u_char = Re*visc_ref/L_char/rho_char  !! Characteristic velocity
-  real(rkind), parameter :: u_inflow = u_char  !! Inflow velocity (occasionally differs from u_char)
-  real(rkind), parameter :: Time_char= L_char/u_char            !! Characteristic time-scale
-    
-  !! Secondary fluid parameters -------------------------------------------------------------------
-  real(rkind), parameter :: csq = (u_char/Ma)**two  !! Reference sound speed   
-  real(rkind), parameter :: T0 = csq/gammagas/Rs0   !! Reference temperature 
+  real(rkind), parameter :: lambda_th_ref = visc_ref*Rs0*1.4d0/0.4d0/Pr
+  real(rkind), parameter :: Mdiff_ref = lambda_th_ref*0.4d0/rho_char/Rs0/1.4d0/one !! one is Lewis #
+   
   
-  !! Parameters for temperature dependence of thermal conductivity
-  real(rkind), parameter :: T_ref = T0
-  real(rkind), parameter :: r_temp_dependence = 7.0d-1
-
+  real(rkind), parameter :: csq = 1.4d0*Rs0*T_ref             !! Sound speed squared
+  real(rkind), parameter :: Ma = u_char/sqrt(csq)             !! Mach number
+ 
   
 #ifdef isoT
   real(rkind), parameter :: p_infinity = csq    !! Reference pressure
 #else
-  real(rkind), parameter :: p_infinity = rho_char*Rs0*T0
+  real(rkind), parameter :: p_infinity = rho_char*Rs0*T_ref
 #endif
 
-  !! Maximum possible number of species
-  integer(ikind), parameter :: nspec_max = 20   
+
 
 end module common_parameter

@@ -19,7 +19,7 @@ module thermodynamics
   !! 3) tdtp      - Temperature dependent transport properties. cp = cp(T) (a pre-defined polynomial),
   !!                and so calculation of the temperature from the energy involves solution of a 
   !!                non-linear system. The temperature dependence of the viscosity etc is by a power 
-  !!                scaling of the base values of (T/T0)**r, with r a constant.
+  !!                scaling of the base values of (T/T_ref)**r, with r a constant.
   !!
   use kind_parameters
   use common_parameter
@@ -72,6 +72,21 @@ contains
 
      return
   end subroutine evaluate_temperature_and_cp
+!! ------------------------------------------------------------------------------------------------
+  subroutine evaluate_enthalpy(i,ispec,enthalpy)  
+     !! Evaluate the enthalpy of species ispec based on temperature.
+     integer(ikind),intent(in) :: i,ispec
+     real(rkind),intent(out) :: enthalpy
+     real(rkind) :: cp_ispec
+     
+     !! Placeholder. Waiting for cp = poly(T).
+     cp_ispec = cp0_molar(ispec)*Rgas_universal/molar_mass(ispec)
+     enthalpy = cp_ispec*T(i)
+          
+  
+  
+     return
+  end subroutine evaluate_enthalpy
 !! ------------------------------------------------------------------------------------------------
   subroutine evaluate_pressure
      integer(ikind) :: i
@@ -144,7 +159,7 @@ contains
 !lambda_th(i) = lambda_th_ref
 !Mdiff(i,:) = Mdiff_ref
 
-!write(6,*) visc(i),lambda_th(i),Mdiff(i,1)        
+!write(6,*) visc(i),lambda_th(i),Mdiff(i,1)     
      end do
      !$omp end parallel do
 #else

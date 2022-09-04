@@ -40,11 +40,6 @@ program datgen
   integer(ikind) :: npdps_new,inew,block_left,block_right,block_new,block_delete,block_end
   real(rkind) :: b0,b1,b2,b3 !! Coefficients in dx functions
 
-
-   
-  grx=0.0d0
-  gry=0.0d0
-
   write(*,*) 'Cases: '
   write(*,*) '  case 1:  box for Rayleigh-Taylor'
   write(*,*) '  case 2:  unit torus with 4 cylinders'

@@ -59,7 +59,9 @@ contains
      Lchar(3) = zero
      Lchar(4) = zero
      Lchar(5)= Lchar(1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro) 
+#ifdef ms
      Lchar(5+1:5+nspec) = zero     
+#endif     
      Lchar(2) = gammagasm1*(Lchar(5)+Lchar(1))/c/c &
                  - gammagasm1*tmpro*gradv(2) - gammagasm1*tmpro*gradw(3) !! Compatible with fixing dT/dt=0?  
 #else          
@@ -69,7 +71,9 @@ contains
      Lchar(3) = zero
      Lchar(4) = zero
      Lchar(5)= Lchar(1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro) 
+#ifdef ms     
      Lchar(5+1:5+nspec) = zero     
+#endif     
 #endif                             
 #endif          
 
@@ -80,7 +84,7 @@ contains
      real(rkind),dimension(:),intent(inout) :: Lchar
      real(rkind),dimension(:),intent(in) :: gradlnro,gradp,gradu,gradv,gradw
      integer(ikind) :: i,ispec
-     real(rkind) :: tmpro,c,gammagasm1,gamma_gas
+     real(rkind) :: tmpro,c,gammagasm1,gammagas
      
      !! Index of this boundary node
      i = boundary_list(j)
@@ -108,7 +112,9 @@ contains
      Lchar(5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &     !! Track u_inflow
               - half*(v(i)*gradp(2)+p(i)*gradv(2)+tmpro*c*v(i)*gradu(2)) &    !! transverse 1 conv. terms
               - half*(w(i)*gradp(3)+p(i)*gradw(3)+tmpro*c*w(i)*gradu(3))      !! transverse 2 conv. terms 
+#ifdef ms
      Lchar(5+1:5+nspec) = zero
+#endif     
 #else
      !! ISOTHERMAL FLOWS, HARD INFLOW
      !Lchar(1) is outgoing, so doesn't require modification
@@ -116,7 +122,9 @@ contains
      Lchar(3) = zero        
      Lchar(4) = zero
      Lchar(5) = Lchar(1)   !! Acoustically reflecting
+#ifdef ms
      Lchar(5+1:5+nspec) = zero          
+#endif     
 #endif
          
 #else
@@ -124,9 +132,9 @@ contains
 
 #ifndef hardinf
     !! THERMAL FLOWS, PARTIALLY NON-REFLECTING
-    gamma_gas = cp(i)/(cp(i)-Rgas_mix(i))
+    gammagas = cp(i)/(cp(i)-Rgas_mix(i))
     gammagasm1 = gammagas - one
-    Lchar(2) = (T0-T(i))*c*0.278d0/L_domain_x/gammagas &
+    Lchar(2) = (T_inflow-T(i))*c*0.278d0/L_domain_x/gammagas &
              - (v(i)*gradlnro(2)*tmpro + tmpro*gradv(2) + v(i)*gradp(2)/c/c + gammagas*p(i)*gradv(2)/c/c) &
              - (w(i)*gradlnro(3)*tmpro + tmpro*gradw(3) + w(i)*gradp(3)/c/c + gammagas*p(i)*gradw(3)/c/c)
              !! + visc + source terms TBC
@@ -138,7 +146,9 @@ contains
     Lchar(5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &      !! Track u_inflow
              - half*(v(i)*gradp(2)+gammagas*p(i)*gradv(2)+tmpro*c*v(i)*gradu(2))  & !! transverse 1 conv. terms
              - half*(w(i)*gradp(3)+gammagas*p(i)*gradw(3)+tmpro*c*w(i)*gradu(3))    !! transverse 2 conv. terms  
+#ifdef ms
     Lchar(5+1:5+nspec) = zero                 
+#endif    
 #else
     !! THERMAL FLOWS, HARD INFLOW 
     !Lchar(1) is outgoing, so doesn't require modification
@@ -149,7 +159,9 @@ contains
              - gammagasm1*tmpro*gradv(2) &   !! trans 1 term
              - gammagasm1*tmpro*gradw(3)     !! Trans 2 term 
                  ! + dT/dy term?
+#ifdef ms
     Lchar(5+1:5+nspec) = zero                                  
+#endif    
 #endif
 #endif       
          
@@ -161,7 +173,7 @@ contains
      real(rkind),dimension(:),intent(inout) :: Lchar
      real(rkind),dimension(:),intent(in) :: gradp,gradu,gradv,gradw
      integer(ikind) :: i,ispec
-     real(rkind) :: tmpro,c,gammagasm1,gamma_gas
+     real(rkind) :: tmpro,c,gammagasm1,gammagas
      
      !! Index of this boundary node
      i = boundary_list(j)
@@ -192,7 +204,7 @@ contains
 #else
      !! THERMAL FLOWS, PARTIALLY NON-REFLECTING
      if(u(i).le.c) then !! Subsonic. If supersonic, just use L1 from definition...
-        gamma_gas = cp(i)/(cp(i)-Rgas_mix(i))     
+        gammagas = cp(i)/(cp(i)-Rgas_mix(i))     
         Lchar(1) = (p(i)-p_infinity)*0.278d0*c*(one)/two/L_domain_x &                               !! track p_infinity
                  - (one-u(i)/c)*half*(v(i)*gradp(2)+gammagas*p(i)*gradv(2)-tmpro*c*v(i)*gradu(2)) & !! trans1 conv.
                  - (one-u(i)/c)*half*(w(i)*gradp(3)+gammagas*p(i)*gradw(3)-tmpro*c*w(i)*gradu(3))   !! trasn2 conv.

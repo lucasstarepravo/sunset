@@ -13,6 +13,7 @@
 # dim3       Two (0) or three (1) dimensional simulation                               (default: 0)
 # pgrad      Drive the flow with a pressure gradient and P.I.D control                 (default: 0)
 # tdtp       Temperature dependent transport properties (1) or constant (0)            (default: 0)
+# yout       Output the complete composition (1) or don't (0)                          (default: 0)
 # -------------------------------------------------------------------------------------------------
 #
 # EXAMPLE USAGE:
@@ -59,6 +60,9 @@ FFLAGS += -Dpgrad
 endif
 ifeq ($(tdtp),1)
 FFLAGS += -Dtdtp
+endif
+ifeq ($(yout),1)
+FFLAGS += -Doutput_composition
 endif
 LDFLAGS := -fopenmp -m64 -lopenblas 
 

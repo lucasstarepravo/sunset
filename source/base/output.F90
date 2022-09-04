@@ -147,8 +147,8 @@ contains
      real(rkind) :: tmpT,xn,yn,tmpro
 
      !! Only output from the first sheet
-!     if(iprocZ.eq.0)then     
-if(.true.)then     
+     if(iprocZ.eq.0)then     
+!if(.true.)then     
 
         !! Calculate the vorticity 
         allocate(gradu(npfb,dims),gradv(npfb,dims),gradw(npfb,dims));gradw=zero
@@ -171,20 +171,7 @@ if(.true.)then
 #endif        
         end do
         !$omp end parallel do
-
-!! TEMPORARY OUTPUT DENSITY GRADIENT AS VORT.
-!     call calc_gradient(lnro,gradu)
-!     !$omp parallel do private(tmpT)
-!     do i=1,npfb
-!        tmpT = gradu(i,1)**two + gradu(i,2)**two
-!        vort(i) = exp(lnro(i))*tmpT
-!     end do
-!     !$omp end parallel do
-!     gradu=zero
-!     gradv=zero
-!! END TEMPORARY     
-     
-    
+      
         if(nb.ne.0)then
            do j=1,nb  !! On WALL boundaries, vorticity requires some rotation...
               i=boundary_list(j)
@@ -223,10 +210,12 @@ if(.true.)then
         !! Local number nodes output
         np_out_local = npfb_layer 
         
-        !! N species output
+        !! Number of species out
+        nspec_out = 1
+#ifdef output_composition
         nspec_out = nspec
-
-
+#endif                
+        
         !! Write the main dump files
         open(unit = 20,file=fname)  
         write(20,*) np_out_local
@@ -236,42 +225,16 @@ if(.true.)then
 
 #ifdef dim3
            write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),node_type(i),tmpro, &
-                       u(i),v(i),w(i),vort(i),roE(i)/tmpro,tmpT,Yspec(i,1)
-!if(i.le.npfb) then        
-!           write(20,*) rp(i,1)+0.5*iprocX,rp(i,2)+2.0*iprocY,rp(i,3)+0.5*iprocZ,s(i),node_type(i) &
-!                       ,tmpro,u(i),v(i),w(i),dble(ij_count(i)) &
-!                       ,roE(i)/tmpro,zero,divvel(i)  !! Diagnostic/debugging output
-!else if(i.le.np_nohalo) then        
-!           write(20,*) rp(i,1)+0.5*iprocX,rp(i,2)+2.0*iprocY,rp(i,3)+0.5*iprocZ,s(i),node_type(i) &
-!                       ,tmpro,u(i),v(i),w(i),zero &
-!                       ,roE(i)/tmpro,one,divvel(i)  !! Diagnostic/debugging output
-!else 
-!           write(20,*) rp(i,1)+0.5*iprocX,rp(i,2)+2.0*iprocY,rp(i,3)+0.5*iprocZ,s(i),node_type(i) &
-!                       ,tmpro,u(i),v(i),w(i),zero &
-!                       ,roE(i)/tmpro,two,divvel(i)  !! Diagnostic/debugging output
-!end if             
-
+                       u(i),v(i),w(i),vort(i),roE(i)/tmpro,tmpT,Yspec(i,1:nspec_out)        
 #else
-           write(20,*) rp(i,1),rp(i,2),s(i),node_type(i),tmpro,u(i),v(i),vort(i), &
-                       roE(i)/tmpro,tmpT,Yspec(i,1)
-!if(i.le.npfb) then        
-!           write(20,*) rp(i,1)+0.4*iprocX,rp(i,2)+4.4*iprocY,h(i),node_type(i),tmpro,u(i),v(i),dble(ij_count(i)) &
-!                  ,roE(i)/tmpro,zero,Yspec(i,1)  !! Diagnostic/debugging output
-!else if(i.le.np_nohalo) then        
-!           write(20,*) rp(i,1)+0.4*iprocX,rp(i,2)+4.4*iprocY,h(i),node_type(i),tmpro,u(i),v(i),zero &
-!                  ,roE(i)/tmpro,one,Yspec(i,1)  !! Diagnostic/debugging output
-!else 
-!           write(20,*) rp(i,1)+0.4*iprocX,rp(i,2)+4.4*iprocY,h(i),node_type(i),tmpro,u(i),v(i),zero &
-!                  ,roE(i)/tmpro,two,Yspec(i,1)  !! Diagnostic/debugging output               
-!end if             
-
-
+           write(20,*) rp(i,1),rp(i,2),s(i),node_type(i),tmpro,u(i),v(i),alpha_out(i), &
+                       roE(i)/tmpro,tmpT,Yspec(i,1:nspec_out)
 #endif
         end do
 
         flush(20)
         close(20)
-        if(allocated(vort)) deallocate(vort)     
+        if(allocated(vort)) deallocate(vort)               
      end if
 
      !! Write the time,dump number and # nodes to file
@@ -537,7 +500,7 @@ if(.true.)then
   subroutine species_check
      !! This subroutine calculates total quantity of each species in the domain
      integer(ikind) :: i,ispec
-     real(rkind) :: tot_vol,tmpro,dVi,tot_vol_tmp,tmpY
+     real(rkind) :: tot_vol,tmpro,dVi,tot_vol_tmp,tmpY,sumY,tot_error,tot_error_tmp
      real(rkind),dimension(:),allocatable :: tot_Yspec,tot_Yspec_tmp
 #ifdef ms     
      
@@ -545,29 +508,36 @@ if(.true.)then
      allocate(tot_Yspec(nspec),tot_Yspec_tmp(nspec))   
      tot_Yspec = zero;tot_vol = zero
      
-     !$omp parallel do private(tmpro,dVi,ispec,tmpY) reduction(+:tot_Yspec,tot_vol)
+     tot_error = zero
+     !$omp parallel do private(tmpro,dVi,ispec,tmpY,sumY) reduction(+:tot_Yspec,tot_vol,tot_error)
      do i=1,npfb
         tmpro = exp(lnro(i))
         dVi = s(i)*s(i)*L_char*L_char !! assume square nodes for now...
 #ifdef dim3
         dVi = dVi*dz*L_char
 #endif        
-
+        
+        sumY = -one
         do ispec=1,nspec
            tmpY = Yspec(i,ispec)
            tot_Yspec(ispec) = tot_Yspec(ispec) + dVi*tmpY*tmpro
+           
+           sumY = sumY + tmpY
         end do
+        tot_error = tot_error + sumY*sumY
 !        tot_vol = tot_vol + dVi
      end do
      !$omp end parallel do
      
 #ifdef mp
      tot_Yspec_tmp = tot_Yspec
-     tot_vol_tmp = tot_vol;
+     tot_vol_tmp = tot_vol;tot_error_tmp = tot_error
      call MPI_ALLREDUCE(tot_Yspec_tmp,tot_Yspec,nspec,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(tot_error_tmp,tot_error,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)     
 !    call MPI_ALLREDUCE(tot_vol_tmp,tot_vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
+     tot_error = sqrt(tot_error/dble(npfb_global))
      if(iproc.eq.0)then
-        write(199,*) time/Time_char,tot_Yspec(:)
+        write(199,*) time/Time_char,tot_error,tot_Yspec(:)
         flush(199)
      end if
 #else

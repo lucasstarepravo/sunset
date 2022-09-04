@@ -18,6 +18,7 @@ module common_vars
   !! Evolved fluid quantities
   real(rkind), dimension(:), allocatable, target :: u,v,w,lnro,roE
   real(rkind), dimension(:,:), allocatable :: Yspec  
+  real(rkind), dimension(:),allocatable :: alpha_out
   
   !! Number of species
   integer(ikind) :: nspec

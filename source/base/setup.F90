@@ -268,7 +268,8 @@ contains
      !! Allocate arrays for properties
      allocate(u(np),v(np),w(np),lnro(np),roE(np),divvel(np))
      allocate(Yspec(np,nspec))
-     u=zero;v=zero;w=zero;lnro=zero;roE=one;Yspec=zero;divvel=zero
+     u=zero;v=zero;w=zero;lnro=zero;roE=one;Yspec=one;divvel=zero
+     allocate(alpha_out(np));alpha_out = zero
 
 #ifdef mp
      call halo_exchanges_all
@@ -327,7 +328,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      integer(ikind) :: ispec
      !! Hard-coded for now...
 #ifdef ms
-     nspec = 2
+     nspec = 5
 #else
      nspec = 1
 #endif     
@@ -339,6 +340,11 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         Lewis_number(ispec) = one
         cp0_molar(ispec) = 1004.5*molar_mass(ispec)/Rgas_universal
      end do
+     Lewis_number(2) = half
+     Lewis_number(3) = 1.5d0
+     Lewis_number(4) = two
+     Lewis_number(5) = one               
+     
      
 
      
@@ -365,21 +371,29 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         v(i) = zero!sin(two*pi*x)*cos(two*pi*y)!*cos(two*pi*z/Lz)    !!c c
         w(i) = zero!u(i);u(i)=zero
         tmp = -half*half*(cos(4.0d0*pi*x) + cos(4.0d0*pi*y))/csq
-        lnro(i) = log(rho_char)!log(rho_char + tmp)!log(rho_char)       
+        lnro(i) = log(rho_char)!log(rho_char + tmp)
 !if(x.le.zero) lnro(i) = log(1.2*rho_char)
               
 #ifdef ms    
 !        do ispec=1,nspec      
-           tmp = 20.0d0*((x-one)**two + (y-half)**two)
-           tmp = 20.0d0*(y**two)
-           tmp = exp(-tmp**4.0d0)
-!tmp = exp(-tmp**4.0d0)
-           Yspec(i,1) = tmp!log(max(verysmall,tmp)) - log(max(verysmall,one-tmp))
-           Yspec(i,2) = one - tmp
+           tmp = 20.0d0*(y**two);tmp = exp(-tmp**4.0d0)
+           Yspec(i,1) = half*half*tmp
+
+           tmp = 20.0d0*(x**two);tmp = exp(-tmp**4.0d0)
+           Yspec(i,2) = half*half*tmp
+
+           tmp = 20.0d0*(x**two + y**two);tmp = exp(-tmp**4.0d0)
+           Yspec(i,3) = half*half*tmp           
+           
+           tmp = one + sin(two*pi*x)*sin(two*pi*y);tmp = half*tmp
+           Yspec(i,4) = half*half*tmp           
+
+           
+           Yspec(i,5) = one - Yspec(i,1) - Yspec(i,2) - Yspec(i,3) - Yspec(i,4)
 !        end do
 #endif         
 
-        tmp = T0!*(one + 0.01*sin(two*pi*z/Lz)) !! z-variation of temperature...
+        tmp = T_ref!*(one + 0.01*sin(two*pi*z/Lz)) !! z-variation of temperature...
 
         roE(i) = exp(lnro(i))*(tmp*287.0025/0.4 + half*u(i)*u(i) + half*v(i)*v(i) + half*w(i)*w(i))
                 
@@ -392,7 +406,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 
         
         !! Hydrostatic energy gradient 
-!        tmp = T0*(one + 0.01*sin(two*pi*z/Lz))
+!        tmp = T_ref*(one + 0.01*sin(two*pi*z/Lz))
 !        tmp = (rho_char/exp(lnro(i)))*tmp*Rs0/gammagasm1 + dot_product(grav,rp(i,:))/gammagasm1
 !        roE(i) = (tmp + half*u(i)*u(i) + half*v(i)*v(i) + half*w(i)*w(i))*exp(lnro(i))
               
@@ -408,15 +422,15 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      !! Values on boundaries
      if(nb_global.ne.0)then
         if(nb.ne.0)then
-           allocate(T_bound(nb));T_bound = T0
+           allocate(T_bound(nb));T_bound = T_ref
            do j=1,nb
               i=boundary_list(j)
               if(node_type(i).eq.0) then !! wall initial conditions
                  u(i)=zero;v(i)=zero;w(i)=zero
 
-                 tmp = T0*(one + 0.01*sin(two*pi*rp(i,3)/Lz))
+                 tmp = T_ref*(one + 0.01*sin(two*pi*rp(i,3)/Lz))
                  T_bound(j) = tmp*rho_char/exp(lnro(i)) + dot_product(grav,rp(i,:))/Rs0                
-!                 T_bound(j) = (rho_char/exp(lnro(i)))*T0
+!                 T_bound(j) = (rho_char/exp(lnro(i)))*T_ref
                  tmp = T_bound(j)*287.0025/0.4
                  roE(i) = tmp*exp(lnro(i)) 
               end if                 
