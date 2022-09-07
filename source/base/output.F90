@@ -221,13 +221,17 @@ contains
         write(20,*) np_out_local
         do i=1,np_out_local
            tmpro = exp(lnro(i))
+#ifndef isoT
            tmpT = T(i)
+#else
+           tmpT = zero
+#endif           
 
 #ifdef dim3
-           write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),node_type(i),tmpro, &
+           write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),h(i),node_type(i),tmpro, &
                        u(i),v(i),w(i),vort(i),roE(i)/tmpro,tmpT,Yspec(i,1:nspec_out)        
 #else
-           write(20,*) rp(i,1),rp(i,2),s(i),node_type(i),tmpro,u(i),v(i),alpha_out(i), &
+           write(20,*) rp(i,1),rp(i,2),s(i),h(i),node_type(i),tmpro,u(i),v(i),alpha_out(i), &
                        roE(i)/tmpro,tmpT,Yspec(i,1:nspec_out)
 #endif
         end do

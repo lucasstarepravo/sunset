@@ -37,7 +37,7 @@ contains
 
      !! Time begins at zero
      time = zero;itime=0
-     dt_out = 0.05d0*Time_char         !! Frequency to output fields
+     dt_out = 0.001d0*Time_char         !! Frequency to output fields
      dt_mout = 0.01d0*Time_char       !! Frequency to output mean stats
      time_end = 1.0d2*Time_char
   
@@ -270,6 +270,7 @@ contains
      allocate(Yspec(np,nspec))
      u=zero;v=zero;w=zero;lnro=zero;roE=one;Yspec=one;divvel=zero
      allocate(alpha_out(np));alpha_out = zero
+     allocate(T(np));T=T_ref
 
 #ifdef mp
      call halo_exchanges_all
@@ -328,24 +329,37 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      integer(ikind) :: ispec
      !! Hard-coded for now...
 #ifdef ms
-     nspec = 5
+     nspec = 2
 #else
      nspec = 1
 #endif     
      allocate(molar_mass(nspec),Lewis_number(nspec))
-     allocate(cp0_molar(nspec))
+     nintervals_cp = 1 !! Number of temperature intervals
+     polyorder_cp = 7  !! Order of polynomials
+     allocate(coef_cp(nspec,polyorder_cp+1,nintervals_cp))
+     allocate(T_intervals_cp(nintervals_cp+1))
+     
+     T_intervals_cp = (/3.0d2,1.0d3,5.0d3/) 
+      
 
      do ispec = 1,nspec
-        molar_mass(ispec) = 2.897d-2  !! N.B. molar mass is in kg/mol
+        molar_mass(ispec) = 2.884d-2  !! N.B. molar mass is in kg/mol
         Lewis_number(ispec) = one
-        cp0_molar(ispec) = 1004.5*molar_mass(ispec)/Rgas_universal
-     end do
-     Lewis_number(2) = half
-     Lewis_number(3) = 1.5d0
-     Lewis_number(4) = two
-     Lewis_number(5) = one               
-     
-     
+        
+        !! Temporary, single-interval, single-step mechanism, 7th order polynomial
+        coef_cp(ispec,1,1) =  3.7473930d0
+        coef_cp(ispec,2,1) = -2.1196798d-3
+        coef_cp(ispec,3,1) =  5.7579747d-6
+        coef_cp(ispec,4,1) = -5.3740086d-9
+        coef_cp(ispec,5,1) =  2.4929389d-12
+        coef_cp(ispec,6,1) = -5.7657654d-16
+        coef_cp(ispec,7,1) =  5.2939377d-20  
+        coef_cp(ispec,8,1) = -1.0643198E+03                                      
+                           
+        !! Convert cp coefficients from molar to mass based
+        coef_cp(ispec,:,:) = coef_cp(ispec,:,:)*Rgas_universal/molar_mass(ispec)
+        
+     end do                      
 
      
      return
@@ -354,6 +368,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
   subroutine initial_solution
      use mirror_boundaries
      use derivatives
+     use thermodynamics
      !! Temporary subroutine whilst developing. Initialises all fields
      integer(ikind) :: i,j,k,n_restart,ispec
      real(rkind) :: x,y,z,tmp,tmpro
@@ -377,45 +392,15 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 #ifdef ms    
 !        do ispec=1,nspec      
            tmp = 20.0d0*(y**two);tmp = exp(-tmp**4.0d0)
-           Yspec(i,1) = half*half*tmp
+           tmp = one - half*(one + erf(20.0d0*x))
+           Yspec(i,1) = tmp
+           Yspec(i,2) = one - tmp
 
-           tmp = 20.0d0*(x**two);tmp = exp(-tmp**4.0d0)
-           Yspec(i,2) = half*half*tmp
-
-           tmp = 20.0d0*(x**two + y**two);tmp = exp(-tmp**4.0d0)
-           Yspec(i,3) = half*half*tmp           
-           
-           tmp = one + sin(two*pi*x)*sin(two*pi*y);tmp = half*tmp
-           Yspec(i,4) = half*half*tmp           
-
-           
-           Yspec(i,5) = one - Yspec(i,1) - Yspec(i,2) - Yspec(i,3) - Yspec(i,4)
 !        end do
 #endif         
 
-        tmp = T_ref!*(one + 0.01*sin(two*pi*z/Lz)) !! z-variation of temperature...
-
-        roE(i) = exp(lnro(i))*(tmp*287.0025/0.4 + half*u(i)*u(i) + half*v(i)*v(i) + half*w(i)*w(i))
-                
-!        call evaluate_grf(x,y,z,tmp)
-!        if(tmp.le.zero) then 
-!           lnro(i) = log(rho_char)
-!        else
-!           lnro(i) = log(onethird*rho_char)
-!        end if
-
-        
-        !! Hydrostatic energy gradient 
-!        tmp = T_ref*(one + 0.01*sin(two*pi*z/Lz))
-!        tmp = (rho_char/exp(lnro(i)))*tmp*Rs0/gammagasm1 + dot_product(grav,rp(i,:))/gammagasm1
-!        roE(i) = (tmp + half*u(i)*u(i) + half*v(i)*v(i) + half*w(i)*w(i))*exp(lnro(i))
-              
-        !! Lamb-Oseen vortex
-!        tmp = half ! vortex strength, vortex size is 0.1 (so 2R^2 = 0.02)
-!        u(i) = u_char + tmp*two*y*exp(-(x*x+y*y)/0.02d0)/0.02
-!        v(i) = -tmp*two*x*exp(-(x*x+y*y)/0.02d0)/0.02
-!        tmp = -tmp*tmp*exp(-(x*x+y*y)/0.01d0)/0.01/csq
-!        lnro(i) = log(one+tmp)         
+        T(i) = T_ref
+                    
      end do
      !$OMP END PARALLEL DO
      
@@ -430,9 +415,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 
                  tmp = T_ref*(one + 0.01*sin(two*pi*rp(i,3)/Lz))
                  T_bound(j) = tmp*rho_char/exp(lnro(i)) + dot_product(grav,rp(i,:))/Rs0                
-!                 T_bound(j) = (rho_char/exp(lnro(i)))*T_ref
-                 tmp = T_bound(j)*287.0025/0.4
-                 roE(i) = tmp*exp(lnro(i)) 
+                 T(i) = T_bound(j)
               end if                 
               if(node_type(i).eq.1) then !! inflow initial conditions
                  u(i)=u_char
@@ -443,22 +426,25 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
            end do
         end if
      end if
+     
+     !! Set energy from lnro,u,Y,T
+     call initialise_energy
 #else    
      !! RESTART OPTION. Ask for input number (just hard-coded for now...)
-     n_restart = 200
+     n_restart = 2
 #ifdef mp
      k=10000+iproc
 #else
      k=10000
 #endif     
      if( n_restart .lt. 10 ) then 
-        write(fname,'(A14,I5,A1,I1)') './data_out/uv_',k,'_',n_restart
+        write(fname,'(A17,I5,A1,I1)') './data_out/layer_',k,'_',n_restart
      else if( n_restart .lt. 100 ) then 
-        write(fname,'(A14,I5,A1,I2)') './data_out/uv_',k,'_',n_restart        
+        write(fname,'(A17,I5,A1,I2)') './data_out/layer_',k,'_',n_restart        
      else if( n_restart .lt. 1000 ) then
-        write(fname,'(A14,I5,A1,I3)') './data_out/uv_',k,'_',n_restart        
+        write(fname,'(A17,I5,A1,I3)') './data_out/layer_',k,'_',n_restart        
      else
-        write(fname,'(A14,I5,A1,I4)') './data_out/uv_',k,'_',n_restart        
+        write(fname,'(A17,I5,A1,I4)') './data_out/layer_',k,'_',n_restart        
      end if 
      !! Open the file
      open(14,file=fname)
@@ -467,9 +453,9 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      !! Load the initial conditions
      do i=1,npfb
 #ifdef dim3
-        read(14,*) tmp,tmp,tmp,h(i),k,tmpro,u(i),v(i),w(i),tmp,roE(i),tmp
+        read(14,*) tmp,tmp,tmp,tmp,h(i),k,tmpro,u(i),v(i),w(i),tmp,roE(i),T(i),Yspec(i,1:nspec)
 #else
-        read(14,*) tmp,tmp,h(i),k,tmpro,u(i),v(i),tmp,roE(i),tmp
+        read(14,*) tmp,tmp,tmp,h(i),k,tmpro,u(i),v(i),tmp,roE(i),T(i),Yspec(i,1:nspec)
 #endif        
         if(k.ne.node_type(i)) then
            write(6,*) "ERROR: Problem in restart file. STOPPING."
@@ -482,6 +468,9 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         lnro(i) = log(tmpro)
         roE(i) = roE(i)*tmpro
      end do
+     
+     !! Set energy from lnro,u,Y,T
+     call initialise_energy     
      close(14)
 #endif
    

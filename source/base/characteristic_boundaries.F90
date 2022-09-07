@@ -49,7 +49,9 @@ contains
      Lchar(3) = zero
      Lchar(4) = zero
      Lchar(5)= Lchar(1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro) 
+#ifdef ms     
      Lchar(5+1:5+nspec) = zero
+#endif     
 #else            
 
 #ifdef wall_isoT
@@ -208,6 +210,7 @@ contains
         Lchar(1) = (p(i)-p_infinity)*0.278d0*c*(one)/two/L_domain_x &                               !! track p_infinity
                  - (one-u(i)/c)*half*(v(i)*gradp(2)+gammagas*p(i)*gradv(2)-tmpro*c*v(i)*gradu(2)) & !! trans1 conv.
                  - (one-u(i)/c)*half*(w(i)*gradp(3)+gammagas*p(i)*gradw(3)-tmpro*c*w(i)*gradu(3))   !! trasn2 conv.
+                 
      end if
      !Lchar(2) is outgoing
      !Lchar(3) is outgoing

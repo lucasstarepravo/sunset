@@ -1,4 +1,4 @@
-\documentclass[notitlepage]{revtex4-2}
+\documentclass[notitlepage]{article}
 % includes...
 \usepackage{amsmath}
 \usepackage{bm}
@@ -27,8 +27,8 @@
 \title{SUNSET code: Scalable Unstructred Node-SET code for high fidelity fluid simulations in complex geometries}
 
 \author{J. R. C. King}
-\email{jack.king@manchester.ac.uk}
-\affiliation{Department of Mechanical, Aerospace and Civil Engineering, The University of Manchester, Manchester, M13 9PL, UK}
+%\email{jack.king@manchester.ac.uk}
+%\affiliation{Department of Mechanical, Aerospace and Civil Engineering, The University of Manchester, Manchester, M13 9PL, UK}
 \date{\today}
 \begin{abstract}
 
@@ -74,19 +74,35 @@ where $R_{mix}$ is the gas constant for the mixture, $R_{0}$ is the universal ga
 
 \subsection{Evaluation of temperature and heat capacity}
 
-TBC.
+The temperature dependence of the specific heat capacity of species $\alpha$ is given by a polynomial of order $J$
+\begin{equation}c_{p,\alpha}=\displaystyle\sum_{j=1}^{J}a_{\alpha,j}T^{j-1},\end{equation}
+which is valid over a specified temperature range $T\in\left[T_{low},T_{high}\right]$, and in which the coefficients $a_{\alpha,j}$ are taken from CHEMKIN tables. Integration of this yields an expression for the enthalpy
+\begin{equation}h_{\alpha}=\displaystyle\sum_{j=1}^{J}\frac{a_{\alpha,j}}{j}T^{j} + a_{\alpha,J+1},\end{equation}
+whilst the temperature derivative of $c_{p,\alpha}$ is
+\begin{equation}\frac{dc_{p,\alpha}}{dT}=\displaystyle\sum_{j=1}^{J}\left(j-1\right)a_{\alpha,j}T^{j-2}.\end{equation}
+Noting that the specific heat capacity of species $\alpha$ is $R_{0}/W_{\alpha}$, where $R_{0}$ is the universal gas constant and $W_{\alpha}$ is the molar mass of species $\alpha$, the energy can be written as
+\begin{equation}E=\displaystyle\sum_{\alpha}Y_{\alpha}\left(h_{\alpha}-R_{0}\frac{T}{W_{\alpha}}\right)+\frac{1}{2}\bm{u}\cdot\bm{u}.\end{equation}
+Substituting the polynomial for $h_{\alpha}$ and collecting terms in powers of $T$, we can write
+\begin{equation}f\left(T\right)=C_{0}+\displaystyle\sum_{j=1}^{J}C_{j}T^{j}=0,\label{eq:nonlinearT}\end{equation}
+where the coefficients $B$ are given by
+\begin{subequations}\begin{align}
+B_{0}&=\frac{1}{2}\bm{u}\cdot\bm{u}-E+\displaystyle\sum_{\alpha}Y_{\alpha}a_{\alpha,J+1}\\
+B_{1}&=\displaystyle\sum_{\alpha}Y_{\alpha}a_{\alpha,1} - R_{mix}\\
+B_{j}&=\displaystyle\sum_{\alpha}Y_{\alpha}\frac{a_{\alpha,j}}{j}\qquad\forall{j}\in\left[2,J\right].\end{align}\end{subequations}
+Having calculated the coefficients $B$, we solve the nonlinear equation~\eqref{eq:nonlinearT} numerically via a Newton-Raphson method to obtain the temperature $T$.
 
-TBC for cp independent of T.
 
 \subsection{Temperature dependent transport properties}
 
 The temperature dependence of the transport properties is modelled by the relationship
 \begin{equation}\mu=\mu_{ref}\left(\frac{T}{T_{ref}}\right)^{r_{T}},\label{eq:tdtp_mu}\end{equation}
 where $\mu_{ref}$ is the viscosity at the reference temperature $T_{ref}$, and $r_{T}=0.7$ is a constant exponent. The mixture thermal conductivity is given by
-\begin{equation}\lambda=\frac{\mu}{c_{p}Pr},\end{equation}
+\begin{equation}\lambda=\frac{\mu{c}_{p}}{Pr},\end{equation}
 in which $c_{p}$ is the heat capacity of the mixture, and $Pr$ is the Prandtl number, taken as constant. The molecular diffusivity of species $\alpha$ is given by
 \begin{equation}D_{\alpha}=\frac{\lambda}{\rho{c}_{p}Le_{\alpha}},\end{equation}
 where $Le_{\alpha}$ is the Lewis number for species $\alpha$, which is assumed constant for each species.
+
+
 
 \subsection{Evaluation of reaction rates}
 
@@ -118,7 +134,10 @@ Similarly, the gradients of the transport properties, which have analytic relati
 \begin{equation}\nabla\mu=\frac{r_{T}\mu}{T}\nabla{T}\end{equation}
 \begin{equation}\nabla\lambda=\frac{r_{T}\lambda}{T}\nabla{T}+\frac{\lambda}{c_{p}}\nabla{c_{p}}\end{equation}
 \begin{equation}\nabla{D}_{\alpha}=\frac{r_{T}D_{\alpha}}{T}\nabla{T}-D_{\alpha}\nabla\ln\rho\end{equation}
-
+The gradient of the enthalpy of species $\alpha$ is given by
+\begin{equation}\nabla{h}_{\alpha}=\frac{dh_{\alpha}}{dT}\nabla{T}=c_{p}\nabla{T},\end{equation}
+and the gradient of the mixture specific heat capacity is
+\begin{equation}\nabla{c}_{p}=\displaystyle\sum_{\alpha}\left[Y_{\alpha}\frac{dc_{p}}{dT}\nabla{T}+c_{p}\nabla{Y}_{\alpha}\right].\end{equation}
 \subsection{Boundaries}
 
 Symmetry and periodic boundary conditions are available. The only boundary condition available in the third dimension is periodic. Wall, inflow and outflow boundaries are imposed through the Navier-Stokes characteristic boundary condition formalism of [citeXX]. The basic framework follows that described for isothermal flows in~\cite{king_labfm_2022}.

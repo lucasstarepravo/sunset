@@ -854,7 +854,7 @@ contains
                     xx=x/hh/ss;yy=y/hh/ss  !! Legendre   
 #endif     
                     !! Populate the ABF array
-                    gvec = abfs(rad,xx,yy,ff1)
+                    gvec(1:nsizeG) = abfs(rad,xx,yy,ff1)
 
 
                     !! grad and Laplacian of signal at particular wavenumber qq

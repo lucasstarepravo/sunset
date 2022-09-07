@@ -26,6 +26,7 @@ program main
   integer processor(np_max),node_type(np_max),subset_flag
   real  DT1(i_PART_counter_max),DT2(i_PART_counter_max)  
   integer :: nprocs,iproc,np_ini,np_end,dummy_int,nspecs
+  real :: dummy_real
   
   allocate(xp(np_max))
   allocate(zp(np_max))
@@ -131,15 +132,17 @@ program main
         if(subset_flag.eq.1) then
            if(dim_flag.eq.1) then 
               do i=np_ini,np_end
-                 read(ifi,*,end=300) xp(i),yp(i),zp(i),h(i),node_type(i),ro(i),up(i),vp(i),wp(i), &
+                 read(ifi,*,end=300) xp(i),yp(i),zp(i),h(i),dummy_real,node_type(i),ro(i), &
+                                     up(i),vp(i),wp(i), &
                                      vort(i),energy(i),Temp(i),Yspec(i,1:nspecs)
                  processor(i) = iproc
                  npp=npp+1
               enddo
            else
               do i=np_ini,np_end
-                 read(ifi,*,end=300) xp(i),yp(i),h(i),node_type(i),ro(i),up(i),vp(i),vort(i),energy(i),Temp(i), &
-                                     Yspec(i,1:nspecs)
+                 read(ifi,*,end=300) xp(i),yp(i),h(i),dummy_real,node_type(i),ro(i), &
+                                     up(i),vp(i), &
+                                     vort(i),energy(i),Temp(i),Yspec(i,1:nspecs)
                  processor(i) = iproc
                  npp=npp+1
               enddo
@@ -147,13 +150,13 @@ program main
         else
            if(dim_flag.eq.1) then
               do i=np_ini,np_end
-                 read(ifi,*,end=300) xp(i),yp(i),zp(i),dr,di,dr,dr,dr,dr,vort(i),dr,dr,dr
+                 read(ifi,*,end=300) xp(i),yp(i),zp(i),dr,dr,di,dr,dr,dr,dr,vort(i),dr,dr,dr
                  processor(i) = iproc
                  npp=npp+1
               enddo        
            else
               do i=np_ini,np_end
-                 read(ifi,*,end=300) xp(i),yp(i),dr,di,dr,dr,dr,vort(i),dr,dr,dr
+                 read(ifi,*,end=300) xp(i),yp(i),dr,dr,di,dr,dr,dr,vort(i),dr,dr,dr
                  processor(i) = iproc
                  npp=npp+1
               enddo                   
@@ -208,7 +211,6 @@ program main
      string1 = '   <PointData Scalars='//DQ//'Pressure'//DQ//' Vectors='//DQ//'Velocity'//DQ//'>'
      write(ifo,202)string1
 
-     string2 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'h'//DQ//' format='//DQ//'ascii'//DQ//'>'
 
      !! Vorticity
      string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'Vorticity'//DQ// &
@@ -222,7 +224,8 @@ program main
 
      if(subset_flag.eq.1) then !! Only do those in this if-statement if we want all          
 
-        !! Resolution
+        string2 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'s'//DQ//' format='//DQ//'ascii'//DQ//'>'
+        !! Resolution (actualy s, though array is h)
         write(ifo,202)string2
         do ii=1,np
            write(ifo,*)h(ii)        

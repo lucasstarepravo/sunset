@@ -31,8 +31,14 @@ endif
 # Set compiler flags based on make options
 CFLAGS := -Wall -O3 -g -m64
 FFLAGS := -fopenmp -fbounds-check -ffpe-trap=zero -O3 -Wall -g -J./obj -I./obj -m64
+
+# Isothermal or not. 
 ifeq ($(thermo), 0)
 FFLAGS += -DisoT
+else
+ifeq ($(tdtp),1)
+FFLAGS += -Dtdtp
+endif
 endif
 ifeq ($(react), 1)
 FFLAGS += -Dreact
@@ -58,9 +64,6 @@ endif
 ifeq ($(pgrad),1)
 FFLAGS += -Dpgrad
 endif
-ifeq ($(tdtp),1)
-FFLAGS += -Dtdtp
-endif
 ifeq ($(yout),1)
 FFLAGS += -Doutput_composition
 endif
@@ -74,9 +77,9 @@ SRC_DIR  := $(addprefix source/,$(SUB_DIRS))
 #parameters come first, as almost everything depends on them.
 OBJ_FILES := obj/kind_parameters.o obj/common_parameter.o obj/common_vars.o
 OBJ_FILES += obj/rbfs.o obj/mirror_boundaries.o obj/derivatives.o 
-OBJ_FILES += obj/mpi_transfers.o 
+OBJ_FILES += obj/mpi_transfers.o obj/thermodynamics.o
 OBJ_FILES += obj/neighbours.o obj/output.o obj/setup.o
-OBJ_FILES += obj/labf.o obj/fd.o obj/thermodynamics.o 
+OBJ_FILES += obj/labf.o obj/fd.o  
 OBJ_FILES += obj/characteristic_boundaries.o obj/rhs.o
 OBJ_FILES += obj/step.o
 OBJ_FILES += $(foreach sdir,$(SRC_DIR),$(patsubst $(sdir)/%.F90,obj/%.o,$(wildcard $(sdir)/*.F90)))

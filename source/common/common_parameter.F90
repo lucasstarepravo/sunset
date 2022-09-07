@@ -68,13 +68,13 @@ module common_parameter
   real(rkind), parameter :: rho_char = one                               !! Reference density
   real(rkind), parameter :: Rgas_universal = 8.3144626181d0              !! Universal gas constant
   
-  real(rkind), parameter :: T_ref = 20.0d0!298.0                                !! Reference temperature
+  real(rkind), parameter :: T_ref = 3.0d2                                !! Reference temperature
   real(rkind), parameter :: visc_ref = 1.8d-5                            !! Viscosity at ref T,ro
   real(rkind), parameter :: r_temp_dependence = 7.0d-1                   !! T-exponent for TDTP
   
   !! Primary dimensionless groups -----------------------------------------------------------------
-  real(rkind), parameter :: Re = 1000.0d0 !! Reynolds number
-  real(rkind), parameter :: Pr = one !! Prandtl number
+  real(rkind), parameter :: Re = 1000.0d0                 !! Reynolds number
+  real(rkind), parameter :: Pr = one                      !! Prandtl number
  
   !! Secondary properties -------------------------------------------------------------------------
   real(rkind), parameter :: u_char = Re*visc_ref/L_char/rho_char      !! Reference velocity from Re
@@ -88,6 +88,8 @@ module common_parameter
   real(rkind), parameter :: Rs0 = 287.058d0   !! Reference specific gas constant  
   real(rkind), parameter :: lambda_th_ref = visc_ref*Rs0*1.4d0/0.4d0/Pr
   real(rkind), parameter :: Mdiff_ref = lambda_th_ref*0.4d0/rho_char/Rs0/1.4d0/one !! one is Lewis #
+  
+ 
    
   
   real(rkind), parameter :: csq = 1.4d0*Rs0*T_ref             !! Sound speed squared
@@ -97,7 +99,7 @@ module common_parameter
 #ifdef isoT
   real(rkind), parameter :: p_infinity = csq    !! Reference pressure
 #else
-  real(rkind), parameter :: p_infinity = rho_char*Rs0*T_ref
+  real(rkind), parameter :: p_infinity = rho_char*Rgas_universal*T_ref/0.02884d0
 #endif
 
 

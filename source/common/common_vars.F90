@@ -32,7 +32,10 @@ module common_vars
   real(rkind), dimension(:,:), allocatable :: Mdiff
   
   !! Transport properties - arrays covering the species
-  real(rkind), dimension(:), allocatable :: molar_mass,Lewis_number,cp0_molar
+  real(rkind), dimension(:), allocatable :: molar_mass,Lewis_number
+  real(rkind), dimension(:,:,:),allocatable :: coef_cp !! indexing: ispec,j-exponent,l-interval
+  integer(ikind) :: nintervals_cp,polyorder_cp  !! number of intervals, polynomial order
+  real(rkind), dimension(:), allocatable :: T_intervals_cp !! Interval limits for cp calculation
   
   !! Right-hand-sides
   real(rkind),dimension(:),allocatable :: rhs_lnro,rhs_u,rhs_v,rhs_w,rhs_roE

@@ -398,8 +398,10 @@ contains
         !! Viscous:: s*s*ro/visc
         dt_visc = s(i)*s(i)*exp(lnro(i))/visc(i)
         
+#ifndef isoT        
         !! Thermal:: s*s*ro*cp/lambda_th
         dt_therm = s(i)*s(i)*exp(lnro(i))*cp(i)/lambda_th(i)
+#endif        
         
         !! Molecular diffusivity::  s*s*ro/Mdiff
         dt_spec = s(i)*s(i)*exp(lnro(i))/maxval(Mdiff(i,1:nspec))
