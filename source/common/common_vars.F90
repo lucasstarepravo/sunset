@@ -33,9 +33,9 @@ module common_vars
   
   !! Transport properties - arrays covering the species
   real(rkind), dimension(:), allocatable :: molar_mass,Lewis_number
-  real(rkind), dimension(:,:,:),allocatable :: coef_cp !! indexing: ispec,j-exponent,l-interval
-  integer(ikind) :: nintervals_cp,polyorder_cp  !! number of intervals, polynomial order
-  real(rkind), dimension(:), allocatable :: T_intervals_cp !! Interval limits for cp calculation
+  real(rkind), dimension(:,:),allocatable :: coef_cp !! indexing: ispec,j-exponent
+  integer(ikind) :: polyorder_cp  !! number of intervals, polynomial order
+  real(rkind), dimension(:), allocatable :: T_low_cp,T_high_cp !! Interval limits for cp calculation
   
   !! Right-hand-sides
   real(rkind),dimension(:),allocatable :: rhs_lnro,rhs_u,rhs_v,rhs_w,rhs_roE
@@ -61,7 +61,7 @@ module common_vars
   real(rkind) :: h0,sup_size,h3,hovs,ss,h2,hovs_bound
 
   !! Parameters related to time and some forces etc
-  real(rkind) :: time,dt,time_end,dt_out,dt_mout
+  real(rkind) :: time,dt,dt_previous,time_end,dt_out,dt_mout
   real(rkind) :: time_star !! Dimensionless time (for outputs...)
   real(rkind) :: umax,smax,cmax,smin                  !! maximum velocity,node-spacing,sound speed
   integer(ikind) :: itime
@@ -105,6 +105,7 @@ module common_vars
   integer(ikind),dimension(:),allocatable :: btype !! What type of BC is node i?
   integer(ikind),dimension(:),allocatable :: fd_parent !! pointer to the boundary node which is parent 
   real(rkind),dimension(:),allocatable :: T_bound
+  real(rkind) :: p_outflow   !! Desired pressure on outflow boundary
   
   !! Profiling and openMP parallelisation
   real(rkind) ts_start,ts_end,t_run,t_per_dt,t_last_X

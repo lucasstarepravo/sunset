@@ -56,25 +56,39 @@ module common_parameter
   real(rkind),dimension(4),parameter :: rk3_4s_2r_bh=(/rk3_4s_2r_bh1,rk3_4s_2r_bh2,rk3_4s_2r_bh3,rk3_4s_2r_bh4/)
   real(rkind),dimension(4),parameter :: rk3_4s_2r_bmbh = rk3_4s_2r_b - rk3_4s_2r_bh
 
+  !! Normalisation constants for PID error estimators (OK for combustion at standard P,T)
+  real(rkind), parameter :: elnro_norm = 1.0d-10
+  real(rkind), parameter :: eu_norm = 1.0d-6 
+  real(rkind), parameter :: ev_norm = 1.0d-6 
+  real(rkind), parameter :: ew_norm = 1.0d-6 
+  real(rkind), parameter :: eroE_norm = 1.0d-2 
+  real(rkind), parameter :: eY_norm = 1.0d-10            
+
   !! Maximum possible number of species
   integer(ikind), parameter :: nspec_max = 20   
+  
+  !! Universal (or assumed to be universal) constants ---------------------------------------------
+  real(rkind), parameter :: Rgas_universal = 8.3144626181d0         !! Universal gas constant  
+#ifdef tdtp
+  real(rkind), parameter :: r_temp_dependence = 7.0d-1     !! T-exponent for TDTP
+#else
+  real(rkind), parameter :: r_temp_dependence = zero       !! zero exponent for not(TDTP) 
+#endif  
    
   !! SIMULATION PARAMETERS ========================================================================
   !! Primary domain parameters (i.e. those we can specify) ----------------------------------------
-  real(rkind), parameter :: L_char = half*half*half*half*half*half !! Characteristic lengthscale
+  real(rkind), parameter :: L_char = half*half*half*half*half*half    !! Characteristic lengthscale
   real(rkind), dimension(dims), parameter :: grav = (/zero,zero,zero/) !! Gravity  
   
   !! Primary physical fluid properties ------------------------------------------------------------
-  real(rkind), parameter :: rho_char = one                               !! Reference density
-  real(rkind), parameter :: Rgas_universal = 8.3144626181d0              !! Universal gas constant
-  
-  real(rkind), parameter :: T_ref = 3.0d2                                !! Reference temperature
-  real(rkind), parameter :: visc_ref = 1.8d-5                            !! Viscosity at ref T,ro
-  real(rkind), parameter :: r_temp_dependence = 7.0d-1                   !! T-exponent for TDTP
+  real(rkind), parameter :: rho_char = one           !! Reference density
+  real(rkind), parameter :: T_ref = 3.0d2            !! Reference temperature (for TDTP)
+  real(rkind), parameter :: visc_ref = 1.8d-5        !! Viscosity at ref T,ro
   
   !! Primary dimensionless groups -----------------------------------------------------------------
-  real(rkind), parameter :: Re = 1000.0d0                 !! Reynolds number
-  real(rkind), parameter :: Pr = one                      !! Prandtl number
+  real(rkind), parameter :: Re = 1000.0d0        !! Reynolds number
+  real(rkind), parameter :: Pr = one             !! Prandtl number
+  real(rkind), parameter :: Ma = 0.02d0          !! Mach number (only used for isothermal)      
  
   !! Secondary properties -------------------------------------------------------------------------
   real(rkind), parameter :: u_char = Re*visc_ref/L_char/rho_char      !! Reference velocity from Re
@@ -82,24 +96,13 @@ module common_parameter
   real(rkind), parameter :: Lz = L_char                               !! 3rd dim length-scale
   real(rkind), parameter :: Time_char= L_char/u_char                  !! reference time-scale
   real(rkind), parameter :: T_inflow = T_ref                          !! Inflow temperature 
- 
 
-  !! Temporary (fixed) values of perfect gases and transport properties (whilst T-dependence is being developed)
-  real(rkind), parameter :: Rs0 = 287.058d0   !! Reference specific gas constant  
-  real(rkind), parameter :: lambda_th_ref = visc_ref*Rs0*1.4d0/0.4d0/Pr
-  real(rkind), parameter :: Mdiff_ref = lambda_th_ref*0.4d0/rho_char/Rs0/1.4d0/one !! one is Lewis #
-  
- 
-   
-  
-  real(rkind), parameter :: csq = 1.4d0*Rs0*T_ref             !! Sound speed squared
-  real(rkind), parameter :: Ma = u_char/sqrt(csq)             !! Mach number
- 
-  
+  !! Reference molecular diffusivity assuming unity Lewis number
+  real(rkind), parameter :: Mdiff_ref = visc_ref/rho_char/Pr/one      !! one is Lewis #               
+
+    
 #ifdef isoT
-  real(rkind), parameter :: p_infinity = csq    !! Reference pressure
-#else
-  real(rkind), parameter :: p_infinity = rho_char*Rgas_universal*T_ref/0.02884d0
+  real(rkind), parameter :: csq = (u_char/Ma)**two  !! Sound speed squared
 #endif
 
 

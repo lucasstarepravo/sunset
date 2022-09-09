@@ -1,48 +1,48 @@
-This is BibTeX, Version 0.99d (TeX Live 2019/Debian)
+This is BibTeX, Version 0.99d (TeX Live 2022/dev/Debian)
 Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
 The top-level auxiliary file: sunsetcode.aux
 The style file: elsarticle-num-names.bst
 Database file #1: sunsetcodeNotes.bib
 Database file #2: sunset_refs.bib
 Reallocated singl_function (elt_size=4) to 100 items from 50.
-You've used 1 entry,
+You've used 2 entries,
             2918 wiz_defined-function locations,
-            632 strings with 5314 characters,
-and the built_in function-call counts, 669 in all, are:
-= -- 50
-> -- 19
+            639 strings with 5488 characters,
+and the built_in function-call counts, 1339 in all, are:
+= -- 101
+> -- 46
 < -- 1
-+ -- 7
-- -- 6
-* -- 76
-:= -- 99
-add.period$ -- 2
-call.type$ -- 1
-change.case$ -- 7
-chr.to.int$ -- 1
-cite$ -- 1
-duplicate$ -- 47
-empty$ -- 48
-format.name$ -- 11
-if$ -- 118
++ -- 17
+- -- 15
+* -- 160
+:= -- 195
+add.period$ -- 4
+call.type$ -- 2
+change.case$ -- 15
+chr.to.int$ -- 2
+cite$ -- 2
+duplicate$ -- 96
+empty$ -- 96
+format.name$ -- 23
+if$ -- 242
 int.to.chr$ -- 1
 int.to.str$ -- 1
-missing$ -- 9
-newline$ -- 20
-num.names$ -- 4
-pop$ -- 14
+missing$ -- 19
+newline$ -- 25
+num.names$ -- 8
+pop$ -- 29
 preamble$ -- 1
-purify$ -- 7
+purify$ -- 15
 quote$ -- 0
-skip$ -- 12
+skip$ -- 22
 stack$ -- 0
-substring$ -- 30
-swap$ -- 35
+substring$ -- 60
+swap$ -- 73
 text.length$ -- 0
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 9
+type$ -- 18
 warning$ -- 0
-while$ -- 4
+while$ -- 8
 width$ -- 0
-write$ -- 28
+write$ -- 42

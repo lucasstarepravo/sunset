@@ -19,7 +19,7 @@ program main
   integer :: itn,ifi,ifo,di,dim_flag
   real :: dr
       
-  real,allocatable,dimension(:):: xp,zp,up,vp,wp,ro,vort,energy,h,Temp,Y0,yp
+  real,allocatable,dimension(:):: xp,zp,up,vp,wp,ro,vort,h,Temp,Y0,yp
   real,allocatable,dimension(:,:) :: Yspec
   real time(i_PART_counter_max), DT(i_PART_counter_max)
   integer np_all(i_PART_counter_max), IT(i_PART_counter_max)
@@ -37,7 +37,6 @@ program main
   zp = 0.0d0;yp=0.0d0;wp=0.0d0
   allocate(ro(np_max))
   allocate(vort(np_max))
-  allocate(energy(np_max))
   allocate(h(np_max))
   allocate(Temp(np_max))
   allocate(Y0(np_max))
@@ -85,7 +84,7 @@ program main
         
   !! Loop over each frame   
 !  !$omp parallel do private(name_vtu,ngrab,npp,iproc,name_orig,supp1,supp2,supp3,supp, &
-!  !$omp xp,zp,h,node_type,ro,up,vp,vort,energy,Temp,Y0,np_ini,np_end,np,i,processor, &
+!  !$omp xp,zp,h,node_type,ro,up,vp,vort,Temp,Y0,np_ini,np_end,np,i,processor, &
 !  !$omp string1,string2,string3,string4,np_string3,np_string4,np_string5,np_string6,np_string7,np_string8, &
 !  !$omp itn,ifi,ifo,proc5)
   do iframe=N_start,Nframes+1
@@ -134,7 +133,7 @@ program main
               do i=np_ini,np_end
                  read(ifi,*,end=300) xp(i),yp(i),zp(i),h(i),dummy_real,node_type(i),ro(i), &
                                      up(i),vp(i),wp(i), &
-                                     vort(i),energy(i),Temp(i),Yspec(i,1:nspecs)
+                                     vort(i),Temp(i),Yspec(i,1:nspecs)
                  processor(i) = iproc
                  npp=npp+1
               enddo
@@ -142,7 +141,7 @@ program main
               do i=np_ini,np_end
                  read(ifi,*,end=300) xp(i),yp(i),h(i),dummy_real,node_type(i),ro(i), &
                                      up(i),vp(i), &
-                                     vort(i),energy(i),Temp(i),Yspec(i,1:nspecs)
+                                     vort(i),Temp(i),Yspec(i,1:nspecs)
                  processor(i) = iproc
                  npp=npp+1
               enddo
@@ -238,15 +237,6 @@ program main
         write(ifo,202)string1
         do ii=1,np
            write(ifo,*)ro(ii)
-        enddo
-        string3 = '    </DataArray>'
-        write(ifo,202) string3
-
-        !! ENERGY        
-        string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'energy'//DQ//' format='//DQ//'ascii'//DQ//'>'
-        write(ifo,202)string1
-        do ii=1,np
-           write(ifo,*)energy(ii)
         enddo
         string3 = '    </DataArray>'
         write(ifo,202) string3
@@ -393,7 +383,7 @@ program main
 
 
   deallocate(xp,zp,up,vp,wp)
-  deallocate(ro,vort,energy,h,Temp,Y0)  
+  deallocate(ro,vort,h,Temp,Y0)  
 
 
   stop

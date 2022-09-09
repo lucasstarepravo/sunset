@@ -182,7 +182,7 @@ contains
      !! Register 3 is rhs_lnro,rhs_u,rhs_v (only used for RHS)
      !! Register 4 is e_acc_lnro,e_acc_u,e_acc_v - error accumulator
      integer(ikind) :: i,k,ispec
-     real(rkind) :: time0
+     real(rkind) :: time0,emax_Y
      real(rkind),dimension(:),allocatable :: u_reg1,v_reg1,w_reg1,lnro_reg1,roE_reg1
      real(rkind),dimension(:),allocatable :: e_acc_lnro,e_acc_u,e_acc_v,e_acc_E,e_acc_w
      real(rkind),dimension(:,:),allocatable :: Yspec_reg1,e_acc_Yspec
@@ -317,16 +317,16 @@ contains
 #endif
         
         !! Calculating L_infinity of error norms
-        enrm_ro = abs(e_acc_lnro(i))!/(exp(lnro(i))+1.0d-9)      
-        enrm_u = abs(e_acc_u(i))/(abs(u(i))+1.0d-9)  !! divide by zero mollification...
-        enrm_v = abs(e_acc_v(i))/(abs(v(i))+1.0d-9)
-        enrm_w = abs(e_acc_w(i))/(abs(w(i))+1.0d-9)        
+        enrm_ro = abs(e_acc_lnro(i))/(lnro(i)+elnro_norm)      
+        enrm_u = abs(e_acc_u(i))/(abs(u(i)) + eu_norm)  !! divide by zero mollification...
+        enrm_v = abs(e_acc_v(i))/(abs(v(i)) + ev_norm)  !! but should be scaled according to
+        enrm_w = abs(e_acc_w(i))/(abs(w(i)) + ew_norm)  !! expected magnitude of each property      
 #ifndef isoT
-        enrm_E = abs(e_acc_E(i))/(abs(roE(i))+1.0d-9)
+        enrm_E = abs(e_acc_E(i))/(abs(roE(i)) + eroE_norm)
 #endif
 #ifdef ms 
         do ispec=1,nspec
-           enrm_Yspec(ispec) = abs(e_acc_Yspec(i,ispec))/(abs(Yspec(i,ispec))+1.0d-9)
+           enrm_Yspec(ispec) = abs(e_acc_Yspec(i,ispec))/(abs(Yspec(i,ispec)) + eY_norm)
         end do
 #endif
      end do
@@ -338,8 +338,20 @@ contains
      deallocate(e_acc_lnro,e_acc_u,e_acc_v,e_acc_E,e_acc_Yspec,e_acc_w)
      
      !! Finalise L_infinity error norms: find max and ensure it's >0     
-     emax_np1 = max(max(max(enrm_ro,enrm_E),max(max(enrm_u,enrm_v),enrm_w)),1.0d-16)
-     !! TBC: additional dependence on Yspec error norm.
+#ifdef ms
+     emax_Y = maxval(enrm_Yspec(1:nspec))     
+#else
+     emax_Y = zero
+#endif         
+     emax_np1 = max( &
+                    max( &
+                        max(enrm_ro,enrm_E), &
+                        max( &
+                            max(enrm_u,enrm_v),&
+                            max(enrm_w,emax_Y) &
+                            ) &
+                        ), &
+                    1.0d-16)
 
      !! Set the new time   
      time = time0 + dt
@@ -370,6 +382,9 @@ contains
      real(rkind) :: dt_visc,dt_therm,dt_spec,dt_cfl,dt_parabolic     
      real(rkind) :: c,uplusc
      
+     !! Store the last time-step in dt_previous in case we're using PID controller later
+     dt_previous = dt
+     
      call evaluate_mixture_gas_constant
      call evaluate_temperature_and_cp
      call evaluate_transport_properties   
@@ -380,16 +395,14 @@ contains
      !$omp parallel do private(c,uplusc) reduction(min:dt_cfl,dt_visc,dt_therm,dt_spec) &
      !$omp reduction(max:cmax,umax)
      do i=1,npfb
-#ifdef isoT
-        c = sqrt(csq)
-#else             
-        c = sqrt(cp(i)*Rgas_mix(i)*T(i)/(cp(i)-Rgas_mix(i)))
-#endif        
+        !! Sound speed 
+        c = calc_sound_speed_at_node(cp(i),Rgas_mix(i),T(i))    
  
         !! Max velocity and sound speed
         umax = sqrt(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))
         cmax = c
         
+        !! Max speed of information propagation
         uplusc = umax + c
         
         !! Acoustic:: s/(u+c)
@@ -419,22 +432,26 @@ contains
      smin = minval(s(1:npfb))*L_char
 
      !! Set time step
-     dt_parabolic = 0.3d0*min(dt_visc,min(dt_therm,dt_spec)) !! Parabolic (2nd order)
+     dt_parabolic = 0.3d0*min(dt_visc,min(dt_therm,dt_spec)) !! Parabolic=diffusive constraints
      dt = min(dt_parabolic,one*dt_cfl)
 
-
-   
+      
 #ifdef mp     
      !! Find global time-step
      dt_local = dt
      call MPI_ALLREDUCE(dt_local,dt,1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror) 
+     !! Output time-step (only if not reacting)
+#ifndef react
      if(iproc.eq.0) then
         write(192,*) time,dt
         flush(192)
      end if
+#endif     
 #else
+#ifndef react
      write(192,*) time,dt
      flush(192)         
+#endif     
 #endif     
 
      return
@@ -442,16 +459,24 @@ contains
 !! ------------------------------------------------------------------------------------------------  
   subroutine set_tstep_PID
      integer(ikind) :: i
-     real(rkind) :: dtfactor
+     real(rkind) :: dtfactor,emax_local
      real(rkind) :: facA,facB,facC
      real(rkind) :: kappa,alph,beta,gamm,eps
      real(rkind) :: tratio_min,tratio_max
      real(rkind) :: umag2,umag
      real(rkind) :: dtmax,c,dt_local
      
-     !! Set the upper limit of dt to the recently calculated dt based on CFL-type conditions.
+     !! Set the upper limit of dt to that based on CFL-type conditions (currently stored in dt), and
+     !! pass the old value back into dt
      dtmax = dt
+     dt = dt_previous
      
+#ifdef mp     
+     !! Parallel transfer to obtain the global maximum error          
+     emax_local = emax_np1
+     call MPI_ALLREDUCE(emax_local,emax_np1,1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror) 
+#endif     
+          
      !! PID parameters...
      kappa=0.9
      alph=0.7/2.0;beta=0.4/2.0;gamm=0.1/2.0
@@ -466,12 +491,16 @@ contains
          
      !! Combined factor
      dtfactor = kappa*exp(facA+facB+facC)
+     
+     !! Suppress big changes in time step (especially increases). N.B. this significantly reduces
+     !! the stiffness of the PID system, and seems faster so far.
+     dtfactor = one + one*atan((dtfactor-one)/one)
 
-     !! Limiting change in dt
-     tratio_min = 1.0d-2
-     tratio_max = 1.01d0
-     if(dtfactor.lt.tratio_min) dtfactor = tratio_min
-     if(dtfactor.gt.tratio_max) dtfactor = tratio_max     
+     !! Old approach to limiting change in dt - hard cut-offs
+!     tratio_min = 1.0d-1
+!     tratio_max = 1.01d0
+!     if(dtfactor.lt.tratio_min) dtfactor = tratio_min
+!     if(dtfactor.gt.tratio_max) dtfactor = tratio_max     
      
      !! Set time new step
      dt = dt*dtfactor
@@ -486,12 +515,14 @@ contains
      if(iproc.eq.0) then
         write(192,*) time,dt
         flush(192)
+!write(6,*) itime,dtmax,dt        
      end if
 #else
      write(192,*) time,dt
      flush(192)         
 #endif 
  
+
      return
   end subroutine set_tstep_PID
 !! ------------------------------------------------------------------------------------------------  

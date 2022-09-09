@@ -1,4 +1,4 @@
-\documentclass[notitlepage]{article}
+\documentclass[notitlepage]{revtex4-1}
 % includes...
 \usepackage{amsmath}
 \usepackage{bm}
@@ -24,7 +24,7 @@
 }
 \begin{document}
 %front matter
-\title{SUNSET code: Scalable Unstructred Node-SET code for high fidelity fluid simulations in complex geometries}
+\title{SUNSET code: Scalable Unstructured Node-SET code for high fidelity fluid simulations in complex geometries}
 
 \author{J. R. C. King}
 %\email{jack.king@manchester.ac.uk}
@@ -39,9 +39,9 @@ This document contains a brief description and guide to the SUNSET code. Numeric
 \maketitle
 %end front matter
 
-\section{Directory structure}
+\section{Overview}
 
-
+The \textbf{S}calable \textbf{U}nstructured \textbf{N}ode-\textbf{SET} code (SUNSET code) is designed for high fidelity simulations of fluid flows on non-trivial geometries. The spatial discretisation is by a combination of LABFM~\cite{king_labfm_2021,king_labfm_2022} and finite differences. Order of accuracy of spatial discretisation can be specified (between $4^{th}$ and $12^{th}$). Time integration via explicit $3^{rd}$ order Runge-Kutta scheme. Boundary conditions with the characteristic based formulation, with non-periodic boundaries dropping to $4^{th}$ order at walls, inflows and outflows. Resolution is non-uniform in first two dimensions. Scalable via OpenMP and MPI. Thermodynamics can vary from isothermal to thermal, with temperature dependent transport properties. Solves for an arbitrary number of miscible chemical species.
 
 
 \section{Governing Equations}\label{ge}
@@ -51,7 +51,7 @@ The code solves the compressible Navier-Stokes equations in the form
 \begin{equation}\frac{\partial\bm{u}}{\partial{t}}+\bm{u}\cdot\nabla\bm{u}=-\frac{1}{\rho}\nabla{p}+\frac{1}{\rho}\nabla\cdot\bm{\tau}+\bm{f}\label{eq:mom}\end{equation}
 \begin{equation}\frac{\partial\rho{E}}{\partial{t}}+\bm{u}\cdot\nabla\left(\rho{E}\right)=-\nabla\cdot\left(p\bm{u}\right)-\nabla\cdot\bm{q}+\nabla\cdot\left(\bm{\tau}\bm{u}\right)+\bm{u}\cdot\bm{f}\label{eq:en}\end{equation}
 and
-\begin{equation}\frac{\partial{Y}_{\alpha}}{\partial{t}}+\bm{u}\cdot\nabla{Y}_{\alpha}=\frac{\dot\omega_{\alpha}}{\rho}-\frac{1}{\rho}\nabla\left(\rho\bm{V}_{\alpha}Y_{\alpha}\right)\qquad\forall\alpha\in\left[1,N_{S}\right]\label{eq:Y}\end{equation}
+\begin{equation}\frac{\partial{Y}_{\alpha}}{\partial{t}}+\bm{u}\cdot\nabla{Y}_{\alpha}=\frac{\dot\omega_{\alpha}}{\rho}-\frac{1}{\rho}\nabla\cdot\left(\rho\bm{V}_{\alpha}Y_{\alpha}\right)\qquad\forall\alpha\in\left[1,N_{S}\right]\label{eq:Y}\end{equation}
 where $\rho$ is the density, $\bm{u}$ the velocity, $p$ the pressure, $E$ the total energy, $\bm{\tau}$ the viscous stress, $\bm{f}$ a body force, $\bm{q}$ the heat flux, $Y_{\alpha}$ the concentration of species $\alpha\in\left[1,N_{S}\right]$, and $\bm{V}_{\alpha}$ is the molecular diffusion velocity of species $\alpha$. $\dot\omega_{\alpha}$ is the production rate of species $\alpha$.
 
 The viscous stress is defined as 
@@ -84,12 +84,16 @@ Noting that the specific heat capacity of species $\alpha$ is $R_{0}/W_{\alpha}$
 \begin{equation}E=\displaystyle\sum_{\alpha}Y_{\alpha}\left(h_{\alpha}-R_{0}\frac{T}{W_{\alpha}}\right)+\frac{1}{2}\bm{u}\cdot\bm{u}.\end{equation}
 Substituting the polynomial for $h_{\alpha}$ and collecting terms in powers of $T$, we can write
 \begin{equation}f\left(T\right)=C_{0}+\displaystyle\sum_{j=1}^{J}C_{j}T^{j}=0,\label{eq:nonlinearT}\end{equation}
-where the coefficients $B$ are given by
+where the coefficients $C$ are given by
 \begin{subequations}\begin{align}
-B_{0}&=\frac{1}{2}\bm{u}\cdot\bm{u}-E+\displaystyle\sum_{\alpha}Y_{\alpha}a_{\alpha,J+1}\\
-B_{1}&=\displaystyle\sum_{\alpha}Y_{\alpha}a_{\alpha,1} - R_{mix}\\
-B_{j}&=\displaystyle\sum_{\alpha}Y_{\alpha}\frac{a_{\alpha,j}}{j}\qquad\forall{j}\in\left[2,J\right].\end{align}\end{subequations}
-Having calculated the coefficients $B$, we solve the nonlinear equation~\eqref{eq:nonlinearT} numerically via a Newton-Raphson method to obtain the temperature $T$.
+C_{0}&=\frac{1}{2}\bm{u}\cdot\bm{u}-E+\displaystyle\sum_{\alpha}Y_{\alpha}a_{\alpha,J+1}\\
+C_{1}&=\displaystyle\sum_{\alpha}Y_{\alpha}a_{\alpha,1} - R_{mix}\\
+C_{j}&=\displaystyle\sum_{\alpha}Y_{\alpha}\frac{a_{\alpha,j}}{j}\qquad\forall{j}\in\left[2,J\right].\end{align}\end{subequations}
+The derivative of $f$ is
+\begin{equation}f^{\prime}\left(T\right)=\displaystyle\sum_{j=1}^{J}jC_{j}T^{j-1}.\end{equation}
+Having calculated the coefficients $C$, we solve the nonlinear equation~\eqref{eq:nonlinearT} numerically via a Newton-Raphson method to obtain the temperature $T$.
+
+Note that in the case where $a_{\alpha,1}\ne0$ and $a_{\alpha,j\in\left[2,J\right]}=0$ (i.e. $c_{p,\alpha}$ is independent of temperature), $f\left(T\right)$ is linear in $T$, and the Newton-Raphson method will converge (exactly) after a single iteration.
 
 
 \subsection{Temperature dependent transport properties}

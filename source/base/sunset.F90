@@ -55,16 +55,16 @@ program sunset
 
   !! Initialise time profiling and output counter...
   n_out = 0;ts_start = omp_get_wtime()
-  m_out = 0
+  m_out = 0 
         
   !! MAIN TIME LOOP ---------------------------------------------------
   do while (time.le.time_end)
-    
-     !! Set the time step
-     call set_tstep     
-     
-     !! Additional constraints based on error estimation: essential for reacting flows
-!     call set_tstep_PID  
+
+
+     call set_tstep      !! CFL type stability based dt    
+#ifdef react     
+     call set_tstep_PID  !! Error estimation based dt (in addition!)
+#endif     
 
      !! Output, conditionally: at start, subsequently every dt_out
      if(itime.eq.0.or.time.gt.n_out*dt_out) then 
@@ -73,9 +73,12 @@ program sunset
         call output_layer(n_out)
      end if        
     
-     !! Perform one time step
+     !! Perform one time step (with Error estimation if reacting flows)
+#ifndef react
      call step_rk3_4S_2R
-!     call step_rk3_4S_2R_EE     
+#else     
+     call step_rk3_4S_2R_EE     
+#endif     
 
      !! Calculate time-profiling and output to screen
      itime = itime + 1

@@ -69,6 +69,7 @@ contains
         call evaluate_transport_properties
      end if
 
+     !! Allocate and evaluate the pressure over the whole domain.
      call evaluate_pressure
 
      !! Initialise  right hand sides to zero
@@ -217,7 +218,7 @@ contains
 
 #ifndef isoT                                 
            !! Add h*div.(ro*D*gradY) for species ispec to the energy diffusion store
-           call evaluate_enthalpy(T(i),ispec,enthalpy)
+           call evaluate_enthalpy_at_node(T(i),ispec,enthalpy)
            store_diff_E(i) = store_diff_E(i) + molec_diff*enthalpy          
            !! Add gradh.ro*D*gradY for species ispec 
            grad_enthalpy = cp(i)*gradT(i,:)
@@ -225,7 +226,7 @@ contains
                                                dot_product(gradYspec(i,:),grad_enthalpy)          
  
            !! Evaluate dcp/dT
-           call evaluate_dcpdT(T(i),ispec,cpispec,dcpdT)
+           call evaluate_dcpdT_at_node(T(i),ispec,cpispec,dcpdT)
            
            !! Add this species contrib to gradcp(mix) = YdcpdT*gradT + cp(ispec)gradY
            gradcp(i,:) = gradcp(i,:) + Yspec(i,ispec)*dcpdT*gradT(i,:) &
@@ -274,7 +275,7 @@ contains
 
 #ifndef isoT
                  !! Add h*div.(ro*D*gradY) for species ispec to the energy diffusion store
-                 call evaluate_enthalpy(T(i),ispec,enthalpy)
+                 call evaluate_enthalpy_at_node(T(i),ispec,enthalpy)
                  store_diff_E(i) = store_diff_E(i) + molec_diff*enthalpy           
                  !! Add gradh.ro*D*gradY for species ispec 
                  grad_enthalpy = cp(i)*gradT(i,:)
@@ -282,7 +283,7 @@ contains
                                                      dot_product(gradYspec(i,:),grad_enthalpy)
 
                  !! Evaluate dcp/dT
-                 call evaluate_dcpdT(T(i),ispec,cpispec,dcpdT)
+                 call evaluate_dcpdT_at_node(T(i),ispec,cpispec,dcpdT)
            
                  !! Add this species contrib to gradcp(mix) = YdcpdT*gradT + cp(ispec)gradY
                  gradcp(i,:) = gradcp(i,:) + Yspec(i,ispec)*dcpdT*gradT(i,:) &
@@ -315,7 +316,7 @@ contains
 
 #ifndef isoT                 
                  !! Add h*div.(ro*D*gradY) for species ispec to the energy diffusion store
-                 call evaluate_enthalpy(T(i),ispec,enthalpy)
+                 call evaluate_enthalpy_at_node(T(i),ispec,enthalpy)
                  store_diff_E(i) = store_diff_E(i) + molec_diff*enthalpy           
                  !! Add gradh.ro*D*gradY for species ispec 
                  grad_enthalpy = cp(i)*gradT(i,:)
@@ -323,9 +324,9 @@ contains
                                                      dot_product(gradYspec(i,:),grad_enthalpy)             
 
                  !! Evaluate dcp/dT
-                 call evaluate_dcpdT(T(i),ispec,cpispec,dcpdT)
+                 call evaluate_dcpdT_at_node(T(i),ispec,cpispec,dcpdT)
            
-                 !! Add this species contrib to gradcp(mix) = YdcpdT*gradT + cp(ispec)gradY
+                 !! Add this species contrib to gradcp(mix) = YdcpdT*gradT + cp(ispec)*gradY
                  gradcp(i,:) = gradcp(i,:) + Yspec(i,ispec)*dcpdT*gradT(i,:) &
                                            + cpispec*gradYspec(i,:)
 #endif       
@@ -368,7 +369,7 @@ contains
            
 #ifndef isoT           
            !! Add h*diffusion_correction_term to the energy diffusion store
-           call evaluate_enthalpy(T(i),ispec,enthalpy)           
+           call evaluate_enthalpy_at_node(T(i),ispec,enthalpy)           
            store_diff_E(i) = store_diff_E(i) - Yspec(i,ispec)*store_diff_Y(i)*enthalpy           
            !! Add ro*gradh*Y*sum_over_species(DgradY) for species ispec
            grad_enthalpy = cp(i)*gradT(i,:)
@@ -496,7 +497,7 @@ contains
            i=boundary_list(j)
            tmpro = exp(lnro(i))
 #ifndef isoT           
-           c=calc_sound_speed(cp(i),Rgas_mix(i),T(i)) 
+           c=calc_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
 #else
            c=sqrt(csq)
 #endif            
@@ -729,7 +730,7 @@ contains
        i=boundary_list(j)
        tmpro = exp(lnro(i))
 #ifndef isoT       
-       c=calc_sound_speed(cp(i),Rgas_mix(i),T(i)) 
+       c=calc_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
        gammagasm1 = Rgas_mix(i)/(cp(i)-Rgas_mix(i))
 #else
        c=sqrt(csq)

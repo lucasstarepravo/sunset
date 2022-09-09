@@ -229,10 +229,10 @@ contains
 
 #ifdef dim3
            write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),h(i),node_type(i),tmpro, &
-                       u(i),v(i),w(i),vort(i),roE(i)/tmpro,tmpT,Yspec(i,1:nspec_out)        
+                       u(i),v(i),w(i),vort(i),tmpT,Yspec(i,1:nspec_out)        
 #else
            write(20,*) rp(i,1),rp(i,2),s(i),h(i),node_type(i),tmpro,u(i),v(i),alpha_out(i), &
-                       roE(i)/tmpro,tmpT,Yspec(i,1:nspec_out)
+                       tmpT,Yspec(i,1:nspec_out)
 #endif
         end do
 
@@ -322,7 +322,9 @@ contains
 !! ------------------------------------------------------------------------------------------------
   subroutine liftdrag
      !! TO DO: Update for 3 dimensional simulations  
+     !! TO DO: Update for non-isothermal simulations
      use derivatives
+#ifdef isoT     
      integer(ikind) :: i,j
      real(rkind),dimension(dims) :: gradu0,gradv0,Fn,force,force_tmp
      real(rkind),dimension(dims,dims) :: Jinv,sigma
@@ -372,6 +374,7 @@ contains
      flush(194)
 #endif     
      
+#endif     
      return
   end subroutine liftdrag
 !! ------------------------------------------------------------------------------------------------  

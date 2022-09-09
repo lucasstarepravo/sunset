@@ -1,0 +1,8 @@
+!! This is the control file for sunset code
+
+!! Characteristic length-scale (L_char)
+0.01d0
+
+!! Gravity vector (grav)
+0.0d0 0.0d0 0.0d0
+

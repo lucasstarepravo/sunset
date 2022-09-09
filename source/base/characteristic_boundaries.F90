@@ -37,7 +37,7 @@ contains
 
      !! Store the sound speed
 #ifndef isoT       
-     c=calc_sound_speed(cp(i),Rgas_mix(i),T(i)) 
+     c=calc_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
 #else
      c=sqrt(csq)
 #endif 
@@ -96,7 +96,7 @@ contains
 
      !! Store the sound speed
 #ifndef isoT       
-     c=calc_sound_speed(cp(i),Rgas_mix(i),T(i)) 
+     c=calc_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
 #else
      c=sqrt(csq)
 #endif 
@@ -185,7 +185,7 @@ contains
 
      !! Store the sound speed
 #ifndef isoT       
-     c=calc_sound_speed(cp(i),Rgas_mix(i),T(i)) 
+     c=calc_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
 #else
      c=sqrt(csq)
 #endif 
@@ -193,7 +193,7 @@ contains
 #ifdef isoT
      !! ISOTHERMAL FLOWS, PARTIALLY NON-REFLECTING
      if(u(i).lt.c) then
-        Lchar(1) = (p(i)-p_infinity)*0.278d0*c*(one)/two/L_domain_x &                      !! track p_infinity
+        Lchar(1) = (p(i)-p_outflow)*0.278d0*c*(one)/two/L_domain_x &                      !! track p_outflow
                  - (one-u(i)/c)*half*(v(i)*gradp(2)+p(i)*gradv(2)-tmpro*c*v(i)*gradu(2)) & !!transverse 1 conv. terms
                  - (one-u(i)/c)*half*(w(i)*gradp(3)+p(i)*gradw(3)-tmpro*c*w(i)*gradu(3))   !! transverse 2 conv. terms
      end if
@@ -207,7 +207,7 @@ contains
      !! THERMAL FLOWS, PARTIALLY NON-REFLECTING
      if(u(i).le.c) then !! Subsonic. If supersonic, just use L1 from definition...
         gammagas = cp(i)/(cp(i)-Rgas_mix(i))     
-        Lchar(1) = (p(i)-p_infinity)*0.278d0*c*(one)/two/L_domain_x &                               !! track p_infinity
+        Lchar(1) = (p(i)-p_outflow)*0.278d0*c*(one)/two/L_domain_x &                               !! track p_outflow
                  - (one-u(i)/c)*half*(v(i)*gradp(2)+gammagas*p(i)*gradv(2)-tmpro*c*v(i)*gradu(2)) & !! trans1 conv.
                  - (one-u(i)/c)*half*(w(i)*gradp(3)+gammagas*p(i)*gradw(3)-tmpro*c*w(i)*gradu(3))   !! trasn2 conv.
                  
