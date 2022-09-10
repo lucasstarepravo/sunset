@@ -13,7 +13,7 @@
 # dim3       Two (0) or three (1) dimensional simulation                               (default: 0)
 # pgrad      Drive the flow with a pressure gradient and P.I.D control                 (default: 0)
 # tdtp       Temperature dependent transport properties (1) or constant (0)            (default: 0)
-# yout       Output the complete composition (1) or don't (0)                          (default: 0)
+# yout       Output the complete composition (1) or don't (0)                          (default: 1)
 # -------------------------------------------------------------------------------------------------
 #
 # EXAMPLE USAGE:
@@ -32,7 +32,7 @@ endif
 CFLAGS := -Wall -O3 -g -m64
 FFLAGS := -fopenmp -fbounds-check -ffpe-trap=zero -O3 -Wall -g -J./obj -I./obj -m64
 
-# Isothermal or not. 
+# Isothermal or not. tdtp can only happen if not(isoT)
 ifeq ($(thermo), 0)
 FFLAGS += -DisoT
 else
@@ -40,31 +40,43 @@ ifeq ($(tdtp),1)
 FFLAGS += -Dtdtp
 endif
 endif
-ifeq ($(react), 1)
-FFLAGS += -Dreact
-endif
-ifeq ($(restart), 1)
-FFLAGS += -Drestart
-endif
-ifeq ($(hardinf), 1)
-FFLAGS += -Dhardinf
-endif
+# Multi-species?
 ifeq ($(multispec), 1)
 FFLAGS += -Dms
 endif
+# Reacting, and if so, force multispeces
+ifeq ($(react), 1)
+FFLAGS += -Dreact
+ifeq ($multispec),0)
+FFLAGS += -Dms
+endif
+endif
+# Restart from dump file.
+ifeq ($(restart), 1)
+FFLAGS += -Drestart
+endif
+# Inflow boundary types
+ifeq ($(hardinf), 1)
+FFLAGS += -Dhardinf
+endif
+# Multiprocessor? (use mpi?)
 ifeq ($(mpi),1)
 FFLAGS += -Dmp
 endif
+# Wall boundary types
 ifneq ($(wisot),0)
 FFLAGS += -Dwall_isoT
 endif
+# Three dimensional?
 ifeq ($(dim3),1)
 FFLAGS += -Ddim3
 endif
+# Flow driven by pressure gradient?
 ifeq ($(pgrad),1)
 FFLAGS += -Dpgrad
 endif
-ifeq ($(yout),1)
+# Output full chemical composition?
+ifneq ($(yout),0)
 FFLAGS += -Doutput_composition
 endif
 LDFLAGS := -fopenmp -m64 -lopenblas 

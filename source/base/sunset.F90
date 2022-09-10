@@ -28,9 +28,8 @@ program sunset
   call MPI_INIT(ierror)
 #endif  
 
-  !! Initial conditions
+  !! Load primary control data and initial conditions
   call initial_setup  
-  call load_chemistry_data
   call setup_domain
 
   !! Build the neighbour lists
@@ -50,7 +49,8 @@ program sunset
 #endif    
   call filter_coefficients   
   
-  !! Create initial fields for primary variables
+  !! Load data and create initial fields for primary variables
+  call load_chemistry_data
   call initial_solution
 
   !! Initialise time profiling and output counter...

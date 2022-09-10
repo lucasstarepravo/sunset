@@ -691,6 +691,7 @@ contains
      integer(ikind),dimension(:),allocatable :: full_j_link_i
      real(rkind),dimension(dims) :: grad_s
      real(rkind) :: grad_s_mag,hfactor,radmax
+     real(rkind),dimension(:),allocatable :: neighbourcountreal
  
 #if ORDER==2
      k=2
@@ -726,6 +727,7 @@ contains
      
      !! Temporary neighbour lists...
      allocate(full_j_link_i(nplink));full_j_link_i=0
+     allocate(neighbourcountreal(npfb));neighbourcountreal=zero
 
      !! Set parameters of h-reduction
      reduction_factor = 0.98 
@@ -915,8 +917,8 @@ contains
            !! The bug may be due to a race condition or something, but not really sure
            !! What's the best way to fix this??
         end do
-        !! Temporary: store size in w(i)
-        w(i) = dble(ij_count(i))
+        !! Temporary: store size in neighbourcountreal(i)
+        neighbourcountreal(i) = dble(ij_count(i))
      end do
      !$OMP END PARALLEL DO    
      deallocate(amat,mmat,bvecL,bvecX,bvecY,gvec,xvec)      
@@ -932,7 +934,7 @@ contains
            h(ii) = hh
             
            !! Store count in w for diagnostics        
-           w(ii) = dble(ij_count(i))           
+           neighbourcountreal(ii) = dble(ij_count(i))           
         end do    
      end do
      !$omp end parallel do     
@@ -973,7 +975,7 @@ contains
      !$OMP PARALLEL DO REDUCTION(+:qq)
      do i=1,npfb
         if(node_type(i).eq.999)then
-           qq = qq + w(i)**2
+           qq = qq + neighbourcountreal(i)**2
         else
            qq = qq + dble(ij_count(i))**two
         end if           
@@ -982,13 +984,10 @@ contains
      qq = sqrt(qq/npfb)   
      
      !! Output to screen
-     write(6,*) "iproc",iproc,"ij_count mean,min:",qq,floor(minval(w(1:npfb)))
-          
-     !! Zero w
-     w = zero
-     
+     write(6,*) "iproc",iproc,"ij_count mean,min:",qq,floor(minval(neighbourcountreal(1:npfb)))
+               
      !! Deallocation
-     deallocate(full_j_link_i)
+     deallocate(full_j_link_i,neighbourcountreal)
 
      return
   end subroutine adapt_stencils   

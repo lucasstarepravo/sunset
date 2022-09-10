@@ -30,9 +30,7 @@ contains
   subroutine initial_setup       
      !! Initialises key simulation parameters, and loads control data
      integer(ikind) :: i
-     real(rkind) :: dummy_real
-     
-
+    
      !! Set up integers for processor and number of processors
 #ifdef mp
      call MPI_COMM_SIZE(MPI_COMM_WORLD, nprocs, ierror)
@@ -40,22 +38,8 @@ contains
 #endif
 
      !! Load data from the control file
-     open(unit=12,file='control.in')
-     read(12,*)                       !! Ignore header and blank line
-     read(12,*)
-
-     !! Length-scale
-     read(12,*)
-     read(12,*) dummy_real
-     read(12,*)
+     call load_control_data
      
-     
-     
-     
-     close(12)
-     
-     write(6,*) iproc,dummy_real
-
 
      !! Time begins at zero
      time = zero;itime=0
@@ -286,18 +270,6 @@ contains
 #else
      np_nohalo = np  
 #endif     
-
-     !! Allocate arrays for properties
-     allocate(u(np),v(np),w(np),lnro(np),roE(np),divvel(np))
-     allocate(Yspec(np,nspec))
-     u=zero;v=zero;w=zero;lnro=zero;roE=one;Yspec=one;divvel=zero
-     allocate(alpha_out(np));alpha_out = zero
-     allocate(T(np));T=T_ref
-
-#ifdef mp
-     call halo_exchanges_all
-     call halo_exchange_int(node_type)     
-#endif     
      
      !! Build link lists for boundary and internal nodes
      if(nb.ne.0) then
@@ -347,46 +319,6 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      return
   end subroutine setup_domain
 !! ------------------------------------------------------------------------------------------------
-  subroutine load_chemistry_data
-     integer(ikind) :: ispec
-     !! Hard-coded for now...
-#ifdef ms
-     nspec = 2
-#else
-     nspec = 1
-#endif     
-     allocate(molar_mass(nspec),Lewis_number(nspec))
-
-     polyorder_cp = 7  !! Order of polynomials
-     allocate(coef_cp(nspec,polyorder_cp+1))
-     allocate(T_low_cp(nspec),T_high_cp(nspec))
-     
-     
-
-     do ispec = 1,nspec
-        molar_mass(ispec) = 2.884d-2  !! N.B. molar mass is in kg/mol
-        Lewis_number(ispec) = one
-        
-        T_low_cp(ispec) = 3.0d2;T_high_cp(ispec) = 3.0d3
-        !! Temporary, single-step mechanism, 7th order polynomial
-        coef_cp(ispec,1) =  3.7473930d0
-        coef_cp(ispec,2) = -2.1196798d-3
-        coef_cp(ispec,3) =  5.7579747d-6
-        coef_cp(ispec,4) = -5.3740086d-9
-        coef_cp(ispec,5) =  2.4929389d-12
-        coef_cp(ispec,6) = -5.7657654d-16
-        coef_cp(ispec,7) =  5.2939377d-20  
-        coef_cp(ispec,8) = -1.0643198E+03                                      
-                           
-        !! Convert cp coefficients from molar to mass based
-        coef_cp(ispec,:) = coef_cp(ispec,:)*Rgas_universal/molar_mass(ispec)
-        
-     end do                      
-
-     
-     return
-  end subroutine load_chemistry_data  
-!! ------------------------------------------------------------------------------------------------
   subroutine initial_solution
      use mirror_boundaries
      use derivatives
@@ -395,6 +327,19 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      integer(ikind) :: i,j,k,n_restart,ispec
      real(rkind) :: x,y,z,tmp,tmpro
      character(70) :: fname
+     
+     
+     !! Allocate arrays for properties
+     allocate(u(np),v(np),w(np),lnro(np),roE(np),divvel(np))
+     allocate(Yspec(np,nspec))
+     u=zero;v=zero;w=zero;lnro=zero;roE=one;Yspec=one;divvel=zero
+     allocate(alpha_out(np));alpha_out = zero
+     allocate(T(np));T=T_ref
+     
+     !! Allocate the boundary temperatures
+     if(nb.ne.0) then
+        allocate(T_bound(nb));T_bound = T_ref                 
+     end if
      
      call initialise_grf
  
@@ -434,27 +379,27 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      !$OMP END PARALLEL DO
      
      !! Values on boundaries
-     if(nb_global.ne.0)then
-        if(nb.ne.0)then
-           allocate(T_bound(nb));T_bound = T_ref
-           do j=1,nb
-              i=boundary_list(j)
-              if(node_type(i).eq.0) then !! wall initial conditions
-                 u(i)=zero;v(i)=zero;w(i)=zero
+     if(nb.ne.0)then
+        do j=1,nb
+           i=boundary_list(j)
+           if(node_type(i).eq.0) then !! wall initial conditions
+              u(i)=zero;v(i)=zero;w(i)=zero
 
-                 tmp = T_ref*(one + 0.01*sin(two*pi*rp(i,3)/Lz))
-                 T_bound(j) = tmp !! Might want changing                
-                 T(i) = T_bound(j)
-              end if                 
-              if(node_type(i).eq.1) then !! inflow initial conditions
-                 u(i)=u_char
-              end if
-              if(node_type(i).eq.2) then !! outflow initial conditions
-                 u(i)=u_char
-              end if
-           end do
-        end if
+              tmp = T_ref*(one + 0.01*sin(two*pi*rp(i,3)/Lz))
+              T_bound(j) = tmp !! Might want changing                
+              T(i) = T_bound(j)
+           end if                 
+           if(node_type(i).eq.1) then !! inflow initial conditions
+              u(i)=u_char
+           end if
+           if(node_type(i).eq.2) then !! outflow initial conditions
+              u(i)=u_char
+           end if
+        end do
      end if
+     
+     !! Make a simple laminar flame?
+     call make_1d_1step_flame
      
      !! Set energy from lnro,u,Y,T
      call initialise_energy
@@ -496,6 +441,14 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         end if
         lnro(i) = log(tmpro)
      end do
+     
+     !! Re-specify the boundary temperatures
+     if(nb.ne.0) then
+        do j=1,nb
+           i=internal_list(j)
+           T_bound(j) = T(i)
+        end do
+     end if
      
      !! Set energy from lnro,u,Y,T
      call initialise_energy     
@@ -711,5 +664,157 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
   
      return
   end subroutine evaluate_grf  
+!! ------------------------------------------------------------------------------------------------
+  subroutine load_control_data
+     integer(ikind) :: dummy_int
+     real(rkind) :: dummy_real
+     
+
+     !! Load data from the control file
+     open(unit=12,file='control.in')
+     read(12,*)                       !! Ignore header and blank line
+     read(12,*)
+
+     !! Length-scale
+     read(12,*)
+     read(12,*) dummy_real
+     read(12,*)
+     
+     
+     
+     
+     close(12)
+     
+     write(6,*) iproc,dummy_real  
+     
+     return
+  end subroutine load_control_data
+!! ------------------------------------------------------------------------------------------------  
+  subroutine load_chemistry_data
+     integer(ikind) :: ispec,iorder
+     
+     !! Load data from the thermochemistry control file
+     open(unit=12,file='thermochem.in')
+     read(12,*)                       !! Ignore header and blank line
+     read(12,*)
+
+     !! Number of chemical species
+     read(12,*)
+     read(12,*) nspec
+     read(12,*)
+#ifndef ms
+     nspec = 1  !! If not multispecies, nspec must be 1
+#endif          
+
+     !! Order of polynomial for cp(T)
+     read(12,*)
+     read(12,*) polyorder_cp
+     read(12,*)
+
+     !! Allocate space for molar mass, Lewis number, and polynomial fitting for cp(T)   
+     allocate(molar_mass(nspec),Lewis_number(nspec))
+     allocate(coef_cp(nspec,polyorder_cp+1))
+     allocate(T_low_cp(nspec),T_high_cp(nspec))
+          
+     !! Load molar mass, Lewis, and polynomial fits   
+     read(12,*) !! Read comment line  
+     do ispec = 1,nspec
+        read(12,*) !! Read species identifier comment line
+        read(12,*) molar_mass(ispec)
+        read(12,*) Lewis_number(ispec)
+        read(12,*) T_low_cp(ispec),T_high_cp(ispec)
+        
+        read(12,*)  !! Blank line
+        do iorder=1,polyorder_cp+1
+           read(12,*) coef_cp(ispec,iorder)
+        end do
+        read(12,*) !! Blank line                            
+                           
+        !! Convert cp coefficients from molar to mass based
+        coef_cp(ispec,:) = coef_cp(ispec,:)*Rgas_universal/molar_mass(ispec)
+        
+     end do     
+     
+     !! Read in step list and  
+     
+     close(12)               
+
+     
+     return
+  end subroutine load_chemistry_data    
+!! ------------------------------------------------------------------------------------------------
+  subroutine make_1d_1step_flame
+     integer(ikind) :: i,ispec,j
+     real(rkind) :: flame_location,flame_thickness
+     real(rkind) :: T_reactants,T_products
+     real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z
+
+     !! Position and scale     
+     flame_location = zero
+     flame_thickness = 1.0d-3/L_char !! Scale thickness because position vectors are scaled...
+
+     !! Temperatures
+     T_reactants = T_ref
+     T_products = 2.3d3
+     
+     !! Pressure through flame
+     P_flame = rho_char*Rgas_universal*T_reactants/molar_mass(1) 
+     
+     !! Inflow speed
+     u_reactants = u_inflow
+     
+     !$omp parallel do private(x,y,z,c,Rmix_local,ispec)
+     do i=1,npfb
+        x = rp(i,1);y=rp(i,2);z=rp(i,3)
+        
+        !! Error function based progress variable
+        c = half*(one + erf((x-flame_location)/flame_thickness))
+        
+        !! Temperature profile
+        T(i) = T_reactants + (T_products - T_reactants)*c
+        
+        !! Composition
+        Yspec(i,1) = one - c
+        Yspec(i,2) = c
+        
+        !! Local mixture gas constant
+        Rmix_local = zero
+        do ispec=1,nspec
+           Rmix_local = Rmix_local + Yspec(i,ispec)/molar_mass(ispec)
+        end do
+        Rmix_local = Rmix_local*Rgas_universal
+        
+        !! Density
+        lnro(i) = log(P_flame/Rmix_local/T(i))
+        
+        !! Velocity
+        u(i) = u_reactants*rho_char/exp(lnro(i))
+        v(i) = zero
+        w(i) = zero
+     end do
+     !$omp end parallel do
+     
+     !! Values on boundaries
+     if(nb.ne.0)then
+        do j=1,nb
+           i=boundary_list(j)
+           if(node_type(i).eq.0) then !! wall initial conditions
+              u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
+              T_bound(j) = T(i)
+           end if                 
+           if(node_type(i).eq.1) then !! inflow initial conditions
+              u(i)=u_char
+              T_bound(j) = T(i) !! Inflow temperature is T_cold
+           end if
+           if(node_type(i).eq.2) then !! outflow initial conditions
+              T_bound(j) = T(i)  !! Outflow temperature is T_hot
+           end if
+        end do
+     end if
+ 
+  
+  
+     return
+  end subroutine make_1d_1step_flame
 !! ------------------------------------------------------------------------------------------------
 end module setup
