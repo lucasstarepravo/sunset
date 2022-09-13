@@ -4,42 +4,55 @@
 2
 
 !! Order of polynomial -1 for cp(T) = poly(T)
-7
+13
 
 !! Molar mass, Lewis number and polynomial fit of each species
 !! Species 1 - Reactants
 2.884d-2
 1.0d0
-3.0d2 3.0d3
+3.0d2 5.0d3
 ! cp coefs
-3.7473930d0
--2.1196798d-3
-5.7579747d-6
--5.3740086d-9
-2.4929389d-12
--5.7657654d-16
-5.2939377d-20  
--1.0643198E+03       
-
+3.2428519d+00
+2.1179168d-03
+-8.4814189d-06
+2.0568254d-08
+-2.6323108d-11
+2.0097372d-14
+-9.7906865d-18
+3.1274724d-21
+-6.5311124d-25
+8.5929001d-29
+-6.4660818d-33
+2.1221432d-37
+-1.0176132d+03
+ 
 !! Species 2 - Products
 2.884d-2
 1.0d0
 3.0d2 3.0d3
 ! cp coefs
-3.7473930d0
--2.1196798d-3
-5.7579747d-6
--5.3740086d-9
-2.4929389d-12
--5.7657654d-16
-5.2939377d-20  
--1.0643198E+03                                  
+3.2428519d+00
+2.1179168d-03
+-8.4814189d-06
+2.0568254d-08
+-2.6323108d-11
+2.0097372d-14
+-9.7906865d-18
+3.1274724d-21
+-6.5311124d-25
+8.5929001d-29
+-6.4660818d-33
+2.1221432d-37
+-9.1602826d+03                        
+
+!! Number of steps
+1
 
 !! Chemical mechanism step list
 1 1 1     !! Reaction number, number of reactants, number of products
 1 1       !! Identity of reactants, and molar stoichiometric coefficients
 2 1       !! Identity of products, and molar stoichiometric coefficients
-1.0d0 1.0d0 1.0d0 !! The three coefficients which give the rate constant!
+2.7500E+07  0.0000E+00  1.0000E+08 !! The three coefficients which give the rate constant
 
 !! Another example of the above (2H2 + O2 ==> 2H2O )
 1 2 1     !! Reaction number, number of reactants, number of products

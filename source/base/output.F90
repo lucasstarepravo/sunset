@@ -32,7 +32,7 @@ contains
      real(rkind) :: t_per_dt_global,t_last_x_global,t_run_global
      real(rkind) :: cput,cput_global
      
-     allocate(maxphi(5+nspec),minphi(5+nspec))
+     allocate(maxphi(6+nspec),minphi(6+nspec))
      
     
      ts_end=omp_get_wtime()
@@ -78,7 +78,8 @@ contains
            write(6,*) "Max |w|:",max(maxphi(3),abs(minphi(3)))
            write(6,*) "max/min ro:",maxphi(4),minphi(4)
            write(6,*) "max/min ro*E:",maxphi(5),minphi(5)
-           write(6,*) "max/min Y0:",maxphi(6),minphi(6)
+           write(6,*) "max/min T:",maxphi(6),minphi(6)
+           write(6,*) "max/min Y0:",maxphi(7),minphi(7)
     
            write(6,*) "There are",n_threads_global,"threads spread over ",nprocs,"MPI tasks"
            write(6,*) "Wall clock run time=",t_run_global
@@ -95,11 +96,8 @@ contains
            write(6,*) "Divergence                :",segment_time_global(6)/sum(segment_time_global(1:8))
            write(6,*) "Boundary 2nd derivatives  :",segment_time_global(7)/sum(segment_time_global(1:8))
            write(6,*) "RHS building              :",segment_time_global(8)/sum(segment_time_global(1:8))           
-           write(6,'(/,/,A)') "  "
-                    
-           
-           
-!        write(6,'(/,/,/,/,/,/,/,/,/,/,/,/,/,A)') "  "
+           write(6,'(/,A)') "  "
+                                         
         end if
 
         t_last_X = 0.0d0
@@ -109,6 +107,8 @@ contains
         write(6,*) "np,npfb",np,npfb,"n_out real",time/dt_out
         write(6,*) "Max |u|,|v|:",max(maxval(u(1:npfb)),abs(minval(u(1:npfb)))),max(maxval(v(1:npfb)),abs(minval(v(1:npfb))))
         write(6,*) "Max |w|:",max(maxval(w(1:npfb)),abs(minval(w(1:npfb))))
+        write(6,*) "Max/min roE:",maxval(roE(1:npfb)),minval(roE(1:npfb))
+        write(6,*) "Max/min T:",maxval(T(1:npfb)),minval(T(1:npfb))        
         write(6,*) "max/min ro:",exp(maxval(lnro(1:npfb))),exp(minval(lnro(1:npfb)))   
         write(6,*) "Number of threads=",n_threads,"Run time=",t_run
         write(6,*) "run-time/dt=",t_per_dt,"Moving avg=",t_last_X/dble(scr_freq)
@@ -125,7 +125,7 @@ contains
         write(6,*) "Divergence                :",segment_time_local(6)/sum(segment_time_local(1:8))
         write(6,*) "Boundary 2nd derivatives  :",segment_time_local(7)/sum(segment_time_local(1:8))
         write(6,*) "RHS building              :",segment_time_local(8)/sum(segment_time_local(1:8))        
-        write(6,'(/,/,/,/,/,A)') "  "                  
+        write(6,'(/,/,/,A)') "  "                  
 #endif          
      
      end if
@@ -144,7 +144,7 @@ contains
      character(70) :: fname
      real(rkind),dimension(:),allocatable :: vort,testout
      real(rkind),dimension(:,:),allocatable :: testoutv
-     real(rkind) :: tmpT,xn,yn,tmpro
+     real(rkind) :: tmpT,xn,yn,tmpro,tmpVort
 
      !! Only output from the first sheet
      if(iprocZ.eq.0)then     
@@ -226,12 +226,16 @@ contains
 #else
            tmpT = zero
 #endif           
+ 
+           !! Pass something to tmpVort (we use vorticity to output other things sometimes during
+           !! debugging...)
+           tmpVort = alpha_out(i)!vort(i)
 
 #ifdef dim3
            write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),h(i),node_type(i),tmpro, &
-                       u(i),v(i),w(i),vort(i),tmpT,Yspec(i,1:nspec_out)        
+                       u(i),v(i),w(i),tmpVort(i),tmpT,Yspec(i,1:nspec_out)        
 #else
-           write(20,*) rp(i,1),rp(i,2),s(i),h(i),node_type(i),tmpro,u(i),v(i),alpha_out(i), &
+           write(20,*) rp(i,1),rp(i,2),s(i),h(i),node_type(i),tmpro,u(i),v(i),tmpVort, &
                        tmpT,Yspec(i,1:nspec_out)
 #endif
         end do
@@ -640,5 +644,40 @@ contains
   
     return
   end subroutine error_TG   
+!! ------------------------------------------------------------------------------------------------ 
+  subroutine output_laminar_flame_structure(n_out)
+     !! Output data for a laminar 1D flame profile.
+     integer(ikind),intent(in) :: n_out !! Number of output file
+     integer(ikind) :: i,j,k
+     real(rkind) :: x,y
+     character(70) :: fname
+#ifndef mp           
+        !! set the name of the file...
+        !! first number is processor number, second is dump number (allowed up to 9999 processors)
+        if( n_out .lt. 10 ) then 
+           write(fname,'(A16,I1)') './data_out/flame_',n_out        
+        else if( n_out .lt. 100 ) then 
+           write(fname,'(A16,I2)') './data_out/flame_',n_out          
+        else if( n_out .lt. 1000 ) then
+           write(fname,'(A16,I3)') './data_out/flame_',n_out         
+        else
+           write(fname,'(A16,I4)') './data_out/flame_',n_out           
+        end if   
+        
+        !! Write the main dump files
+        open(unit = 20,file=fname)  
+        
+!        !$omp parallel do private(x,y)
+        do i=1,npfb
+           x=rp(i,1);y=rp(i,2)
+           if(abs(y).le.s(i)) then  !! For nodes within a node-spacing of y=0
+              write(20,*) x,y,u(i),v(i),w(i),exp(lnro(i)),roE(i),T(i),Yspec(i,1:nspec)
+           end if
+        end do
+!        !$omp end parallel do
+        
+#endif  
+    return
+  end subroutine output_laminar_flame_structure  
 !! ------------------------------------------------------------------------------------------------ 
 end module output

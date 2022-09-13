@@ -43,8 +43,7 @@ contains
 
      !! Time begins at zero
      time = zero;itime=0
-     dt_out = 0.001d0*Time_char         !! Frequency to output fields
-     dt_mout = 0.01d0*Time_char       !! Frequency to output mean stats
+     dt_out = 0.0001d0*Time_char         !! Frequency to output fields
      time_end = 1.0d2*Time_char
   
      !! Particles per smoothing length and supportsize/h
@@ -335,6 +334,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      u=zero;v=zero;w=zero;lnro=zero;roE=one;Yspec=one;divvel=zero
      allocate(alpha_out(np));alpha_out = zero
      allocate(T(np));T=T_ref
+     allocate(p(np));p=zero
      
      !! Allocate the boundary temperatures
      if(nb.ne.0) then
@@ -400,6 +400,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      
      !! Make a simple laminar flame?
      call make_1d_1step_flame
+!     call make_hotspot
      
      !! Set energy from lnro,u,Y,T
      call initialise_energy
@@ -708,12 +709,13 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 
      !! Order of polynomial for cp(T)
      read(12,*)
-     read(12,*) polyorder_cp
+     read(12,*) ncoefs_cp
      read(12,*)
+     polyorder_cp = ncoefs_cp - 2
 
      !! Allocate space for molar mass, Lewis number, and polynomial fitting for cp(T)   
      allocate(molar_mass(nspec),Lewis_number(nspec))
-     allocate(coef_cp(nspec,polyorder_cp+1))
+     allocate(coef_cp(nspec,ncoefs_cp))
      allocate(T_low_cp(nspec),T_high_cp(nspec))
           
      !! Load molar mass, Lewis, and polynomial fits   
@@ -725,7 +727,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         read(12,*) T_low_cp(ispec),T_high_cp(ispec)
         
         read(12,*)  !! Blank line
-        do iorder=1,polyorder_cp+1
+        do iorder=1,ncoefs_cp
            read(12,*) coef_cp(ispec,iorder)
         end do
         read(12,*) !! Blank line                            
@@ -735,7 +737,23 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         
      end do     
      
-     !! Read in step list and  
+     !! Number of steps
+     read(12,*)
+     read(12,*) nsteps
+     read(12,*)
+     
+     !! Space for rate constants
+     allocate(Arrhenius_coefs(nsteps,3))
+     
+     read(12,*) !! Blank lines TBC
+     read(12,*)
+     read(12,*)     
+     read(12,*)
+     read(12,*) Arrhenius_coefs(1,1:3)
+     
+     !! Take logarithm of pre-exponential factor
+     Arrhenius_coefs(1,1) = log(Arrhenius_coefs(1,1))
+     Arrhenius_coefs(1,3) = Arrhenius_coefs(1,3)/Rgas_universal/1.0d3 !! Note scaling to adjust for units
      
      close(12)               
 
@@ -751,11 +769,11 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 
      !! Position and scale     
      flame_location = zero
-     flame_thickness = 1.0d-3/L_char !! Scale thickness because position vectors are scaled...
+     flame_thickness = 4.0d-4/L_char !! Scale thickness because position vectors are scaled...
 
      !! Temperatures
      T_reactants = T_ref
-     T_products = 2.3d3
+     T_products = 1.8d3
      
      !! Pressure through flame
      P_flame = rho_char*Rgas_universal*T_reactants/molar_mass(1) 
@@ -785,7 +803,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         Rmix_local = Rmix_local*Rgas_universal
         
         !! Density
-        lnro(i) = log(P_flame/Rmix_local/T(i))
+        lnro(i) = log(P_flame) - log(Rmix_local) - log(T(i))
         
         !! Velocity
         u(i) = u_reactants*rho_char/exp(lnro(i))

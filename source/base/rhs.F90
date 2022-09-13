@@ -23,6 +23,7 @@ module rhs
   use derivatives
   use thermodynamics
   use characteristic_boundaries
+  use chemistry
   implicit none
   
  
@@ -101,8 +102,12 @@ contains
      call calc_rhs_Yspec
      call calc_rhs_vel
      call calc_rhs_roE
-     if(nb.ne.0) call calc_rhs_nscbc     
+     if(nb.ne.0) call calc_rhs_nscbc   
      
+     !! Calculate chemical production rates and add these to rhs of species equation
+#ifdef react     
+     call calculate_chemical_production_rates  
+#endif     
      
      !! Clear space no longer required
      deallocate(gradlnro,gradu,gradv,gradw,gradp)
@@ -112,7 +117,6 @@ contains
      deallocate(gradT)
      deallocate(lambda_th)
 #endif     
-     deallocate(p)
      deallocate(visc,Mdiff)
 
      return

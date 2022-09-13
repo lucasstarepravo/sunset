@@ -77,16 +77,16 @@ module common_parameter
    
   !! SIMULATION PARAMETERS ========================================================================
   !! Primary domain parameters (i.e. those we can specify) ----------------------------------------
-  real(rkind), parameter :: L_char = half*half*half*half*half*half    !! Characteristic lengthscale
+  real(rkind), parameter :: L_char = 0.01d0    !! Characteristic lengthscale
   real(rkind), dimension(dims), parameter :: grav = (/zero,zero,zero/) !! Gravity  
   
   !! Primary physical fluid properties ------------------------------------------------------------
-  real(rkind), parameter :: rho_char = one           !! Reference density
+  real(rkind), parameter :: rho_char = 1.15622d0        !! Reference density
   real(rkind), parameter :: T_ref = 3.0d2            !! Reference temperature (for TDTP)
   real(rkind), parameter :: visc_ref = 1.8d-5        !! Viscosity at ref T,ro
   
   !! Primary dimensionless groups -----------------------------------------------------------------
-  real(rkind), parameter :: Re = 1000.0d0        !! Reynolds number
+  real(rkind), parameter :: Re = 249.17d0        !! Reynolds number
   real(rkind), parameter :: Pr = one             !! Prandtl number
   real(rkind), parameter :: Ma = 0.02d0          !! Mach number (only used for isothermal)      
  

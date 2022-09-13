@@ -802,22 +802,24 @@ contains
      
      
      
-     call MPI_ALLREDUCE(maxval(u(1:np)),maxphi(1),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(maxval(v(1:np)),maxphi(2),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)               
-     call MPI_ALLREDUCE(maxval(w(1:np)),maxphi(3),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(maxval(lnro(1:np)),maxphi(4),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(maxval(roE(1:np)),maxphi(5),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(maxval(u(1:npfb)),maxphi(1),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(maxval(v(1:npfb)),maxphi(2),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)               
+     call MPI_ALLREDUCE(maxval(w(1:npfb)),maxphi(3),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(maxval(lnro(1:npfb)),maxphi(4),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(maxval(roE(1:npfb)),maxphi(5),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(maxval(T(1:npfb)),maxphi(6),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
      do ispec=1,nspec
-        call MPI_ALLREDUCE(maxval(Yspec(1:np,ispec)),maxphi(5+ispec),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
+        call MPI_ALLREDUCE(maxval(Yspec(1:npfb,ispec)),maxphi(6+ispec),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
      end do
   
-     call MPI_ALLREDUCE(minval(u(1:np)),minphi(1),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(minval(v(1:np)),minphi(2),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)               
-     call MPI_ALLREDUCE(minval(w(1:np)),minphi(3),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(minval(lnro(1:np)),minphi(4),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(minval(roE(1:np)),minphi(5),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(minval(u(1:npfb)),minphi(1),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(minval(v(1:npfb)),minphi(2),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)               
+     call MPI_ALLREDUCE(minval(w(1:npfb)),minphi(3),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(minval(lnro(1:npfb)),minphi(4),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(minval(roE(1:npfb)),minphi(5),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(minval(T(1:npfb)),minphi(6),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
      do ispec=1,nspec
-        call MPI_ALLREDUCE(minval(Yspec(1:np,ispec)),minphi(5+ispec),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror) 
+        call MPI_ALLREDUCE(minval(Yspec(1:npfb,ispec)),minphi(6+ispec),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror) 
      end do
      !! Density from density logarithm
      maxphi(4) = exp(maxphi(4));minphi(4)=exp(minphi(4))

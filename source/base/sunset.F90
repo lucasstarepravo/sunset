@@ -68,9 +68,10 @@ program sunset
 
      !! Output, conditionally: at start, subsequently every dt_out
      if(itime.eq.0.or.time.gt.n_out*dt_out) then 
-!     if(itime.eq.0.or.mod(itime,1).eq.0)then
+!     if(itime.eq.0.or.mod(itime,100).eq.0)then
         n_out = n_out + 1
         call output_layer(n_out)
+        call output_laminar_flame_structure(n_out)
      end if        
     
      !! Perform one time step (with Error estimation if reacting flows)
@@ -105,6 +106,9 @@ subroutine deallocate_everything
   use common_parameter
   use common_vars
   
+  !! Tell the screen we've reached the end
+  write(6,*) iproc,"Reached the end of simulation. Cleaning up and stopping!"
+  
   !! Main arrays
   deallocate(rp,u,v,w,lnro,roE,Yspec,s)
 
@@ -116,9 +120,10 @@ subroutine deallocate_everything
   
   !! LABFM and FD weightings
   if(allocated(ij_w_grad)) then
-     deallocate(ij_w_grad,ij_wb_grad2,ij_w_hyp)
-     deallocate(ij_w_grad_sum,ij_wb_grad2_sum,ij_w_hyp_sum)     
+     deallocate(ij_w_grad,ij_w_hyp)
+     deallocate(ij_w_grad_sum,ij_w_hyp_sum)     
   end if
+  if(allocated(ij_wb_grad2)) deallocate(ij_wb_grad2,ij_wb_grad2_sum)
   if(allocated(ij_link_fd)) then
      deallocate(ij_link_fd)
      deallocate(ij_fd_grad,ij_fd_grad2,ij_fd_hyp)

@@ -48,7 +48,7 @@ contains
 #ifndef isoT
      allocate(cp(np))
      T(:)=zero
-     allocate(T_coef_B(polyorder_cp))
+     allocate(T_coef_B(polyorder_cp+1))
      
      !! Loop over all nodes
      maxiters = 0
@@ -58,16 +58,16 @@ contains
         !!Initialise coefficients:
         T_coef_A = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i)) - roE(i)/exp(lnro(i))
         T_coef_B(1) = -Rgas_mix(i)
-        T_coef_B(2:polyorder_cp) = zero
+        T_coef_B(2:polyorder_cp+1) = zero
         
         !! Build coefficients
-        do iorder = 1,polyorder_cp       
+        do iorder = 1,polyorder_cp+1
            do ispec=1,nspec
               T_coef_B(iorder) = T_coef_B(iorder) + Yspec(i,ispec)*coef_cp(ispec,iorder)/dble(iorder)    
            end do       
         end do
         do ispec = 1,nspec
-           T_coef_A = T_coef_A + Yspec(i,ispec)*coef_cp(ispec,polyorder_cp+1)
+           T_coef_A = T_coef_A + Yspec(i,ispec)*coef_cp(ispec,polyorder_cp+2)
         end do
         
         !! Initial guess for T
@@ -80,9 +80,9 @@ contains
            NRiters = NRiters + 1
         
            !! Evaluate f(T) and f'(T)
-           fT = T_coef_B(polyorder_cp)*T_tmp
-           dfT = dble(polyorder_cp)*T_coef_B(polyorder_cp)
-           do iorder = polyorder_cp-1,1,-1
+           fT = T_coef_B(polyorder_cp+1)*T_tmp
+           dfT = dble(polyorder_cp+1)*T_coef_B(polyorder_cp+1)
+           do iorder = polyorder_cp,1,-1
               fT = (fT + T_coef_B(iorder))*T_tmp
               dfT = dfT*T_tmp + T_coef_B(iorder)
            end do
@@ -118,8 +118,8 @@ contains
      do i=1,np
         cp(i) = zero
         do ispec=1,nspec
-           cp_tmp = coef_cp(ispec,polyorder_cp)
-           do iorder=polyorder_cp-1,1,-1
+           cp_tmp = coef_cp(ispec,polyorder_cp+1)
+           do iorder=polyorder_cp,1,-1
               cp_tmp = cp_tmp*T(i) + coef_cp(ispec,iorder)
            end do  
         
@@ -143,11 +143,17 @@ contains
      integer(ikind) :: iorder
      
      !! Enthalpy = polynomial(T).    
-     enthalpy = Temp*coef_cp(ispec,polyorder_cp)/dble(polyorder_cp)
-     do iorder=polyorder_cp-1,1,-1
+     enthalpy = Temp*coef_cp(ispec,polyorder_cp+1)/dble(polyorder_cp+1)
+     do iorder=polyorder_cp,1,-1
         enthalpy = Temp*(enthalpy + coef_cp(ispec,iorder)/dble(iorder) )
      end do
-     enthalpy = enthalpy + coef_cp(ispec,polyorder_cp+1)
+     enthalpy = enthalpy + coef_cp(ispec,polyorder_cp+2)
+     
+     !! Expensive form:
+!     enthalpy = coef_cp(ispec,polyorder_cp+2)
+!     do iorder=1,polyorder_cp+1
+!        enthalpy = enthalpy + (coef_cp(ispec,iorder)/dble(iorder))*Temp**dble(iorder)
+!     end do
                  
      return
   end subroutine evaluate_enthalpy_at_node
@@ -158,8 +164,6 @@ contains
      integer(ikind) :: i
      real(rkind) :: tmp_kinetic,tmpro
      
-     allocate(p(np))
-
 #ifdef isoT    
      !! Isothermal, calculate pressure from density
      !$omp parallel do private(tmpro)
@@ -246,9 +250,9 @@ contains
      real(rkind),intent(out) :: dcpdT,cpispec
      integer(ikind) :: iorder
               
-     dcpdT = dble(polyorder_cp-1)*coef_cp(ispec,polyorder_cp)
-     cpispec = coef_cp(ispec,polyorder_cp)
-     do iorder=polyorder_cp-1,2,-1
+     dcpdT = dble(polyorder_cp)*coef_cp(ispec,polyorder_cp+1)
+     cpispec = coef_cp(ispec,polyorder_cp+1)
+     do iorder=polyorder_cp,2,-1
         dcpdT = dcpdT*Temp + dble(iorder-1)*coef_cp(ispec,iorder)
         cpispec = cpispec*Temp + coef_cp(ispec,iorder)
      end do
@@ -279,50 +283,46 @@ contains
      real(rkind) :: enthalpy,Rgas_mix_local,p_local,psum
      
 #ifndef isoT     
-     !$omp parallel do private(ispec,enthalpy)
+     !! Evaluate the energy (roE) and pressure.
+     !$omp parallel do private(ispec,enthalpy,Rgas_mix_local)
      do i=1,npfb
         !! Initialise roE with K.E. term
         roE(i) = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))
-        
+
         !! Loop over species
+        Rgas_mix_local = zero
         do ispec=1,nspec       
            !! Evaluate local species enthalpy
            call evaluate_enthalpy_at_node(T(i),ispec,enthalpy)
            
-           !! Add species contribution to energy
-           roE(i) = roE(i) + Yspec(i,ispec)*(enthalpy - Rgas_universal*T(i)/molar_mass(ispec))
+           !! Add species enthalpy contribution
+           roE(i) = roE(i) + Yspec(i,ispec)*enthalpy
+           
+           !! Build the local mixture gas constant
+           Rgas_mix_local = Rgas_mix_local + Yspec(i,ispec)*Rgas_universal/molar_mass(ispec)
         end do           
+           
+        !! Subtract RgasT
+        roE(i) = roE(i) - Rgas_mix_local*T(i)           
            
         !! Multiply to get roE
         roE(i) = roE(i)*exp(lnro(i))
+        
+        p(i) = exp(lnro(i))*Rgas_mix_local*T(i)
 
      end do
      !$omp end parallel do
-#endif
      
-     !! Pressure on outflow nodes
-#ifdef isoT
-     P_outflow = csq*rho_char
-#else     
+     !! Pressure on outflow nodes 
      psum = zero;nsum = 0
      if(nb.ne.0)then
-        !$omp parallel do private(i,ispec,Rgas_mix_local,p_local) reduction(+:psum,nsum)
+        !$omp parallel do private(i) reduction(+:psum,nsum)
         do j=1,nb
            i=boundary_list(j)
            if(node_type(i).eq.2) then
-              
-              !! Evaluate local mixture gas constant
-              Rgas_mix_local = zero
-              do ispec=1,nspec
-                 Rgas_mix_local = Rgas_mix_local + Yspec(i,ispec)/molar_mass(ispec)
-              end do
-              Rgas_mix_local = Rgas_mix_local*Rgas_universal
-           
-              !! Evaluate local pressure
-              p_local = exp(lnro(i))*Rgas_mix_local*T(i)
-            
-              !! Augment the accumulators
-              psum = psum + p_local
+                          
+              !! Augment the accumulators for sum of pressure and # outflow nodes
+              psum = psum + p(i)
               nsum = nsum + 1
            end if
         end do
@@ -336,6 +336,8 @@ contains
         end if
         
      end if
+#else
+     P_outflow = csq*rho_char
 #endif
 
        
