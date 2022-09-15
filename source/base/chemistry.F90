@@ -31,10 +31,14 @@ contains
            arrhenius_rate = arrhenius_coefs(1,1) + arrhenius_coefs(1,2)*log(T(i)) - arrhenius_coefs(1,3)/T(i)
            arrhenius_rate = exp(arrhenius_rate)
 
-           production_rate = 1.0d-3*tmpro*max(Yspec(i,1),zero)*arrhenius_rate !! Scaling for R0, W units
+           production_rate = arrhenius_rate*(tmpro*max(Yspec(i,1),zero)/molar_mass(1))**one !! molar production rate
+           production_rate = production_rate*molar_mass(1) !! Mass production rate
+!write(6,*) T(i),tmpro,Yspec(i,1),arrhenius_rate,production_rate           
 !if(arrhenius_rate.ne.zero)then
 !write(6,*) iproc,i,itime,arrhenius_rate,production_rate        
 !end if
+!if(itime.eq.1.and.production_rate.gt.1d-5) write(6,*) T(i),production_rate
+
            rhs_Yspec(i,1) = rhs_Yspec(i,1) - production_rate/tmpro
            rhs_Yspec(i,2) = rhs_Yspec(i,2) + production_rate/tmpro
 !        end do

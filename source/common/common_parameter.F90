@@ -68,7 +68,7 @@ module common_parameter
   integer(ikind), parameter :: nspec_max = 20   
   
   !! Universal (or assumed to be universal) constants ---------------------------------------------
-  real(rkind), parameter :: Rgas_universal = 8.3144626181d0         !! Universal gas constant  
+  real(rkind), parameter :: Rgas_universal = 8.3144626181d3         !! Universal gas constant  
 #ifdef tdtp
   real(rkind), parameter :: r_temp_dependence = 7.0d-1     !! T-exponent for TDTP
 #else
@@ -86,7 +86,7 @@ module common_parameter
   real(rkind), parameter :: visc_ref = 1.8d-5        !! Viscosity at ref T,ro
   
   !! Primary dimensionless groups -----------------------------------------------------------------
-  real(rkind), parameter :: Re = 249.17d0        !! Reynolds number
+  real(rkind), parameter :: Re = 250.51d0        !! Reynolds number
   real(rkind), parameter :: Pr = one             !! Prandtl number
   real(rkind), parameter :: Ma = 0.02d0          !! Mach number (only used for isothermal)      
  

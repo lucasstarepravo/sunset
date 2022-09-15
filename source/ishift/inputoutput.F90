@@ -119,6 +119,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      real(rkind) :: ns,dummy,prox,rad,radmin,dx,dy,smag
      real(rkind),dimension(dims) :: rij
      real(rkind),dimension(:,:),allocatable :: tmp_vec
+     integer(ikind) :: shiftflag
 
      !! STEP 1: Load IPART (some params, plus list of nodes + boundary normals)
      open(13,file='../gen/IPART')
@@ -161,30 +162,41 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      write(6,*) nb,npfb     
      close(13)     
 
-     !! Randomly perturb the nodes
-     smag = 0.5d0
-     do i=1,npfb
-        if(node_type(i).ge.3)then  !! only perturb interior nodes
-        dx = rand();dx = smag*(dx - 0.5d0)*2.0d0*s(i)
-        dy = rand();dy = smag*(dy - 0.5d0)*2.0d0*s(i)        
-        rp(i,:) = rp(i,:) + (/dx,dy/)
-        end if
-!        write(32,*) rp(i,:)
-     end do
-
-     write(6,*) "Before iterative shifting:",nb,npfb,np
-
-     call iteratively_shift(10)
-     call iteratively_shift(10)
-     call iteratively_shift(10)
-     call iteratively_shift(10)
-     call iteratively_shift(10)               
+     write(6,*) "Shake and shift nodes? (1=yes, 0=no)"
+     read(5,*) shiftflag
      
-     !! Output post-shift distribution
-!     do i=1,npfb
-!        write(31,*) rp(i,:)
-!     end do
-     write(6,*) "After iterative shifting:",nb,npfb,np
+     if(shiftflag.eq.1) then
+
+        !! Randomly perturb the nodes
+        smag = 0.5d0
+        do i=1,npfb
+           if(node_type(i).ge.3)then  !! only perturb interior nodes
+           dx = rand();dx = smag*(dx - 0.5d0)*2.0d0*s(i)
+           dy = rand();dy = smag*(dy - 0.5d0)*2.0d0*s(i)        
+           rp(i,:) = rp(i,:) + (/dx,dy/)
+           end if
+!           write(32,*) rp(i,:)
+        end do
+
+        write(6,*) "Before iterative shifting:",nb,npfb,np
+
+        call iteratively_shift(10)
+        call iteratively_shift(10)
+        call iteratively_shift(10)
+        call iteratively_shift(10)
+        call iteratively_shift(10)                   
+     
+        !! Output post-shift distribution
+!        do i=1,npfb
+!           write(31,*) rp(i,:)
+!        end do
+        write(6,*) "After iterative shifting:",nb,npfb,np
+     
+     end if
+        !! Output post-shift distribution
+        do i=1,npfb
+           write(31,*) rp(i,:)
+        end do
 
 
                     

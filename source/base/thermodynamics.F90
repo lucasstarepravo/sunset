@@ -34,11 +34,11 @@ module thermodynamics
 
 contains
 !! ------------------------------------------------------------------------------------------------
-  subroutine evaluate_temperature_and_cp
+  subroutine evaluate_temperature
      !! Evaluate temperature, either as constant (isothermal), or analytically (assuming cp=const)
      !! or numerically (assuming cp=cp(T)).
      integer(ikind) :: i,ispec,iorder,NRiters,maxiters
-     real(rkind) :: tmp_kinetic,cp_tmp,deltaT
+     real(rkind) :: tmp_kinetic,deltaT
      real(rkind) :: T_coef_A,T_tmp,fT,dfT
      real(rkind),dimension(:),allocatable :: T_coef_B
      real(rkind),parameter :: T_tolerance=1.0d-10
@@ -46,7 +46,6 @@ contains
      logical :: keepgoing
 
 #ifndef isoT
-     allocate(cp(np))
      T(:)=zero
      allocate(T_coef_B(polyorder_cp+1))
      
@@ -112,7 +111,21 @@ contains
         maxiters = max(NRiters,maxiters)
      end do
      !$omp end parallel do
-         
+#endif        
+
+!write(6,*) maxiters
+
+     return
+  end subroutine evaluate_temperature
+!! ------------------------------------------------------------------------------------------------  
+  subroutine evaluate_cp
+     !! Evaluate the specific heat capacity for the mixture.
+     integer(ikind) :: i,ispec,iorder
+     real(rkind) :: cp_tmp
+
+#ifndef isoT
+     allocate(cp(np))
+            
      !! Calculate  mixture cp
      !$omp parallel do private(ispec,cp_tmp,iorder)
      do i=1,np
@@ -128,11 +141,10 @@ contains
         end do
      end do
      !$omp end parallel do
-
 #endif        
 
      return
-  end subroutine evaluate_temperature_and_cp
+  end subroutine evaluate_cp
 !! ------------------------------------------------------------------------------------------------
   subroutine evaluate_enthalpy_at_node(Temp,ispec,enthalpy)  
      !! Evaluate the enthalpy of species ispec based on temperature at one node: take in temperature
@@ -280,14 +292,17 @@ contains
      !! Additionally calculate the pressure on outflow boundary nodes, and set P_outflow to the
      !! average of this (it should be uniform along bound)
      integer(ikind) :: i,ispec,j,nsum
-     real(rkind) :: enthalpy,Rgas_mix_local,p_local,psum
+     real(rkind) :: enthalpy,Rgas_mix_local,p_local,psum,tmpro
      
 #ifndef isoT     
      !! Evaluate the energy (roE) and pressure.
-     !$omp parallel do private(ispec,enthalpy,Rgas_mix_local)
+     !$omp parallel do private(ispec,enthalpy,Rgas_mix_local,tmpro)
      do i=1,npfb
         !! Initialise roE with K.E. term
         roE(i) = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))
+        
+        !! Evaluate density from its logarithm
+        tmpro = exp(lnro(i))
 
         !! Loop over species
         Rgas_mix_local = zero
@@ -301,18 +316,25 @@ contains
            !! Build the local mixture gas constant
            Rgas_mix_local = Rgas_mix_local + Yspec(i,ispec)*Rgas_universal/molar_mass(ispec)
         end do           
-           
+
+        !! Evaluate the pressure           
+        p(i) = tmpro*Rgas_mix_local*T(i)
+
         !! Subtract RgasT
-        roE(i) = roE(i) - Rgas_mix_local*T(i)           
+        roE(i) = roE(i) - Rgas_mix_local*T(i)     
+        
+!if(node_type(i).eq.1) write(6,*) "reactants",roE(i),tmpro,p(i)
+!if(node_type(i).eq.2) write(6,*) "products",roE(i),tmpro,p(i)
            
         !! Multiply to get roE
-        roE(i) = roE(i)*exp(lnro(i))
+        roE(i) = roE(i)*tmpro
         
-        p(i) = exp(lnro(i))*Rgas_mix_local*T(i)
+write(499,*) rp(i,1),roE(i),tmpro
 
      end do
      !$omp end parallel do
-     
+          
+
      !! Pressure on outflow nodes 
      psum = zero;nsum = 0
      if(nb.ne.0)then

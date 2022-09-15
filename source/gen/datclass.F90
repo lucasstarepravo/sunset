@@ -178,7 +178,56 @@ case(1) !! Box for Rayleigh Taylor
      write(*,*) 'nb,npfb= ', nb,npfb,nbio
 
 !! ------------------------------------------------------------------------------------------------
-  case(2) !! EMPTY
+  case(2) !! GRID!
+
+
+     yl=0.0125d0  ! channel width
+     xl=1.0d0 ! channel length
+     dx0=xl/1000.0       !15
+     xbcond=0;ybcond=1     
+     
+     nb_patches = 4
+     allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
+     allocate(b_type(nb_patches))
+     b_type(:) = (/ 3, 2, 3, 1/)  
+     b_node(1,:) = (/ -0.5d0*xl, -0.5d0*yl /)
+     b_node(2,:) = (/ 0.5d0*xl, -0.5d0*yl /)
+     b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
+     b_node(4,:) = (/ -0.5d0*xl, 0.5d0*yl /)
+     nb_blobs = 0
+     call make_boundary_edge_vectors
+     xb_min = minval(b_node(:,1));xb_max = maxval(b_node(:,1));yb_min = minval(b_node(:,2));yb_max = maxval(b_node(:,2))
+
+     !! Uniform resolution
+     dxmax = dx0  
+     dxmin = dx0
+     dxb=dx0
+     dxio=dx0
+     call make_boundary_particles
+     call make_boundary_blobs               
+     ipart = nb   
+     
+     dx = dx0
+     x = xb_min + 5.0*dx
+     do while(x.lt.xb_max-4.5*dx)
+        y = yb_min + 0.5*dx
+        do while(y.lt.yb_max)
+              ipart=ipart+1;xp(ipart)= x;yp(ipart)= y;dxp(ipart) = dx
+           y = y + dx
+        enddo
+        x = x + dx
+     enddo     
+                        
+     npfb = ipart
+     dx0 = maxval(dxp(1:npfb))
+     
+     do i=1,npfb
+        write(30,*) xp(i),yp(i)
+     end do
+
+
+     write(*,*) 'nb,npfb= ', nb,npfb,nbio
+       
 
 !! ------------------------------------------------------------------------------------------------
   case(3) !! Kolmogorov flow
@@ -536,6 +585,13 @@ case(5) !! Inflow/outflow tube for simple flames
         end do        
         
         !! And what is the spacing, based on dist2bound?
+!! Over-ride object tests
+if(abs(x).le.0.05) then
+   dist2bound=0.0d0
+else
+   dist2bound=min(abs(x-0.05),abs(x+0.05))
+endif   
+   
         if(dist2bound.le.b0*dx0) then  !! Close - set to dxmin
            dx = dxmin                     
         else if(dist2bound.le.b1*dx0)then  !! A bit further out, smoothly vary from dxmin to dx0
@@ -544,7 +600,7 @@ case(5) !! Inflow/outflow tube for simple flames
            dx = dx0 + (dxio-dx0)*((dist2bound-b1*dx0)/(b2*dxio))
         else     !! Far out: set to dxio
            dx = dxio
-        end if       
+        end if               
       
                
         !! Check whether to place a particle here, based on some criteria

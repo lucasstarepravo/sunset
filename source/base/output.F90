@@ -671,7 +671,7 @@ contains
         do i=1,npfb
            x=rp(i,1);y=rp(i,2)
            if(abs(y).le.s(i)) then  !! For nodes within a node-spacing of y=0
-              write(20,*) x,y,u(i),v(i),w(i),exp(lnro(i)),roE(i),T(i),Yspec(i,1:nspec)
+              write(20,*) x,y,u(i),v(i),w(i),exp(lnro(i)),roE(i),T(i),p(i),Yspec(i,1:nspec)
            end if
         end do
 !        !$omp end parallel do

@@ -36,7 +36,7 @@ module rhs
   real(rkind),dimension(:,:),allocatable :: graddivvel
   real(rkind),dimension(:),allocatable :: lapu,lapv,lapw
   real(rkind),dimension(:),allocatable :: lapYspec
-  real(rkind),dimension(:,:),allocatable :: gradYspec
+  real(rkind),dimension(:,:,:),allocatable :: gradYspec
   real(rkind),dimension(:,:),allocatable :: gradT,gradcp
   
   real(rkind),dimension(:),allocatable :: store_diff_E,store_diff_Y
@@ -66,7 +66,8 @@ contains
      !! to calc_all_rhs in the RK scheme.
      if(.not.(allocated(visc))) then
         call evaluate_mixture_gas_constant
-        call evaluate_temperature_and_cp     
+        call evaluate_temperature
+        call evaluate_cp   
         call evaluate_transport_properties
      end if
 
@@ -177,7 +178,7 @@ contains
      real(rkind),dimension(:,:),allocatable :: grad2Yspec
      integer(ikind) :: i,j,ispec
      real(rkind),dimension(dims) :: tmp_vec,gradmdiff,grad_enthalpy
-     real(rkind) :: tmp_scal,lapYspec_tmp,tmpY,molec_diff,enthalpy,dcpdT,cpispec
+     real(rkind) :: tmp_scal,lapYspec_tmp,tmpY,molec_diff,enthalpy,dcpdT,cpispec,tmpro
      real(rkind),dimension(:,:),allocatable :: DgradYsum
 
 
@@ -186,27 +187,30 @@ contains
      allocate(gradcp(npfb,dims));gradcp = zero
 #endif     
 #ifdef ms     
-     allocate(gradYspec(npfb,dims))
+     allocate(gradYspec(npfb,dims,nspec))
      allocate(lapYspec(npfb))
      allocate(store_diff_Y(npfb));store_diff_Y = zero
      allocate(molar_weighted_gradYsum(npfb,dims));molar_weighted_gradYsum = zero
      allocate(DgradYsum(npfb,dims));DgradYsum = zero
      
+     !! Loop over all species
      do ispec=1,nspec
      
-        call calc_gradient(Yspec(:,ispec),gradYspec)
+        !! Calculate gradient and Laplacian for Yspec for this species     
+        call calc_gradient(Yspec(:,ispec),gradYspec(:,:,ispec))
         call calc_laplacian(Yspec(:,ispec),lapYspec)
         
 
         segment_tstart = omp_get_wtime()               
         !$omp parallel do private(i,tmp_vec,tmp_scal,tmpY,gradmdiff,molec_diff,enthalpy,grad_enthalpy, &
-        !$omp dcpdT,cpispec)
+        !$omp dcpdT,cpispec,tmpro)
         do j=1,npfb-nb
            i=internal_list(j)
+           tmpro = exp(lnro(i))
            tmp_vec(1) = u(i);tmp_vec(2) = v(i);tmp_vec(3) = w(i)
 
            !! Advection
-           tmp_scal = -dot_product(tmp_vec,gradYspec(i,:))
+           tmp_scal = -dot_product(tmp_vec,gradYspec(i,:,ispec))
          
            !! Molecular diffusion (N.B. gradmdiff may be non-zero even if isothermal)
            gradmdiff(:) = -Mdiff(i,ispec)*gradlnro(i,:)
@@ -214,8 +218,8 @@ contains
            gradmdiff(:) = gradmdiff(:) + r_temp_dependence*Mdiff(i,ispec)*gradT(i,:)/T(i)
 #endif           
            molec_diff = Mdiff(i,ispec)*lapYspec(i) &
-                      + Mdiff(i,ispec)*dot_product(gradYspec(i,:),gradlnro(i,:)) &
-                      + dot_product(gradYspec(i,:),gradmdiff(:))
+                      + Mdiff(i,ispec)*dot_product(gradYspec(i,:,ispec),gradlnro(i,:)) &
+                      + dot_product(gradYspec(i,:,ispec),gradmdiff(:))
            
            !! Add this term to the diffusion correction store
            store_diff_Y(i) = store_diff_Y(i) + molec_diff
@@ -223,23 +227,23 @@ contains
 #ifndef isoT                                 
            !! Add h*div.(ro*D*gradY) for species ispec to the energy diffusion store
            call evaluate_enthalpy_at_node(T(i),ispec,enthalpy)
-           store_diff_E(i) = store_diff_E(i) + molec_diff*enthalpy          
+           store_diff_E(i) = store_diff_E(i) + molec_diff*enthalpy*tmpro       
            !! Add gradh.ro*D*gradY for species ispec 
            grad_enthalpy = cp(i)*gradT(i,:)
            store_diff_E(i) = store_diff_E(i) + exp(lnro(i))*Mdiff(i,ispec)* &
-                                               dot_product(gradYspec(i,:),grad_enthalpy)          
+                                               dot_product(gradYspec(i,:,ispec),grad_enthalpy)          
  
            !! Evaluate dcp/dT
            call evaluate_dcpdT_at_node(T(i),ispec,cpispec,dcpdT)
            
            !! Add this species contrib to gradcp(mix) = YdcpdT*gradT + cp(ispec)gradY
            gradcp(i,:) = gradcp(i,:) + Yspec(i,ispec)*dcpdT*gradT(i,:) &
-                                     + cpispec*gradYspec(i,:)
+                                     + cpispec*gradYspec(i,:,ispec)
 #endif                    
                       
            !! Augment the gradYsums
-           molar_weighted_gradYsum(i,:) = molar_weighted_gradYsum(i,:) + gradYspec(i,:)/molar_mass(ispec)
-           DgradYsum(i,:) = DgradYsum(i,:) + Mdiff(i,ispec)*gradYspec(i,:)
+           molar_weighted_gradYsum(i,:) = molar_weighted_gradYsum(i,:) + gradYspec(i,:,ispec)/molar_mass(ispec)
+           DgradYsum(i,:) = DgradYsum(i,:) + Mdiff(i,ispec)*gradYspec(i,:,ispec)
                       
            !! Build the RHS
            rhs_Yspec(i,ispec) = tmp_scal + molec_diff ! + SOURCE
@@ -256,9 +260,10 @@ contains
            call calc_grad2bound(Yspec(:,ispec),grad2Yspec)
            segment_tstart = omp_get_wtime()               
            !$omp parallel do private(i,tmp_scal,xn,yn,un,ut,dutdt,lapYspec_tmp,tmpY &
-           !$omp ,gradmdiff,molec_diff,enthalpy,grad_enthalpy)
+           !$omp ,gradmdiff,molec_diff,enthalpy,grad_enthalpy,tmpro)
            do j=1,nb
               i=boundary_list(j)
+              tmpro = exp(lnro(i))
               tmp_scal = exp(lnro(i))
                         
               if(node_type(i).eq.0)then  !! walls in bound norm coords
@@ -271,8 +276,8 @@ contains
                  gradmdiff(:) = gradmdiff(:) +  r_temp_dependence*Mdiff(i,ispec)*gradT(i,:)/T(i)
 #endif                 
                  molec_diff = Mdiff(i,ispec)*lapYspec_tmp &
-                            + Mdiff(i,ispec)*dot_product(gradYspec(i,2:3),gradlnro(i,2:3)) &
-                            + dot_product(gradYspec(i,2:3),gradmdiff(2:3))
+                            + Mdiff(i,ispec)*dot_product(gradYspec(i,2:3,ispec),gradlnro(i,2:3)) &
+                            + dot_product(gradYspec(i,2:3,ispec),gradmdiff(2:3))
            
                  !! Add this term to the diffusion correction store
                  store_diff_Y(i) = store_diff_Y(i) + molec_diff
@@ -280,23 +285,23 @@ contains
 #ifndef isoT
                  !! Add h*div.(ro*D*gradY) for species ispec to the energy diffusion store
                  call evaluate_enthalpy_at_node(T(i),ispec,enthalpy)
-                 store_diff_E(i) = store_diff_E(i) + molec_diff*enthalpy           
+                 store_diff_E(i) = store_diff_E(i) + molec_diff*enthalpy*tmpro
                  !! Add gradh.ro*D*gradY for species ispec 
                  grad_enthalpy = cp(i)*gradT(i,:)
                  store_diff_E(i) = store_diff_E(i) + exp(lnro(i))*Mdiff(i,ispec)* &
-                                                     dot_product(gradYspec(i,:),grad_enthalpy)
+                                                     dot_product(gradYspec(i,:,ispec),grad_enthalpy)
 
                  !! Evaluate dcp/dT
                  call evaluate_dcpdT_at_node(T(i),ispec,cpispec,dcpdT)
            
                  !! Add this species contrib to gradcp(mix) = YdcpdT*gradT + cp(ispec)gradY
                  gradcp(i,:) = gradcp(i,:) + Yspec(i,ispec)*dcpdT*gradT(i,:) &
-                                           + cpispec*gradYspec(i,:)
+                                           + cpispec*gradYspec(i,:,ispec)
 #endif                   
                  
                  !! Augment the gradYsums
-                 molar_weighted_gradYsum(i,:) = molar_weighted_gradYsum(i,:) + gradYspec(i,:)/molar_mass(ispec)
-                 DgradYsum(i,:) = DgradYsum(i,:) + Mdiff(i,ispec)*gradYspec(i,:)
+                 molar_weighted_gradYsum(i,:) = molar_weighted_gradYsum(i,:) + gradYspec(i,:,ispec)/molar_mass(ispec)
+                 DgradYsum(i,:) = DgradYsum(i,:) + Mdiff(i,ispec)*gradYspec(i,:,ispec)
 
                  !! Construct the RHS
                  rhs_Yspec(i,ispec) = molec_diff ! + SOURCE
@@ -312,8 +317,8 @@ contains
                  gradmdiff(:) = gradmdiff(:) +  r_temp_dependence*Mdiff(i,ispec)*gradT(i,:)/T(i)
 #endif     
                  molec_diff = Mdiff(i,ispec)*lapYspec_tmp &
-                            + Mdiff(i,ispec)*dot_product(gradYspec(i,:),gradlnro(i,:)) &
-                            + dot_product(gradYspec(i,:),gradmdiff(:))
+                            + Mdiff(i,ispec)*dot_product(gradYspec(i,:,ispec),gradlnro(i,:)) &
+                            + dot_product(gradYspec(i,:,ispec),gradmdiff(:))
            
                  !! Add this term to the diffusion correction store
                  store_diff_Y(i) = store_diff_Y(i) + molec_diff
@@ -321,30 +326,30 @@ contains
 #ifndef isoT                 
                  !! Add h*div.(ro*D*gradY) for species ispec to the energy diffusion store
                  call evaluate_enthalpy_at_node(T(i),ispec,enthalpy)
-                 store_diff_E(i) = store_diff_E(i) + molec_diff*enthalpy           
+                 store_diff_E(i) = store_diff_E(i) + molec_diff*enthalpy*tmpro           
                  !! Add gradh.ro*D*gradY for species ispec 
                  grad_enthalpy = cp(i)*gradT(i,:)
                  store_diff_E(i) = store_diff_E(i) + exp(lnro(i))*Mdiff(i,ispec)* &
-                                                     dot_product(gradYspec(i,:),grad_enthalpy)             
+                                                     dot_product(gradYspec(i,:,ispec),grad_enthalpy)             
 
                  !! Evaluate dcp/dT
                  call evaluate_dcpdT_at_node(T(i),ispec,cpispec,dcpdT)
            
                  !! Add this species contrib to gradcp(mix) = YdcpdT*gradT + cp(ispec)*gradY
                  gradcp(i,:) = gradcp(i,:) + Yspec(i,ispec)*dcpdT*gradT(i,:) &
-                                           + cpispec*gradYspec(i,:)
+                                           + cpispec*gradYspec(i,:,ispec)
 #endif       
                  !! Augment the gradYsums
-                 molar_weighted_gradYsum(i,:) = molar_weighted_gradYsum(i,:) + gradYspec(i,:)/molar_mass(ispec)
-                 DgradYsum(i,:) = DgradYsum(i,:) + Mdiff(i,ispec)*gradYspec(i,:)
+                 molar_weighted_gradYsum(i,:) = molar_weighted_gradYsum(i,:) + gradYspec(i,:,ispec)/molar_mass(ispec)
+                 DgradYsum(i,:) = DgradYsum(i,:) + Mdiff(i,ispec)*gradYspec(i,:,ispec)
                  
                  !! Construct RHS (transverse convective and diffusive)
-                 rhs_Yspec(i,ispec) = -v(i)*gradYspec(i,2) - w(i)*gradYspec(i,3) &
+                 rhs_Yspec(i,ispec) = -v(i)*gradYspec(i,2,ispec) - w(i)*gradYspec(i,3,ispec) &
                                     + molec_diff ! + SOURCE
 
 
                  !! Build the characteristic
-                 L(j,5+ispec) = u(i)*gradYspec(i,1)                
+                 L(j,5+ispec) = u(i)*gradYspec(i,1,ispec)                
 
               end if       
            end do
@@ -363,27 +368,34 @@ contains
      segment_tstart = omp_get_wtime()               
      
      !! Deallocate any stores no longer required    
-     deallocate(gradYspec,lapYspec)
+     deallocate(lapYspec)
   
-     !! Run through species again, and add the diffusion correction term
-     do ispec=1,nspec
-        !$omp parallel do private(enthalpy,grad_enthalpy)
-        do i=1,npfb
-           rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) - Yspec(i,ispec)*store_diff_Y(i)           
+     !! Run through species again
+     !$omp parallel do private(ispec,enthalpy,grad_enthalpy,tmpro)
+     do i=1,npfb
+        tmpro = exp(lnro(i))
+        do ispec=1,nspec     
+           !! Add the diffusion correction term to the rhs
+           rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) - Yspec(i,ispec)*store_diff_Y(i) &
+                              - dot_product(gradYspec(i,:,ispec),DgradYsum(i,:))          
            
 #ifndef isoT           
-           !! Add h*diffusion_correction_term to the energy diffusion store
+           !! Add ro*h*diffusion_correction_term to the energy diffusion store
            call evaluate_enthalpy_at_node(T(i),ispec,enthalpy)           
-           store_diff_E(i) = store_diff_E(i) - Yspec(i,ispec)*store_diff_Y(i)*enthalpy           
+           store_diff_E(i) = store_diff_E(i) - tmpro*Yspec(i,ispec)*store_diff_Y(i)*enthalpy    
+                  
            !! Add ro*gradh*Y*sum_over_species(DgradY) for species ispec
            grad_enthalpy = cp(i)*gradT(i,:)
-           store_diff_E(i) = store_diff_E(i) - Yspec(i,ispec)*exp(lnro(i))* &
-                                               dot_product(grad_enthalpy,DgradYsum(i,:))           
+           store_diff_E(i) = store_diff_E(i) - Yspec(i,ispec)*tmpro* &
+                                               dot_product(grad_enthalpy,DgradYsum(i,:))  
+                                               
+           !! Add ro*h*gradY.sum_over_species(DgradY) for species ispec
+           store_diff_E(i) = store_diff_E(i) - enthalpy*tmpro*dot_product(gradYspec(i,:,ispec),DgradYsum(i,:))
 #endif                                               
         end do
-        !$omp end parallel do     
      end do
-     deallocate(store_diff_Y,DgradYsum)
+     !$omp end parallel do          
+     deallocate(store_diff_Y,DgradYsum,gradYspec)
      
      !! Profiling
      segment_tend = omp_get_wtime()
@@ -626,7 +638,7 @@ contains
                  + (gradu(i,2)+gradv(i,1))**two + (gradu(i,3)+gradw(i,1))**two + (gradv(i,3)+gradw(i,2))**two        
         store_diff_E(i) = store_diff_E(i) + visc(i)*tmp_visc
         
-        !! Thermal diffusion term: div.(lambda*gradT)
+        !! Thermal diffusion term: div.(lambda*gradT + heating due to molecular diffusion)
         store_diff_E(i) = store_diff_E(i) + lambda_th(i)*lapT(i)  
         gradlambda(:) = lambda_th(i)*r_temp_dependence*gradT(i,:)/T(i)  + lambda_th(i)*gradcp(i,:)/cp(i)
         store_diff_E(i) = store_diff_E(i) + dot_product(gradlambda(:),gradT(i,:))

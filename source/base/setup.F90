@@ -43,7 +43,7 @@ contains
 
      !! Time begins at zero
      time = zero;itime=0
-     dt_out = 0.0001d0*Time_char         !! Frequency to output fields
+     dt_out = 0.00005d0*Time_char         !! Frequency to output fields
      time_end = 1.0d2*Time_char
   
      !! Particles per smoothing length and supportsize/h
@@ -399,8 +399,8 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      end if
      
      !! Make a simple laminar flame?
-     call make_1d_1step_flame
-!     call make_hotspot
+!     call make_1d_1step_flame
+     call load_flame_file
      
      !! Set energy from lnro,u,Y,T
      call initialise_energy
@@ -736,7 +736,8 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         coef_cp(ispec,:) = coef_cp(ispec,:)*Rgas_universal/molar_mass(ispec)
         
      end do     
-     
+
+     read(12,*) !! Read comment line    
      !! Number of steps
      read(12,*)
      read(12,*) nsteps
@@ -750,10 +751,10 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      read(12,*)     
      read(12,*)
      read(12,*) Arrhenius_coefs(1,1:3)
-     
+
      !! Take logarithm of pre-exponential factor
      Arrhenius_coefs(1,1) = log(Arrhenius_coefs(1,1))
-     Arrhenius_coefs(1,3) = Arrhenius_coefs(1,3)/Rgas_universal/1.0d3 !! Note scaling to adjust for units
+     Arrhenius_coefs(1,3) = Arrhenius_coefs(1,3)/(Rgas_universal)
      
      close(12)               
 
@@ -769,11 +770,11 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 
      !! Position and scale     
      flame_location = zero
-     flame_thickness = 4.0d-4/L_char !! Scale thickness because position vectors are scaled...
+     flame_thickness = 5.0d-4/L_char !! Scale thickness because position vectors are scaled...
 
      !! Temperatures
      T_reactants = T_ref
-     T_products = 1.8d3
+     T_products = 2.3d3
      
      !! Pressure through flame
      P_flame = rho_char*Rgas_universal*T_reactants/molar_mass(1) 
@@ -809,6 +810,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         u(i) = u_reactants*rho_char/exp(lnro(i))
         v(i) = zero
         w(i) = zero
+                
      end do
      !$omp end parallel do
      
@@ -834,5 +836,102 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
   
      return
   end subroutine make_1d_1step_flame
+!! ------------------------------------------------------------------------------------------------
+  subroutine load_flame_file
+     use thermodynamics
+     integer(ikind) :: i,ispec,j,nflamein
+     real(rkind) :: flame_location,flame_thickness
+     real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z
+     real(rkind),dimension(:),allocatable :: flamein_ro,flamein_u,flamein_T,flamein_Y,flamein_roE
+     real(rkind),dimension(:),allocatable :: flamein_p
+     real(rkind) :: dx_flamein
+
+     !! Open a file containing flame profile
+     open(unit=19,file='init_flame.in')
+     
+     !! Specify the flame pressure
+     P_flame = 1.0d5
+
+     !! Read file, then close it.     
+     !! Format of the file is ro,u,T,Y_reactants over 1001 evenly spaced steps covering 
+     !! a 0.01m long domain.
+     nflamein = 1001
+     dx_flamein = 0.01/(nflamein-1)
+     allocate(flamein_ro(nflamein),flamein_u(nflamein),flamein_T(nflamein),flamein_Y(nflamein))
+     allocate(flamein_roE(nflamein),flamein_p(nflamein))
+     do i=1,nflamein
+        read(19,*) flamein_ro(i),flamein_u(i),flamein_T(i),flamein_Y(i), &
+                   flamein_roE(i),flamein_p(i)
+     end do
+     close(19)
+     
+       
+     !! Loop through all particles. Find the "cell" the particle resides in. Copy data.     
+     !$omp parallel do private(j,x,y,z,c,Rmix_local,ispec)
+     do i=1,npfb
+        x = (rp(i,1)+half)*L_char  !! Scale x - this requires L_char to match the length
+        !! also needs shifting depending on set up.
+        
+        !! Nearest index in flame-in data
+        j = floor(x/dx_flamein) + 1
+        
+        !! Copy data
+        lnro(i) = log(flamein_ro(j))
+        u(i) = flamein_u(j)
+        v(i) = zero
+        w(i) = zero
+        T(i) = flamein_T(j)
+        Yspec(i,1) = flamein_Y(j)
+        Yspec(i,2) = one - Yspec(i,1)    
+        roE(i) = flamein_roE(j)   
+        p(i) = flamein_p(j)         
+     end do
+     !$omp end parallel do
+     
+     !! Free up space
+     deallocate(flamein_ro,flamein_u,flamein_T,flamein_Y,flamein_roE,flamein_p)
+     
+     !! Temporarily copy some energy data to halos and mirrors (it will be later overwritten)
+     !$omp parallel do
+     do i=npfb+1,np
+        roE(i) = roE(1)
+     end do
+     !$omp end parallel do
+     
+     !! Re-evaluate temperature from energy.  
+     call evaluate_mixture_gas_constant        
+     call evaluate_temperature
+
+     
+     !! Re-evaluate density from T and read-from-file-Pressure
+     !$omp parallel do 
+     do i=1,npfb
+        lnro(i) = log(p(i)/(Rgas_mix(i)*T(i)))
+     end do
+     !$omp end parallel do
+     deallocate(Rgas_mix)     
+                
+     !! Values on boundaries
+     if(nb.ne.0)then
+        do j=1,nb
+           i=boundary_list(j)
+           if(node_type(i).eq.0) then !! wall initial conditions
+              u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
+              T_bound(j) = T(i)
+           end if                 
+           if(node_type(i).eq.1) then !! inflow initial conditions
+              u(i)=u_char
+              T_bound(j) = T(i) !! Inflow temperature is T_cold
+           end if
+           if(node_type(i).eq.2) then !! outflow initial conditions
+              T_bound(j) = T(i)  !! Outflow temperature is T_hot
+           end if
+        end do
+     end if
+ 
+  
+  
+     return
+  end subroutine load_flame_file
 !! ------------------------------------------------------------------------------------------------
 end module setup

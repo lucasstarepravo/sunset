@@ -118,6 +118,7 @@ clean:
 	rm -vf ./sunset
 	rm -rfv fort.*	
 	rm -vf ./data_out/layer*
+	rm -vf ./data_out/flame*
 	rm -vf ./data_out/time.out
 	rm -vf ./data_out/statistics/*.out
 	rm -vf ./paraview_files/LAYER*

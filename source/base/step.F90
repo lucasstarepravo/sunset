@@ -386,7 +386,8 @@ contains
      dt_previous = dt
      
      call evaluate_mixture_gas_constant
-     call evaluate_temperature_and_cp
+     call evaluate_temperature
+     call evaluate_cp
      call evaluate_transport_properties   
      
      !! Find minimum values for cfl, visc, thermal, and molecular diffusive steps
@@ -507,6 +508,9 @@ contains
      
      !! Impose upper limit
      if(dt.gt.dtmax) dt = dtmax
+     
+!! Force time-step
+!dt = 1.0d-9     
      
 #ifdef mp     
      !! Find global time-step
