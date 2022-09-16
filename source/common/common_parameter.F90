@@ -79,23 +79,24 @@ module common_parameter
   !! Primary domain parameters (i.e. those we can specify) ----------------------------------------
   real(rkind), parameter :: L_char = 0.01d0    !! Characteristic lengthscale
   real(rkind), dimension(dims), parameter :: grav = (/zero,zero,zero/) !! Gravity  
+  real(rkind), parameter :: U_char = 0.39d0    !! Characteristic (often inflow) velocity
   
   !! Primary physical fluid properties ------------------------------------------------------------
   real(rkind), parameter :: rho_char = 1.15622d0        !! Reference density
-  real(rkind), parameter :: T_ref = 3.0d2            !! Reference temperature (for TDTP)
-  real(rkind), parameter :: visc_ref = 1.8d-5        !! Viscosity at ref T,ro
+  real(rkind), parameter :: T_ref = 2.98d2            !! Reference temperature (for TDTP)
+  real(rkind), parameter :: visc_ref = 1.806d-5        !! Viscosity at ref T,ro
   
   !! Primary dimensionless groups -----------------------------------------------------------------
-  real(rkind), parameter :: Re = 250.51d0        !! Reynolds number
-  real(rkind), parameter :: Pr = one             !! Prandtl number
+  real(rkind), parameter :: Pr = 0.7d0             !! Prandtl number
   real(rkind), parameter :: Ma = 0.02d0          !! Mach number (only used for isothermal)      
  
   !! Secondary properties -------------------------------------------------------------------------
-  real(rkind), parameter :: u_char = Re*visc_ref/L_char/rho_char      !! Reference velocity from Re
   real(rkind), parameter :: u_inflow = u_char                         !! Inflow velocity 
   real(rkind), parameter :: Lz = L_char                               !! 3rd dim length-scale
   real(rkind), parameter :: Time_char= L_char/u_char                  !! reference time-scale
-  real(rkind), parameter :: T_inflow = T_ref                          !! Inflow temperature 
+ 
+  !! Secondary dimensionless groups
+  real(rkind), parameter :: Re = rho_char*u_char*L_char/visc_ref      !! Reynolds number
 
   !! Reference molecular diffusivity assuming unity Lewis number
   real(rkind), parameter :: Mdiff_ref = visc_ref/rho_char/Pr/one      !! one is Lewis #               

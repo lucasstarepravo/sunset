@@ -136,7 +136,7 @@ contains
     !! THERMAL FLOWS, PARTIALLY NON-REFLECTING
     gammagas = cp(i)/(cp(i)-Rgas_mix(i))
     gammagasm1 = gammagas - one
-    Lchar(2) = (T_inflow-T(i))*c*0.278d0/L_domain_x/gammagas &
+    Lchar(2) = (T_bound(j)-T(i))*c*0.278d0/L_domain_x/gammagas &  !! Track T_bound(j)
              - (v(i)*gradlnro(2)*tmpro + tmpro*gradv(2) + v(i)*gradp(2)/c/c + gammagas*p(i)*gradv(2)/c/c) &
              - (w(i)*gradlnro(3)*tmpro + tmpro*gradw(3) + w(i)*gradp(3)/c/c + gammagas*p(i)*gradw(3)/c/c)
              !! + visc + source terms TBC

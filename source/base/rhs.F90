@@ -42,6 +42,9 @@ module rhs
   real(rkind),dimension(:),allocatable :: store_diff_E,store_diff_Y
   real(rkind),dimension(:,:),allocatable :: molar_weighted_gradYsum
   
+  real(rkind),dimension(:),allocatable :: enth
+  real(rkind),dimension(:,:),allocatable :: grad_enth
+  
   real(rkind) :: dlnrodn,dlnrodt,dundn,dundt,dutdn,dutdt,dpdn,dpdt
   real(rkind) :: xn,yn,un,ut
   
@@ -379,6 +382,7 @@ contains
            rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) - Yspec(i,ispec)*store_diff_Y(i) &
                               - dot_product(gradYspec(i,:,ispec),DgradYsum(i,:))          
            
+           !! Additional terms for energy equation
 #ifndef isoT           
            !! Add ro*h*diffusion_correction_term to the energy diffusion store
            call evaluate_enthalpy_at_node(T(i),ispec,enthalpy)           
@@ -430,6 +434,7 @@ contains
      call calc_laplacian(w,lapw)          
 #endif     
 
+     !! Pressure gradient (method depends on whether isoT or not)
 #ifndef isoT
      !! Evaluate pressure gradient directly (LABFM...)
      call calc_gradient(p,gradp) 

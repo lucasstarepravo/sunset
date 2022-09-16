@@ -228,6 +228,28 @@ The following cases are currently included in \verb|datclass.F90|:
 \item \verb|data_directory| contains output files produced by the code. \verb|statistics| contains files describing global, time-varying measures (e.g. total K.E.).
 \end{itemize}  
 
+\appendix
+\section{Equations will all terms spelled out}\label{fulleqns}
+
+We now denote the components of $\bm{u}$ as $u$, $v$, and $w$.
+
+\begin{equation}\frac{\partial\ln\rho}{\partial{t}}+\bm{u}\cdot\nabla\ln\rho=-\nabla\cdot\bm{u}\end{equation}
+
+\begin{equation}\frac{\partial\bm{u}}{\partial{t}}=-\frac{1}{\rho}\nabla{p}+\frac{\mu}{\rho}\left[\nabla^{2}\bm{u}-\frac{1}{3}\nabla\left(\nabla\cdot\bm{u}\right)\right]+\nabla\mu\cdot\left(\nabla\bm{u}+\nabla\bm{u}^{T}-\frac{2}{3}\bm{I}\nabla\cdot\bm{u}\right)\end{equation}
+
+
+\begin{multline}
+\frac{\partial\rho{E}}{\partial{t}}+\nabla\cdot\left(\bm{u}\rho{E}\right)=-\nabla\cdot\left(p\bm{u}\right)+\nabla\cdot\left(\bm{\tau}\bm{u}\right)+\bm{u}\cdot\bm{f}\\
++\displaystyle\sum_{\alpha}\left\{\rho{D}_{\alpha}\nabla{Y}_{\alpha}\cdot\nabla{h}_{\alpha}+\rho{h}_{\alpha}\left[D_{\alpha}\nabla^{2}Y_{\alpha}+\nabla{D}_{\alpha}\cdot\nabla{Y}_{\alpha}+D_{\alpha}\nabla{Y}_{\alpha}\cdot\nabla\ln\rho\right]\right\}\\
+-\displaystyle\sum_{\alpha}\left\{\rho{Y}_{\alpha}h_{\alpha}\displaystyle\sum_{\beta}\left[D_{\beta}\nabla^{2}{Y}_{\beta}+\nabla{D}_{\beta}\cdot\nabla{Y}_{\beta}+D_{\beta}\nabla{Y}_{\beta}\cdot\nabla\ln\rho\right]\right\} - \rho\displaystyle\sum_{\alpha}\left\{\left[Y_{\alpha}\nabla{h}_{\alpha}+h_{\alpha}\nabla{Y}_{\alpha}\right]\cdot\displaystyle\sum_{\beta}D_{\beta}\nabla{Y}_{\beta}\right\}
+\end{multline}
+and
+\begin{multline}
+\frac{\partial{Y}_{\alpha}}{\partial{t}}+\bm{u}\cdot\nabla{Y}_{\alpha}=\frac{\dot\omega_{\alpha}}{\rho}
++D_{\alpha}\nabla^{2}{Y}_{\alpha}+\nabla{D}_{\alpha}\cdot\nabla{Y}_{\alpha}+D_{\alpha}\nabla{Y}_{\alpha}\cdot\nabla\ln\rho\\
+-Y_{\alpha}\displaystyle\sum_{\beta}\left[D_{\beta}\nabla^{2}{Y}_{\beta}+\nabla{D}_{\beta}\cdot\nabla{Y}_{\beta}+D_{\beta}\nabla{Y}_{\beta}\cdot\nabla\ln\rho\right]-\nabla{Y}_{\alpha}\cdot\displaystyle\sum_{\beta}D_{\beta}\nabla{Y}_{\beta}
+\end{multline}
+
 \bibliographystyle{elsarticle-num-names}
 \bibliography{sunset_refs}
 

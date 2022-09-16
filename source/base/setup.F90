@@ -43,7 +43,7 @@ contains
 
      !! Time begins at zero
      time = zero;itime=0
-     dt_out = 0.00005d0*Time_char         !! Frequency to output fields
+     dt_out = 0.0002d0*Time_char         !! Frequency to output fields
      time_end = 1.0d2*Time_char
   
      !! Particles per smoothing length and supportsize/h
@@ -904,11 +904,11 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 
      
      !! Re-evaluate density from T and read-from-file-Pressure
-     !$omp parallel do 
-     do i=1,npfb
-        lnro(i) = log(p(i)/(Rgas_mix(i)*T(i)))
-     end do
-     !$omp end parallel do
+!     !$omp parallel do 
+!     do i=1,npfb
+!        lnro(i) = log(p(i)/(Rgas_mix(i)*T(i)))
+!     end do
+!     !$omp end parallel do
      deallocate(Rgas_mix)     
                 
      !! Values on boundaries
