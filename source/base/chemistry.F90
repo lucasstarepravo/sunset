@@ -42,7 +42,6 @@ contains
            rhs_Yspec(i,1) = rhs_Yspec(i,1) - production_rate/tmpro
            rhs_Yspec(i,2) = rhs_Yspec(i,2) + production_rate/tmpro
 !        end do
-alpha_out(i) = production_rate
      end do
      !$omp end parallel do
      

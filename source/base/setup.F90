@@ -323,18 +323,20 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      use derivatives
      use thermodynamics
      !! Temporary subroutine whilst developing. Initialises all fields
-     integer(ikind) :: i,j,k,n_restart,ispec
+     integer(ikind) :: i,j,k,n_restart,ispec,iint
      real(rkind) :: x,y,z,tmp,tmpro
      character(70) :: fname
      
      
-     !! Allocate arrays for properties
+     !! Allocate arrays for properties - primary
      allocate(u(np),v(np),w(np),lnro(np),roE(np),divvel(np))
      allocate(Yspec(np,nspec))
      u=zero;v=zero;w=zero;lnro=zero;roE=one;Yspec=one;divvel=zero
+     !! Secondary
      allocate(alpha_out(np));alpha_out = zero
      allocate(T(np));T=T_ref
      allocate(p(np));p=zero
+     allocate(Tint_index(np));Tint_index = 1
      
      !! Allocate the boundary temperatures
      if(nb.ne.0) then
@@ -345,6 +347,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
  
 
 #ifndef restart     
+if(.false.)then  !! Hard-coded initial conditions
      !! Values within domain
      !$OMP PARALLEL DO PRIVATE(x,y,z,tmp,ispec)
      do i=1,npfb
@@ -354,15 +357,12 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         w(i) = zero!u(i);u(i)=zero
 !        tmp = -half*half*(cos(4.0d0*pi*x) + cos(4.0d0*pi*y))/csq  !! Modify for not(isoT)
         lnro(i) = log(rho_char)!log(rho_char + tmp)
-!if(x.le.zero) lnro(i) = log(1.2*rho_char)
-              
+!if(x.le.zero) lnro(i) = log(1.2*rho_char)             
 
         tmp = half*(one+erf(5.0d0*x))
-        T(i) = T_ref! + 500.0d0*tmp    
+        T(i) = T_ref    
         tmp = rho_char*T_ref/T(i)
-        lnro(i) = log(tmp)          
-                      
-              
+        lnro(i) = log(tmp)                                            
               
 #ifdef ms    
 !        do ispec=1,nspec      
@@ -372,8 +372,6 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 
 !        end do
 #endif         
-
-!        T(i) = T_ref
                     
      end do
      !$OMP END PARALLEL DO
@@ -397,13 +395,12 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
            end if
         end do
      end if
+endif
      
      !! Make a simple laminar flame?
 !     call make_1d_1step_flame
      call load_flame_file
      
-     !! Set energy from lnro,u,Y,T
-     call initialise_energy
 #else    
      !! RESTART OPTION. Ask for input number (just hard-coded for now...)
      n_restart = 2
@@ -450,11 +447,21 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
            T_bound(j) = T(i)
         end do
      end if
-     
-     !! Set energy from lnro,u,Y,T
-     call initialise_energy     
+      
      close(14)
 #endif
+      
+     !! Copy temperature to mirrors and halos
+     call reapply_mirror_bcs_T
+#ifdef mp
+     call halo_exchange_T         
+#endif      
+      
+     !! Set temperature index for all nodes
+     call set_temperature_index
+      
+     !! Set energy from lnro,u,Y,T
+     call initialise_energy         
    
      !! Mirrors and halos                        
      call reapply_mirror_bcs
@@ -480,6 +487,8 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      
      !! Initialise the time-stepping (necessary for PID controlled stepping)
      dt = 1.0d-8
+     
+         
          
      return
   end subroutine initial_solution   
@@ -692,7 +701,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
   end subroutine load_control_data
 !! ------------------------------------------------------------------------------------------------  
   subroutine load_chemistry_data
-     integer(ikind) :: ispec,iorder
+     integer(ikind) :: ispec,iorder,iint
      
      !! Load data from the thermochemistry control file
      open(unit=12,file='thermochem.in')
@@ -707,16 +716,28 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      nspec = 1  !! If not multispecies, nspec must be 1
 #endif          
 
-     !! Order of polynomial for cp(T)
+     !! Number of coefs and order of polynomial for cp(T)
      read(12,*)
      read(12,*) ncoefs_cp
      read(12,*)
      polyorder_cp = ncoefs_cp - 2
+     
+     !! Number of intervals
+     read(12,*)
+     read(12,*) Nints
+     read(12,*)
+     
+     !! Interval limits
+     allocate(Tint_low(Nints),Tint_high(Nints))
+     read(12,*)
+     do iint=1,Nints
+        read(12,*) Tint_low(iint),Tint_high(iint)
+     end do
+     read(12,*)
 
      !! Allocate space for molar mass, Lewis number, and polynomial fitting for cp(T)   
      allocate(molar_mass(nspec),Lewis_number(nspec))
-     allocate(coef_cp(nspec,ncoefs_cp))
-     allocate(T_low_cp(nspec),T_high_cp(nspec))
+     allocate(coef_cp(nspec,Nints,ncoefs_cp),coef_h(nspec,Nints,ncoefs_cp))
           
      !! Load molar mass, Lewis, and polynomial fits   
      read(12,*) !! Read comment line  
@@ -724,16 +745,23 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         read(12,*) !! Read species identifier comment line
         read(12,*) molar_mass(ispec)
         read(12,*) Lewis_number(ispec)
-        read(12,*) T_low_cp(ispec),T_high_cp(ispec)
-        
-        read(12,*)  !! Blank line
-        do iorder=1,ncoefs_cp
-           read(12,*) coef_cp(ispec,iorder)
+
+        do iint = 1,Nints        
+           read(12,*)  !! Comment line
+           do iorder=1,ncoefs_cp
+              read(12,*) coef_cp(ispec,iint,iorder)
+           end do
         end do
         read(12,*) !! Blank line                            
                            
         !! Convert cp coefficients from molar to mass based
-        coef_cp(ispec,:) = coef_cp(ispec,:)*Rgas_universal/molar_mass(ispec)
+        coef_cp(ispec,:,:) = coef_cp(ispec,:,:)*Rgas_universal/molar_mass(ispec)
+
+        !! Pre-divide coefs by iorder for h.
+        do iorder = 1,polyorder_cp + 1
+           coef_h(ispec,:,iorder) = coef_cp(ispec,:,iorder)/dble(iorder)
+        end do
+        coef_h(ispec,:,polyorder_cp+2) = coef_cp(ispec,:,polyorder_cp+2)
         
      end do     
 
@@ -810,7 +838,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         u(i) = u_reactants*rho_char/exp(lnro(i))
         v(i) = zero
         w(i) = zero
-                
+                        
      end do
      !$omp end parallel do
      
@@ -884,7 +912,8 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         Yspec(i,1) = flamein_Y(j)
         Yspec(i,2) = one - Yspec(i,1)    
         roE(i) = flamein_roE(j)   
-        p(i) = flamein_p(j)         
+        p(i) = flamein_p(j)   
+        
      end do
      !$omp end parallel do
      
@@ -899,8 +928,8 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      !$omp end parallel do
      
      !! Re-evaluate temperature from energy.  
-     call evaluate_mixture_gas_constant        
-     call evaluate_temperature
+!     call evaluate_mixture_gas_constant        
+!     call evaluate_temperature
 
      
      !! Re-evaluate density from T and read-from-file-Pressure
@@ -909,7 +938,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 !        lnro(i) = log(p(i)/(Rgas_mix(i)*T(i)))
 !     end do
 !     !$omp end parallel do
-     deallocate(Rgas_mix)     
+!     deallocate(Rgas_mix)     
                 
      !! Values on boundaries
      if(nb.ne.0)then

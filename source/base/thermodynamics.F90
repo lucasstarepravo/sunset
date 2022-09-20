@@ -38,38 +38,47 @@ contains
      !! Evaluate temperature, either as constant (isothermal), or analytically (assuming cp=const)
      !! or numerically (assuming cp=cp(T)).
      integer(ikind) :: i,ispec,iorder,NRiters,maxiters
-     real(rkind) :: tmp_kinetic,deltaT
-     real(rkind) :: T_coef_A,T_tmp,fT,dfT
-     real(rkind),dimension(:),allocatable :: T_coef_B
+     real(rkind) :: tmp_kinetic,deltaT,iint
+     real(rkind) :: fT_coef_C0,T_tmp,fT,dfT
+     real(rkind),dimension(:),allocatable :: fT_coef_C,dfT_coef_C
      real(rkind),parameter :: T_tolerance=1.0d-10
      integer(ikind),parameter :: NRiters_max=100
      logical :: keepgoing
 
 #ifndef isoT
      T(:)=zero
-     allocate(T_coef_B(polyorder_cp+1))
+     allocate(fT_coef_C(polyorder_cp+1),dfT_coef_C(polyorder_cp+1))
      
      !! Loop over all nodes
      maxiters = 0
-     !$omp parallel do private(T_coef_A,T_coef_B,ispec,iorder,T_tmp,NRiters,fT,dfT,deltaT) &
+     !$omp parallel do private(fT_coef_C0,fT_coef_C,ispec,iorder,T_tmp,NRiters,fT,dfT,deltaT,dfT_coef_C,iint) &
      !$omp reduction(max:maxiters)
      do i=1,np
+     
+       !! Initialise the interval index
+       iint = Tint_index(i)
+         
         !!Initialise coefficients:
-        T_coef_A = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i)) - roE(i)/exp(lnro(i))
-        T_coef_B(1) = -Rgas_mix(i)
-        T_coef_B(2:polyorder_cp+1) = zero
+        fT_coef_C0 = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i)) - roE(i)/exp(lnro(i))
+        fT_coef_C(1) = -Rgas_mix(i)
+        fT_coef_C(2:polyorder_cp+1) = zero
         
         !! Build coefficients
         do iorder = 1,polyorder_cp+1
            do ispec=1,nspec
-              T_coef_B(iorder) = T_coef_B(iorder) + Yspec(i,ispec)*coef_cp(ispec,iorder)/dble(iorder)    
+              fT_coef_C(iorder) = fT_coef_C(iorder) + Yspec(i,ispec)*coef_h(ispec,iint,iorder)
            end do       
         end do
         do ispec = 1,nspec
-           T_coef_A = T_coef_A + Yspec(i,ispec)*coef_cp(ispec,polyorder_cp+2)
+           fT_coef_C0 = fT_coef_C0 + Yspec(i,ispec)*coef_cp(ispec,iint,polyorder_cp+2)
         end do
         
-        !! Initial guess for T
+        !! Make coefficients for dfT
+        do iorder = 1,polyorder_cp+1
+           dfT_coef_C(iorder) = dble(iorder)*fT_coef_C(iorder)
+        end do
+        
+        !! Initial guess for T is current temperature..
         T_tmp = T(i)
         
         !! Newton-Raphson iterations
@@ -79,13 +88,13 @@ contains
            NRiters = NRiters + 1
         
            !! Evaluate f(T) and f'(T)
-           fT = T_coef_B(polyorder_cp+1)*T_tmp
-           dfT = dble(polyorder_cp+1)*T_coef_B(polyorder_cp+1)
+           fT = fT_coef_C(polyorder_cp+1)*T_tmp
+           dfT = dfT_coef_C(polyorder_cp+1)
            do iorder = polyorder_cp,1,-1
-              fT = (fT + T_coef_B(iorder))*T_tmp
-              dfT = dfT*T_tmp + T_coef_B(iorder)
+              fT = (fT + fT_coef_C(iorder))*T_tmp
+              dfT = dfT*T_tmp + dfT_coef_C(iorder)
            end do
-           fT = fT + T_coef_A
+           fT = fT + fT_coef_C0
         
 !if(iproc.eq.0.and.i.eq.100) then
 !     write(6,*) roE(i),NRiters,T_tmp,fT,dfT
@@ -106,34 +115,40 @@ contains
         
         !! Pass new T back to temperature array
         T(i) = T_tmp
-        
+                
         !! Find the maximum number of iterations over this processor
         maxiters = max(NRiters,maxiters)
      end do
      !$omp end parallel do
 #endif        
-
-!write(6,*) maxiters
+     deallocate(fT_coef_C,dfT_coef_C)
+     
+     !! Set the temperature index
+     call set_temperature_index
 
      return
   end subroutine evaluate_temperature
 !! ------------------------------------------------------------------------------------------------  
   subroutine evaluate_cp
      !! Evaluate the specific heat capacity for the mixture.
-     integer(ikind) :: i,ispec,iorder
+     integer(ikind) :: i,ispec,iorder,iint
      real(rkind) :: cp_tmp
 
 #ifndef isoT
      allocate(cp(np))
             
      !! Calculate  mixture cp
-     !$omp parallel do private(ispec,cp_tmp,iorder)
+     !$omp parallel do private(ispec,cp_tmp,iorder,iint)
      do i=1,np
+             
+        !! Initialise the temperature interval index
+        iint = Tint_index(i) 
+             
         cp(i) = zero
         do ispec=1,nspec
-           cp_tmp = coef_cp(ispec,polyorder_cp+1)
+           cp_tmp = coef_cp(ispec,iint,polyorder_cp+1)
            do iorder=polyorder_cp,1,-1
-              cp_tmp = cp_tmp*T(i) + coef_cp(ispec,iorder)
+              cp_tmp = cp_tmp*T(i) + coef_cp(ispec,iint,iorder)
            end do  
         
            cp(i) = cp(i) + Yspec(i,ispec)*cp_tmp
@@ -146,25 +161,25 @@ contains
      return
   end subroutine evaluate_cp
 !! ------------------------------------------------------------------------------------------------
-  subroutine evaluate_enthalpy_at_node(Temp,ispec,enthalpy)  
+  subroutine evaluate_enthalpy_at_node(Temp,iint,ispec,enthalpy)  
      !! Evaluate the enthalpy of species ispec based on temperature at one node: take in temperature
      !! and species flag, and return single value of enthalpy.
-     integer(ikind),intent(in) :: ispec
+     integer(ikind),intent(in) :: ispec,iint
      real(rkind),intent(in) :: Temp
      real(rkind),intent(out) :: enthalpy
      integer(ikind) :: iorder
      
      !! Enthalpy = polynomial(T).    
-     enthalpy = Temp*coef_cp(ispec,polyorder_cp+1)/dble(polyorder_cp+1)
+     enthalpy = Temp*coef_h(ispec,iint,polyorder_cp+1)
      do iorder=polyorder_cp,1,-1
-        enthalpy = Temp*(enthalpy + coef_cp(ispec,iorder)/dble(iorder) )
+        enthalpy = Temp*(enthalpy + coef_h(ispec,iint,iorder))
      end do
-     enthalpy = enthalpy + coef_cp(ispec,polyorder_cp+2)
+     enthalpy = enthalpy + coef_h(ispec,iint,polyorder_cp+2)
      
      !! Expensive form:
-!     enthalpy = coef_cp(ispec,polyorder_cp+2)
+!     enthalpy = coef_h(ispec,iint,polyorder_cp+2)
 !     do iorder=1,polyorder_cp+1
-!        enthalpy = enthalpy + (coef_cp(ispec,iorder)/dble(iorder))*Temp**dble(iorder)
+!        enthalpy = enthalpy + coef_h(ispec,iint,iorder)*Temp**dble(iorder)
 !     end do
                  
      return
@@ -254,21 +269,21 @@ contains
      return
   end subroutine evaluate_transport_properties
 !! ------------------------------------------------------------------------------------------------
-  subroutine evaluate_dcpdT_at_node(Temp,ispec,cpispec,dcpdT)
+  subroutine evaluate_dcpdT_at_node(Temp,iint,ispec,cpispec,dcpdT)
      !! Evaluate the rate of change of cp of species ispec given a temperature, and also the cp
      !! for that species, at a single node.
      real(rkind),intent(in) :: Temp
-     integer(ikind),intent(in) :: ispec
+     integer(ikind),intent(in) :: ispec,iint
      real(rkind),intent(out) :: dcpdT,cpispec
      integer(ikind) :: iorder
               
-     dcpdT = dble(polyorder_cp)*coef_cp(ispec,polyorder_cp+1)
-     cpispec = coef_cp(ispec,polyorder_cp+1)
+     dcpdT = dble(polyorder_cp)*coef_cp(ispec,iint,polyorder_cp+1)
+     cpispec = coef_cp(ispec,iint,polyorder_cp+1)
      do iorder=polyorder_cp,2,-1
-        dcpdT = dcpdT*Temp + dble(iorder-1)*coef_cp(ispec,iorder)
-        cpispec = cpispec*Temp + coef_cp(ispec,iorder)
+        dcpdT = dcpdT*Temp + dble(iorder-1)*coef_cp(ispec,iint,iorder)
+        cpispec = cpispec*Temp + coef_cp(ispec,iint,iorder)
      end do
-     cpispec = cpispec*Temp + coef_cp(ispec,1)
+     cpispec = cpispec*Temp + coef_cp(ispec,iint,1)
   
      return
   end subroutine evaluate_dcpdT_at_node
@@ -284,6 +299,42 @@ contains
 #endif      
   end function calc_sound_speed_at_node
 !! ------------------------------------------------------------------------------------------------
+  subroutine set_temperature_index
+     !! Set the temperature index (Tint_index) 
+     integer(ikind) :: i,iint
+     real(rkind) :: T_local
+     logical :: keepgoing
+     
+     !$omp parallel do private(T_local,keepgoing,iint)
+     do i=1,np
+        !! Local T
+        T_local = T(i)
+        
+        !! Loop up through intervals until we find the right one
+        keepgoing = .true.
+        iint = 1
+        if(T_local.lt.Tint_low(1)) write(6,*) "Warning, T below lower limit."
+        if(T_local.gt.Tint_high(Nints)) write(6,*) "Warning, T above upper limit."
+        
+        do while(keepgoing)
+           if(T_local.lt.Tint_high(iint)) then
+              keepgoing = .false.
+              Tint_index(i) = iint
+           else
+              if(iint.lt.Nints) then
+                 iint = iint + 1
+              end if
+           end if
+        
+        end do
+        
+alpha_out(i) = dble(Tint_index(i))                           
+     end do
+     !$omp end parallel do
+  
+     return
+  end subroutine set_temperature_index
+!! ------------------------------------------------------------------------------------------------
   subroutine initialise_energy
      !! Evaluate roE based on u,lnro,T, over the whole domain. 
      !! This routine is only called at start-up, and it is because loading temperature is a more
@@ -291,13 +342,17 @@ contains
      
      !! Additionally calculate the pressure on outflow boundary nodes, and set P_outflow to the
      !! average of this (it should be uniform along bound)
-     integer(ikind) :: i,ispec,j,nsum
+     integer(ikind) :: i,ispec,j,nsum,iint
      real(rkind) :: enthalpy,Rgas_mix_local,p_local,psum,tmpro
      
 #ifndef isoT     
      !! Evaluate the energy (roE) and pressure.
-     !$omp parallel do private(ispec,enthalpy,Rgas_mix_local,tmpro)
+     !$omp parallel do private(ispec,enthalpy,Rgas_mix_local,tmpro,iint)
      do i=1,npfb
+     
+        !! Initialise the temperature interval index
+        iint = Tint_index(i)
+     
         !! Initialise roE with K.E. term
         roE(i) = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))
         
@@ -308,7 +363,7 @@ contains
         Rgas_mix_local = zero
         do ispec=1,nspec       
            !! Evaluate local species enthalpy
-           call evaluate_enthalpy_at_node(T(i),ispec,enthalpy)
+           call evaluate_enthalpy_at_node(T(i),iint,ispec,enthalpy)
            
            !! Add species enthalpy contribution
            roE(i) = roE(i) + Yspec(i,ispec)*enthalpy

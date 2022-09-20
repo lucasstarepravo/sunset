@@ -157,10 +157,18 @@ contains
     Lchar(5) = Lchar(1)
     Lchar(3) = zero        
     Lchar(4) = zero
-    Lchar(2) = gammagasm1*(Lchar(1)+Lchar(5))/c/c &
-             - gammagasm1*tmpro*gradv(2) &   !! trans 1 term
-             - gammagasm1*tmpro*gradw(3)     !! Trans 2 term 
-                 ! + dT/dy term?
+    
+    !! Fixed temperature option       
+!    Lchar(2) = gammagasm1*(Lchar(1)+Lchar(5))/c/c &
+!             - gammagasm1*tmpro*gradv(2) &   !! trans 1 term
+!             - gammagasm1*tmpro*gradw(3)     !! Trans 2 term 
+             !+dT/dy term?
+             
+    !! Fixed density (and hence mass flux) option             
+    Lchar(2) = -Lchar(1)/c/c &
+               -tmpro*v(i)*gradlnro(2) - tmpro*gradv(2) &  !! trans 1 term
+               -tmpro*w(i)*gradlnro(3) - tmpro*gradw(3)    !! trans 2 term
+
 #ifdef ms
     Lchar(5+1:5+nspec) = zero                                  
 #endif    

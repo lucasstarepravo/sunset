@@ -24,7 +24,8 @@ module mirror_boundaries
   !! 999 = regular fluid
   !! 1000 = mirror/ghost 
 
-  public :: create_mirror_particles,reapply_mirror_bcs,reapply_mirror_bcs_divvel_only
+  public :: create_mirror_particles,reapply_mirror_bcs,reapply_mirror_bcs_divvel_only &
+            ,reapply_mirror_bcs_T
 contains
 !! ------------------------------------------------------------------------------------------------  
   subroutine create_mirror_particles
@@ -283,6 +284,7 @@ contains
   end subroutine reapply_mirror_bcs
 !! ------------------------------------------------------------------------------------------------ 
   subroutine reapply_mirror_bcs_divvel_only
+     !! Just copy divvel to mirrors
      use omp_lib
      integer(ikind) :: i,j
      
@@ -305,5 +307,30 @@ contains
      segment_time_local(2) = segment_time_local(2) + segment_tend - segment_tstart
      return
   end subroutine reapply_mirror_bcs_divvel_only
+!! ------------------------------------------------------------------------------------------------ 
+  subroutine reapply_mirror_bcs_T
+     !! Just copy T to mirrors
+     use omp_lib
+     integer(ikind) :: i,j
+     
+     segment_tstart = omp_get_wtime()
+     
+     !! Update properties in the boundary particles
+     !$OMP PARALLEL DO PRIVATE(i)
+#ifdef mp
+     do j=npfb+1,np_nohalo
+#else
+     do j=npfb+1,np
+#endif
+        i = irelation(j)
+        T(j)=T(i)
+     end do
+     !$OMP END PARALLEL DO     
+
+     !! Profiling
+     segment_tend = omp_get_wtime()
+     segment_time_local(2) = segment_time_local(2) + segment_tend - segment_tstart
+     return
+  end subroutine reapply_mirror_bcs_T
 !! ------------------------------------------------------------------------------------------------ 
 end module mirror_boundaries
