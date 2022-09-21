@@ -131,7 +131,7 @@ subroutine deallocate_everything
   end if
   
   !! Transport properties
-  deallocate(molar_mass,Lewis_number)
+  deallocate(molar_mass,one_over_Lewis_number)
   
   
   return

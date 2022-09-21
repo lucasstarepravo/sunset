@@ -385,9 +385,7 @@ contains
      !! Store the last time-step in dt_previous in case we're using PID controller later
      dt_previous = dt
      
-     call evaluate_mixture_gas_constant
-     call evaluate_temperature
-     call evaluate_cp
+     call evaluate_temperature_and_pressure
      call evaluate_transport_properties   
      
      !! Find minimum values for cfl, visc, thermal, and molecular diffusive steps

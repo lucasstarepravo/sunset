@@ -323,7 +323,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      use derivatives
      use thermodynamics
      !! Temporary subroutine whilst developing. Initialises all fields
-     integer(ikind) :: i,j,k,n_restart,ispec,iint
+     integer(ikind) :: i,j,k,n_restart,ispec
      real(rkind) :: x,y,z,tmp,tmpro
      character(70) :: fname
      
@@ -336,7 +336,6 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      allocate(alpha_out(np));alpha_out = zero
      allocate(T(np));T=T_ref
      allocate(p(np));p=zero
-     allocate(Tint_index(np));Tint_index = 1
      
      !! Allocate the boundary temperatures
      if(nb.ne.0) then
@@ -450,16 +449,7 @@ endif
       
      close(14)
 #endif
-      
-     !! Copy temperature to mirrors and halos
-     call reapply_mirror_bcs_T
-#ifdef mp
-     call halo_exchange_T         
-#endif      
-      
-     !! Set temperature index for all nodes
-     call set_temperature_index
-      
+            
      !! Set energy from lnro,u,Y,T
      call initialise_energy         
    
@@ -701,7 +691,7 @@ endif
   end subroutine load_control_data
 !! ------------------------------------------------------------------------------------------------  
   subroutine load_chemistry_data
-     integer(ikind) :: ispec,iorder,iint
+     integer(ikind) :: ispec,iorder
      
      !! Load data from the thermochemistry control file
      open(unit=12,file='thermochem.in')
@@ -720,48 +710,40 @@ endif
      read(12,*)
      read(12,*) ncoefs_cp
      read(12,*)
-     polyorder_cp = ncoefs_cp - 2
+     !! ncoefs = (polyorder + 1) + 1 + 1: terms in polynomial,coef for h, coef for s
+     polyorder_cp = ncoefs_cp - 3
      
-     !! Number of intervals
+     !! Temperature limits
      read(12,*)
-     read(12,*) Nints
-     read(12,*)
-     
-     !! Interval limits
-     allocate(Tint_low(Nints),Tint_high(Nints))
-     read(12,*)
-     do iint=1,Nints
-        read(12,*) Tint_low(iint),Tint_high(iint)
-     end do
+     read(12,*) T_low,T_high
      read(12,*)
 
      !! Allocate space for molar mass, Lewis number, and polynomial fitting for cp(T)   
-     allocate(molar_mass(nspec),Lewis_number(nspec))
-     allocate(coef_cp(nspec,Nints,ncoefs_cp),coef_h(nspec,Nints,ncoefs_cp))
+     allocate(molar_mass(nspec),one_over_Lewis_number(nspec))
+     allocate(coef_cp(nspec,ncoefs_cp),coef_h(nspec,ncoefs_cp))
           
      !! Load molar mass, Lewis, and polynomial fits   
      read(12,*) !! Read comment line  
      do ispec = 1,nspec
         read(12,*) !! Read species identifier comment line
         read(12,*) molar_mass(ispec)
-        read(12,*) Lewis_number(ispec)
+        read(12,*) one_over_Lewis_number(ispec)
+        one_over_Lewis_number(ispec) = one/one_over_Lewis_number(ispec)
 
-        do iint = 1,Nints        
-           read(12,*)  !! Comment line
-           do iorder=1,ncoefs_cp
-              read(12,*) coef_cp(ispec,iint,iorder)
-           end do
+        read(12,*)  !! Comment line
+        do iorder=1,ncoefs_cp
+           read(12,*) coef_cp(ispec,iorder)
         end do
         read(12,*) !! Blank line                            
                            
         !! Convert cp coefficients from molar to mass based
-        coef_cp(ispec,:,:) = coef_cp(ispec,:,:)*Rgas_universal/molar_mass(ispec)
+        coef_cp(ispec,:) = coef_cp(ispec,:)*Rgas_universal/molar_mass(ispec)
 
         !! Pre-divide coefs by iorder for h.
         do iorder = 1,polyorder_cp + 1
-           coef_h(ispec,:,iorder) = coef_cp(ispec,:,iorder)/dble(iorder)
+           coef_h(ispec,iorder) = coef_cp(ispec,iorder)/dble(iorder)
         end do
-        coef_h(ispec,:,polyorder_cp+2) = coef_cp(ispec,:,polyorder_cp+2)
+        coef_h(ispec,polyorder_cp+2) = coef_cp(ispec,polyorder_cp+2)
         
      end do     
 
@@ -928,8 +910,7 @@ endif
      !$omp end parallel do
      
      !! Re-evaluate temperature from energy.  
-!     call evaluate_mixture_gas_constant        
-!     call evaluate_temperature
+     call evaluate_temperature_and_pressure
 
      
      !! Re-evaluate density from T and read-from-file-Pressure
@@ -938,7 +919,7 @@ endif
 !        lnro(i) = log(p(i)/(Rgas_mix(i)*T(i)))
 !     end do
 !     !$omp end parallel do
-!     deallocate(Rgas_mix)     
+     deallocate(Rgas_mix,cp)     
                 
      !! Values on boundaries
      if(nb.ne.0)then

@@ -32,11 +32,10 @@ module common_vars
   real(rkind), dimension(:,:), allocatable :: Mdiff
   
   !! Transport properties - arrays covering the species
-  real(rkind), dimension(:), allocatable :: molar_mass,Lewis_number
-  real(rkind), dimension(:,:,:),allocatable :: coef_cp,coef_h !! indexing: ispec,interval,j-exponent
-  integer(ikind) :: polyorder_cp,ncoefs_cp,Nints  !! polynomial order,number of coefs,number of intervals
-  real(rkind), dimension(:),allocatable :: Tint_low,Tint_high
-  integer(ikind), dimension(:),allocatable :: Tint_index
+  real(rkind), dimension(:), allocatable :: molar_mass,one_over_Lewis_number
+  real(rkind), dimension(:,:),allocatable :: coef_cp,coef_h !! indexing: ispec,j-exponent
+  integer(ikind) :: polyorder_cp,ncoefs_cp  !! polynomial order,number of coefs
+  real(rkind) :: T_low,T_high
   
   !! Chemical kinetics control data
   integer(ikind) :: nsteps

@@ -24,8 +24,8 @@ module thermodynamics
   !!                     and thermal conductivity may be non-uniform, as they are functions of 
   !!                     composition and density.
   
-  !! Evaluation of and direct reference to CHEMKIN polynomials should only happen within the routines
-  !! in this module.
+  !! Evaluation of and direct reference to CHEMKIN polynomials (i.e. use of coef_cp,coef_h) should 
+  !! only happen within the routines in this module.
   use kind_parameters
   use common_parameter
   use common_vars
@@ -34,43 +34,54 @@ module thermodynamics
 
 contains
 !! ------------------------------------------------------------------------------------------------
-  subroutine evaluate_temperature
-     !! Evaluate temperature, either as constant (isothermal), or analytically (assuming cp=const)
-     !! or numerically (assuming cp=cp(T)).
-     integer(ikind) :: i,ispec,iorder,NRiters,maxiters
-     real(rkind) :: tmp_kinetic,deltaT,iint
+  subroutine evaluate_temperature_and_pressure
+     !! Evaluate temperature numerically with cp = polynomial(T), and the pressure from P=ro*R*T
+     !! Also evaluate the mixture gas constant, and the mixture specific heat capacity
+     integer(ikind) :: i,ispec,iorder,NRiters,maxiters,sumiters
+     real(rkind) :: tmp_kinetic,deltaT,cp_tmp,tmpro
      real(rkind) :: fT_coef_C0,T_tmp,fT,dfT
      real(rkind),dimension(:),allocatable :: fT_coef_C,dfT_coef_C
      real(rkind),parameter :: T_tolerance=1.0d-10
      integer(ikind),parameter :: NRiters_max=100
      logical :: keepgoing
 
+   
+
 #ifndef isoT
-     T(:)=zero
      allocate(fT_coef_C(polyorder_cp+1),dfT_coef_C(polyorder_cp+1))
+     allocate(Rgas_mix(np))
+     allocate(cp(np))
      
      !! Loop over all nodes
-     maxiters = 0
-     !$omp parallel do private(fT_coef_C0,fT_coef_C,ispec,iorder,T_tmp,NRiters,fT,dfT,deltaT,dfT_coef_C,iint) &
-     !$omp reduction(max:maxiters)
+     maxiters = 0;sumiters=0
+     !$omp parallel do private(fT_coef_C0,fT_coef_C,ispec,iorder,T_tmp,NRiters,fT,dfT,deltaT,dfT_coef_C, &
+     !$omp cp_tmp,tmpro) &
+     !$omp reduction(max:maxiters) reduction(+:sumiters)
      do i=1,np
      
-       !! Initialise the interval index
-       iint = Tint_index(i)
+        !! Evaluate the gas constant for the mixture
+        Rgas_mix(i) = zero
+        do ispec = 1,nspec
+           Rgas_mix(i) = Rgas_mix(i) + Yspec(i,ispec)/molar_mass(ispec)
+        end do
+        Rgas_mix(i) = Rgas_mix(i)*Rgas_universal     
+          
+        !! Density from its logarithm  
+        tmpro = exp(lnro(i)) 
          
         !!Initialise coefficients:
-        fT_coef_C0 = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i)) - roE(i)/exp(lnro(i))
+        fT_coef_C0 = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i)) - roE(i)/tmpro
         fT_coef_C(1) = -Rgas_mix(i)
         fT_coef_C(2:polyorder_cp+1) = zero
         
         !! Build coefficients
         do iorder = 1,polyorder_cp+1
            do ispec=1,nspec
-              fT_coef_C(iorder) = fT_coef_C(iorder) + Yspec(i,ispec)*coef_h(ispec,iint,iorder)
+              fT_coef_C(iorder) = fT_coef_C(iorder) + Yspec(i,ispec)*coef_h(ispec,iorder)
            end do       
         end do
         do ispec = 1,nspec
-           fT_coef_C0 = fT_coef_C0 + Yspec(i,ispec)*coef_cp(ispec,iint,polyorder_cp+2)
+           fT_coef_C0 = fT_coef_C0 + Yspec(i,ispec)*coef_cp(ispec,polyorder_cp+2)
         end do
         
         !! Make coefficients for dfT
@@ -116,121 +127,69 @@ contains
         !! Pass new T back to temperature array
         T(i) = T_tmp
                 
-        !! Find the maximum number of iterations over this processor
+        !! Find the maximum number of iterations over this processor and sum of iterations
         maxiters = max(NRiters,maxiters)
-     end do
-     !$omp end parallel do
-#endif        
-     deallocate(fT_coef_C,dfT_coef_C)
-     
-     !! Set the temperature index
-     call set_temperature_index
-
-     return
-  end subroutine evaluate_temperature
-!! ------------------------------------------------------------------------------------------------  
-  subroutine evaluate_cp
-     !! Evaluate the specific heat capacity for the mixture.
-     integer(ikind) :: i,ispec,iorder,iint
-     real(rkind) :: cp_tmp
-
-#ifndef isoT
-     allocate(cp(np))
-            
-     !! Calculate  mixture cp
-     !$omp parallel do private(ispec,cp_tmp,iorder,iint)
-     do i=1,np
-             
-        !! Initialise the temperature interval index
-        iint = Tint_index(i) 
-             
+        sumiters = sumiters + NRiters
+        
+        !! Evaluate the specific heat capacity of the mixture
         cp(i) = zero
         do ispec=1,nspec
-           cp_tmp = coef_cp(ispec,iint,polyorder_cp+1)
+           cp_tmp = coef_cp(ispec,polyorder_cp+1)
            do iorder=polyorder_cp,1,-1
-              cp_tmp = cp_tmp*T(i) + coef_cp(ispec,iint,iorder)
+              cp_tmp = cp_tmp*T(i) + coef_cp(ispec,iorder)
            end do  
+           cp(i) = cp(i) + Yspec(i,ispec)*cp_tmp          
+        end do      
+
+        !! Evaluate the pressure        
+        p(i) = tmpro*Rgas_mix(i)*T(i)
+          
         
-           cp(i) = cp(i) + Yspec(i,ispec)*cp_tmp
-           
-        end do
      end do
      !$omp end parallel do
-#endif        
+
+!write(6,*) "Newton Raphson max and mean iters",maxiters,sumiters/dble(np)   
+     deallocate(fT_coef_C,dfT_coef_C)
+#else
+     !! Isothermal, set constant T, and p proportional to density
+     T(:) = zero
+     !$omp parallel do private(tmpro)
+     do i=1,np    !! N.B. this is over ALL nodes.
+        tmpro = exp(lnro(i))
+        p(i) = csq*tmpro
+     end do
+     !$omp end parallel do      
+     
+#endif     
+          
 
      return
-  end subroutine evaluate_cp
+  end subroutine evaluate_temperature_and_pressure
 !! ------------------------------------------------------------------------------------------------
-  subroutine evaluate_enthalpy_at_node(Temp,iint,ispec,enthalpy)  
+  subroutine evaluate_enthalpy_at_node(Temp,ispec,enthalpy)  
      !! Evaluate the enthalpy of species ispec based on temperature at one node: take in temperature
      !! and species flag, and return single value of enthalpy.
-     integer(ikind),intent(in) :: ispec,iint
+     integer(ikind),intent(in) :: ispec
      real(rkind),intent(in) :: Temp
      real(rkind),intent(out) :: enthalpy
      integer(ikind) :: iorder
      
      !! Enthalpy = polynomial(T).    
-     enthalpy = Temp*coef_h(ispec,iint,polyorder_cp+1)
+     enthalpy = Temp*coef_h(ispec,polyorder_cp+1)
      do iorder=polyorder_cp,1,-1
-        enthalpy = Temp*(enthalpy + coef_h(ispec,iint,iorder))
+        enthalpy = Temp*(enthalpy + coef_h(ispec,iorder))
      end do
-     enthalpy = enthalpy + coef_h(ispec,iint,polyorder_cp+2)
+     enthalpy = enthalpy + coef_h(ispec,polyorder_cp+2)
      
      !! Expensive form:
-!     enthalpy = coef_h(ispec,iint,polyorder_cp+2)
+!     enthalpy = coef_h(ispec,polyorder_cp+2)
 !     do iorder=1,polyorder_cp+1
-!        enthalpy = enthalpy + coef_h(ispec,iint,iorder)*Temp**dble(iorder)
+!        enthalpy = enthalpy + coef_h(ispec,iorder)*Temp**dble(iorder)
 !     end do
                  
      return
   end subroutine evaluate_enthalpy_at_node
 !! ------------------------------------------------------------------------------------------------
-  subroutine evaluate_pressure
-     !! Evaluate the pressure over the whole domain. If isoT, then based on sound speed and 
-     !! density. If thermal, then based on R=ro*R*T.
-     integer(ikind) :: i
-     real(rkind) :: tmp_kinetic,tmpro
-     
-#ifdef isoT    
-     !! Isothermal, calculate pressure from density
-     !$omp parallel do private(tmpro)
-     do i=1,np    !! N.B. this is over ALL particles incl. ghosts
-        tmpro = exp(lnro(i))
-        p(i) = csq*tmpro
-     end do
-     !$omp end parallel do      
-#else
-     !! semi-perfect gas - evaluate from ro,T (and indirectly Y, as Rgas_mix is function of Y)
-     !$omp parallel do private(tmp_kinetic,tmpro)
-     do i=1,np         !! N.B. this is over ALL particles incl. ghosts
-        tmpro = exp(lnro(i))
-        p(i) = tmpro*Rgas_mix(i)*T(i)
-     end do
-     !$omp end parallel do  
-#endif     
-
-  end subroutine evaluate_pressure
-!! ------------------------------------------------------------------------------------------------
-  subroutine evaluate_mixture_gas_constant
-     !! Evaluate the mixture gas constant based on the composition and molar mass of each species.
-     !! For isothermal flows, do nothing.
-     integer(ikind) :: i,ispec
-#ifndef isoT  
-     allocate(Rgas_mix(np))
-     
-     !$omp parallel do private(ispec)
-     do i=1,np
-        Rgas_mix(i) = zero
-        do ispec = 1,nspec
-           Rgas_mix(i) = Rgas_mix(i) + Yspec(i,ispec)/molar_mass(ispec)
-        end do
-        Rgas_mix(i) = Rgas_mix(i)*Rgas_universal
-     end do
-     !$omp end parallel do    
-#endif    
-     return
-  end subroutine evaluate_mixture_gas_constant
-!! ------------------------------------------------------------------------------------------------  
   subroutine evaluate_transport_properties
      !! Uses temperature, cp and density to evaluate thermal conductivity, viscosity and 
      !! molecular diffusivity. For isothermal flows, or if not(tdtp), use reference values.
@@ -254,9 +213,9 @@ contains
         lambda_th(i) = cp(i)*visc(i)/Pr
        
         !! Molecular diffusivity
-        tmp = lambda_th(i)/(exp(lnro(i))*cp(i))
+        tmp = visc(i)/(exp(lnro(i))*Pr)
         do ispec=1,nspec
-           Mdiff(i,ispec) = tmp/Lewis_number(ispec)
+           Mdiff(i,ispec) = tmp*one_over_Lewis_number(ispec)
         end do        
    
      end do
@@ -269,21 +228,21 @@ contains
      return
   end subroutine evaluate_transport_properties
 !! ------------------------------------------------------------------------------------------------
-  subroutine evaluate_dcpdT_at_node(Temp,iint,ispec,cpispec,dcpdT)
+  subroutine evaluate_dcpdT_at_node(Temp,ispec,cpispec,dcpdT)
      !! Evaluate the rate of change of cp of species ispec given a temperature, and also the cp
      !! for that species, at a single node.
      real(rkind),intent(in) :: Temp
-     integer(ikind),intent(in) :: ispec,iint
+     integer(ikind),intent(in) :: ispec
      real(rkind),intent(out) :: dcpdT,cpispec
      integer(ikind) :: iorder
               
-     dcpdT = dble(polyorder_cp)*coef_cp(ispec,iint,polyorder_cp+1)
-     cpispec = coef_cp(ispec,iint,polyorder_cp+1)
+     dcpdT = dble(polyorder_cp)*coef_cp(ispec,polyorder_cp+1)
+     cpispec = coef_cp(ispec,polyorder_cp+1)
      do iorder=polyorder_cp,2,-1
-        dcpdT = dcpdT*Temp + dble(iorder-1)*coef_cp(ispec,iint,iorder)
-        cpispec = cpispec*Temp + coef_cp(ispec,iint,iorder)
+        dcpdT = dcpdT*Temp + dble(iorder-1)*coef_cp(ispec,iorder)
+        cpispec = cpispec*Temp + coef_cp(ispec,iorder)
      end do
-     cpispec = cpispec*Temp + coef_cp(ispec,iint,1)
+     cpispec = cpispec*Temp + coef_cp(ispec,1)
   
      return
   end subroutine evaluate_dcpdT_at_node
@@ -299,42 +258,6 @@ contains
 #endif      
   end function calc_sound_speed_at_node
 !! ------------------------------------------------------------------------------------------------
-  subroutine set_temperature_index
-     !! Set the temperature index (Tint_index) 
-     integer(ikind) :: i,iint
-     real(rkind) :: T_local
-     logical :: keepgoing
-     
-     !$omp parallel do private(T_local,keepgoing,iint)
-     do i=1,np
-        !! Local T
-        T_local = T(i)
-        
-        !! Loop up through intervals until we find the right one
-        keepgoing = .true.
-        iint = 1
-        if(T_local.lt.Tint_low(1)) write(6,*) "Warning, T below lower limit."
-        if(T_local.gt.Tint_high(Nints)) write(6,*) "Warning, T above upper limit."
-        
-        do while(keepgoing)
-           if(T_local.lt.Tint_high(iint)) then
-              keepgoing = .false.
-              Tint_index(i) = iint
-           else
-              if(iint.lt.Nints) then
-                 iint = iint + 1
-              end if
-           end if
-        
-        end do
-        
-alpha_out(i) = dble(Tint_index(i))                           
-     end do
-     !$omp end parallel do
-  
-     return
-  end subroutine set_temperature_index
-!! ------------------------------------------------------------------------------------------------
   subroutine initialise_energy
      !! Evaluate roE based on u,lnro,T, over the whole domain. 
      !! This routine is only called at start-up, and it is because loading temperature is a more
@@ -342,17 +265,14 @@ alpha_out(i) = dble(Tint_index(i))
      
      !! Additionally calculate the pressure on outflow boundary nodes, and set P_outflow to the
      !! average of this (it should be uniform along bound)
-     integer(ikind) :: i,ispec,j,nsum,iint
+     integer(ikind) :: i,ispec,j,nsum
      real(rkind) :: enthalpy,Rgas_mix_local,p_local,psum,tmpro
      
 #ifndef isoT     
      !! Evaluate the energy (roE) and pressure.
-     !$omp parallel do private(ispec,enthalpy,Rgas_mix_local,tmpro,iint)
+     !$omp parallel do private(ispec,enthalpy,Rgas_mix_local,tmpro)
      do i=1,npfb
-     
-        !! Initialise the temperature interval index
-        iint = Tint_index(i)
-     
+          
         !! Initialise roE with K.E. term
         roE(i) = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))
         
@@ -363,7 +283,7 @@ alpha_out(i) = dble(Tint_index(i))
         Rgas_mix_local = zero
         do ispec=1,nspec       
            !! Evaluate local species enthalpy
-           call evaluate_enthalpy_at_node(T(i),iint,ispec,enthalpy)
+           call evaluate_enthalpy_at_node(T(i),ispec,enthalpy)
            
            !! Add species enthalpy contribution
            roE(i) = roE(i) + Yspec(i,ispec)*enthalpy
