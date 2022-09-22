@@ -33,7 +33,7 @@ module common_vars
   
   !! Transport properties - arrays covering the species
   real(rkind), dimension(:), allocatable :: molar_mass,one_over_Lewis_number
-  real(rkind), dimension(:,:),allocatable :: coef_cp,coef_h !! indexing: ispec,j-exponent
+  real(rkind), dimension(:,:),allocatable :: coef_cp,coef_h,coef_dcpdT !! indexing: ispec,j-exponent
   integer(ikind) :: polyorder_cp,ncoefs_cp  !! polynomial order,number of coefs
   real(rkind) :: T_low,T_high
   

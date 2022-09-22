@@ -395,7 +395,7 @@ contains
      !$omp reduction(max:cmax,umax)
      do i=1,npfb
         !! Sound speed 
-        c = calc_sound_speed_at_node(cp(i),Rgas_mix(i),T(i))    
+        c = evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i))    
  
         !! Max velocity and sound speed
         umax = sqrt(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))

@@ -110,7 +110,25 @@ where $Le_{\alpha}$ is the Lewis number for species $\alpha$, which is assumed c
 
 \subsection{Evaluation of reaction rates}
 
-TBC.
+The reaction mechanism is given by $M$ equations written in the form
+\begin{equation}\displaystyle\sum_{\alpha}\nu_{\alpha,m}^{\prime}\mathcal{M}_{\alpha}\rightarrow\displaystyle\sum_{\alpha}\nu_{\alpha,m}^{\prime\prime}\mathcal{M}_{\alpha}\qquad\forall{m}\in\left[1,M\right],\end{equation}
+where $\mathcal{M}_{\alpha}$ symbolises the chemical symbol of species $\alpha$, and 
+$\nu_{\alpha,m}^{\prime}$ and $\nu_{\alpha,m}^{\prime\prime}$ are the molar stoichiometric coefficients of species $\alpha$ in equation $m$.
+
+The reaction rate of species $\alpha$ is given by
+\begin{equation}\omega_{\alpha}=W_{\alpha}\displaystyle\sum_{m=1}^{M}\hat{\omega}_{\alpha,m}\end{equation}
+where $\hat{\omega}_{\alpha,m}$ is the molar production rate of species $\alpha$ due to the $m$-th reaction, and $M$ is the total number of reactions. The molar production rates are given by
+\begin{equation}\hat{\omega}_{\alpha,m}=\left(\nu^{\prime\prime}_{\alpha,m}-\nu^{\prime}_{\alpha,m}\right)\left[k_{f,m}\left(T\right)\displaystyle\prod_{\beta=1}^{N_{S}}\left(\frac{\rho{Y}_{\beta}}{W_{\beta}}\right)^{\nu^{\prime}_{\beta,m}}-k_{b,m}\left(T\right)\displaystyle\prod_{\beta=1}^{N_{S}}\left(\frac{\rho{Y}_{\beta}}{W_{\beta}}\right)^{\nu^{\prime\prime}_{\beta,m}}\right],\end{equation}
+in which $k_{f,m}$ and $k_{b,m}$ are the forward and backward (respectively) rate constants for reaction $m$. The forward rate constant is given by the Arrhenius expression
+\begin{equation}k_{f,m}\left(T\right)=A_{m}T^{n_{m}}\exp\left(\frac{E_{a,m}}{R_{0}T}\right),\end{equation}
+with $A_{m}$, $n_{m}$ and $E_{a,m}$ being specified constants representing the pre-exponential factor, the temperature dependence of the pre-exponential factor, and the activation energy.
+
+\subsubsection{Backwards rate constant}
+
+The backwards rate constant is related to the forward rate constant via
+\begin{equation}\ln{k}_{b,m}=\ln{k}_{f,m} + \displaystyle\sum_{\alpha}\left(\nu^{\prime\prime}_{\alpha,m}-\nu^{\prime}_{\alpha,m}\right)\left(\frac{\hat{g}_{\alpha}}{R_{0}T}+\ln\left(\frac{P_{0}}{R_{0}}\right)-\ln{T}\right),\end{equation}
+in which $P_{0}$ is a reference pressure, and $\hat{g}_{\alpha}$ is the Gibbs function for species $\alpha$, which is given by
+\begin{equation}\frac{\hat{g}_{\alpha}}{W_{\alpha}T}=\frac{a_{\alpha,J+1}}{T}-a_{\alpha,1}\ln{T}+\left(a_{\alpha,1}-a_{\alpha,J+2}\right)-\displaystyle\sum_{j=2}^{J}\frac{a_{\alpha,j}}{j\left(j-1\right)}T^{j-1}.\end{equation}
 
 
 \section{Numerical implementation}

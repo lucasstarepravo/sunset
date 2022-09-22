@@ -21,10 +21,6 @@ module setup
 #endif    
   implicit none
   
-  real(rkind),dimension(:,:),allocatable :: rndshift_x,rndshift_y 
-  real(ikind) :: n_wvnmbrs
-  real(rkind) :: wn_max,wn_min  
-
 contains
 !! ------------------------------------------------------------------------------------------------
   subroutine initial_setup       
@@ -43,7 +39,7 @@ contains
 
      !! Time begins at zero
      time = zero;itime=0
-     dt_out = 0.0002d0*Time_char         !! Frequency to output fields
+     dt_out = 0.001d0*Time_char         !! Frequency to output fields
      time_end = 1.0d2*Time_char
   
      !! Particles per smoothing length and supportsize/h
@@ -323,9 +319,8 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      use derivatives
      use thermodynamics
      !! Temporary subroutine whilst developing. Initialises all fields
-     integer(ikind) :: i,j,k,n_restart,ispec
+     integer(ikind) :: i,j,k,ispec
      real(rkind) :: x,y,z,tmp,tmpro
-     character(70) :: fname
      
      
      !! Allocate arrays for properties - primary
@@ -342,113 +337,20 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         allocate(T_bound(nb));T_bound = T_ref                 
      end if
      
-     call initialise_grf
- 
-
+     !! =======================================================================
+     !! Choose initial conditions
 #ifndef restart     
-if(.false.)then  !! Hard-coded initial conditions
-     !! Values within domain
-     !$OMP PARALLEL DO PRIVATE(x,y,z,tmp,ispec)
-     do i=1,npfb
-        x = rp(i,1);y=rp(i,2);z=rp(i,3)
-        u(i) = u_char!-cos(two*pi*x)*sin(two*pi*y)!*cos(two*pi*z/Lz)!*oosqrt2
-        v(i) = zero!sin(two*pi*x)*cos(two*pi*y)!*cos(two*pi*z/Lz)    !!c c
-        w(i) = zero!u(i);u(i)=zero
-!        tmp = -half*half*(cos(4.0d0*pi*x) + cos(4.0d0*pi*y))/csq  !! Modify for not(isoT)
-        lnro(i) = log(rho_char)!log(rho_char + tmp)
-!if(x.le.zero) lnro(i) = log(1.2*rho_char)             
-
-        tmp = half*(one+erf(5.0d0*x))
-        T(i) = T_ref    
-        tmp = rho_char*T_ref/T(i)
-        lnro(i) = log(tmp)                                            
-              
-#ifdef ms    
-!        do ispec=1,nspec      
-           tmp = one - half*(one + erf(5.0d0*x))
-           Yspec(i,1) = tmp
-           Yspec(i,2) = one - tmp
-
-!        end do
-#endif         
-                    
-     end do
-     !$OMP END PARALLEL DO
-     
-     !! Values on boundaries
-     if(nb.ne.0)then
-        do j=1,nb
-           i=boundary_list(j)
-           if(node_type(i).eq.0) then !! wall initial conditions
-              u(i)=zero;v(i)=zero;w(i)=zero
-
-              tmp = T_ref*(one + 0.01*sin(two*pi*rp(i,3)/Lz))
-              T_bound(j) = tmp !! Might want changing                
-              T(i) = T_bound(j)
-           end if                 
-           if(node_type(i).eq.1) then !! inflow initial conditions
-              u(i)=u_char
-           end if
-           if(node_type(i).eq.2) then !! outflow initial conditions
-              u(i)=u_char
-           end if
-        end do
-     end if
-endif
-     
-     !! Make a simple laminar flame?
-!     call make_1d_1step_flame
-     call load_flame_file
-     
+#ifdef react
+     call make_1d_1step_flame
+!     call load_flame_file    
+#else
+     call hardcode_initial_conditions     
+#endif
 #else    
      !! RESTART OPTION. Ask for input number (just hard-coded for now...)
-     n_restart = 2
-#ifdef mp
-     k=10000+iproc
-#else
-     k=10000
-#endif     
-     if( n_restart .lt. 10 ) then 
-        write(fname,'(A17,I5,A1,I1)') './data_out/layer_',k,'_',n_restart
-     else if( n_restart .lt. 100 ) then 
-        write(fname,'(A17,I5,A1,I2)') './data_out/layer_',k,'_',n_restart        
-     else if( n_restart .lt. 1000 ) then
-        write(fname,'(A17,I5,A1,I3)') './data_out/layer_',k,'_',n_restart        
-     else
-        write(fname,'(A17,I5,A1,I4)') './data_out/layer_',k,'_',n_restart        
-     end if 
-     !! Open the file
-     open(14,file=fname)
-     read(14,*) k
-     if(k.ne.npfb) write(6,*) "WARNING, expecting problem in restart"
-     !! Load the initial conditions
-     do i=1,npfb
-#ifdef dim3
-        read(14,*) tmp,tmp,tmp,tmp,h(i),k,tmpro,u(i),v(i),w(i),tmp,T(i),Yspec(i,1:nspec)
-#else
-        read(14,*) tmp,tmp,tmp,h(i),k,tmpro,u(i),v(i),tmp,T(i),Yspec(i,1:nspec)
-#endif        
-        if(k.ne.node_type(i)) then
-           write(6,*) "ERROR: Problem in restart file. STOPPING."
-#ifdef mp
-           call MPI_Abort(MPI_COMM_WORLD, k, ierror)
-#else
-           stop
+     call load_restart_file(2)
 #endif
-        end if
-        lnro(i) = log(tmpro)
-     end do
-     
-     !! Re-specify the boundary temperatures
-     if(nb.ne.0) then
-        do j=1,nb
-           i=internal_list(j)
-           T_bound(j) = T(i)
-        end do
-     end if
-      
-     close(14)
-#endif
+     !! =======================================================================
             
      !! Set energy from lnro,u,Y,T
      call initialise_energy         
@@ -625,46 +527,6 @@ endif
      return
   end subroutine reduce_arrays
 !! ------------------------------------------------------------------------------------------------
-  subroutine initialise_grf
-     integer(ikind) :: i,j,k
-     
-     n_wvnmbrs = 2
-     allocate(rndshift_x(n_wvnmbrs,n_wvnmbrs))
-     allocate(rndshift_y(n_wvnmbrs,n_wvnmbrs))     
-     
-     do i=1,n_wvnmbrs
-        do j=1,n_wvnmbrs
-           rndshift_x(i,j) = rand()*two*pi
-           rndshift_y(i,j) = rand()*two*pi           
-        end do
-     end do
-     
-     wn_max = 5.0d0*two*pi/L_domain_x
-     wn_min = 1.0d0*two*pi/L_domain_x
-          
-     return
-  end subroutine initialise_grf
-!! ------------------------------------------------------------------------------------------------
-  subroutine evaluate_grf(x,y,z,grf)
-     real(rkind),intent(in) :: x,y,z
-     real(rkind),intent(out) :: grf
-     integer(ikind) :: i,j,k
-     real(rkind) :: wn_i,wn_j
-         
-     grf = zero
-     do i=1,n_wvnmbrs
-        wn_i = dble(i)*two*pi/L_domain_x!wn_min + dble(i)*(wn_max-wn_min)/dble(n_wvnmbrs)
-        do j=1,n_wvnmbrs
-           wn_j = dble(j)*two*pi/L_domain_x!wn_min + dble(j)*(wn_max-wn_min)/dble(n_wvnmbrs)
-           grf = grf + cos(wn_i*x + rndshift_x(i,j))* &
-                       cos(wn_j*y + rndshift_y(i,j))
-        end do
-     end do
-  
-  
-     return
-  end subroutine evaluate_grf  
-!! ------------------------------------------------------------------------------------------------
   subroutine load_control_data
      integer(ikind) :: dummy_int
      real(rkind) :: dummy_real
@@ -720,7 +582,7 @@ endif
 
      !! Allocate space for molar mass, Lewis number, and polynomial fitting for cp(T)   
      allocate(molar_mass(nspec),one_over_Lewis_number(nspec))
-     allocate(coef_cp(nspec,ncoefs_cp),coef_h(nspec,ncoefs_cp))
+     allocate(coef_cp(nspec,ncoefs_cp),coef_h(nspec,ncoefs_cp),coef_dcpdT(nspec,ncoefs_cp))
           
      !! Load molar mass, Lewis, and polynomial fits   
      read(12,*) !! Read comment line  
@@ -745,6 +607,11 @@ endif
         end do
         coef_h(ispec,polyorder_cp+2) = coef_cp(ispec,polyorder_cp+2)
         
+        !! Pre-multiply coefs by iorder-1 for dcp/dT
+        do iorder = 1,polyorder_cp + 1
+           coef_dcpdT(ispec,iorder) = coef_cp(ispec,iorder)*dble(iorder-1)
+        end do
+                
      end do     
 
      read(12,*) !! Read comment line    
@@ -783,7 +650,7 @@ endif
      flame_thickness = 5.0d-4/L_char !! Scale thickness because position vectors are scaled...
 
      !! Temperatures
-     T_reactants = T_ref
+     T_reactants = 3.0d2
      T_products = 2.3d3
      
      !! Pressure through flame
@@ -943,5 +810,117 @@ endif
   
      return
   end subroutine load_flame_file
+!! ------------------------------------------------------------------------------------------------
+  subroutine hardcode_initial_conditions
+     !! Temporary routine to generate initial conditions from some hard-coded functions.
+     integer(ikind) :: i,j,k,ispec
+     real(rkind) :: x,y,z,tmp,tmpro
+     
+     !! Values within domain
+     !$OMP PARALLEL DO PRIVATE(x,y,z,tmp,ispec)
+     do i=1,npfb
+        x = rp(i,1);y=rp(i,2);z=rp(i,3)
+        u(i) = u_char!-cos(two*pi*x)*sin(two*pi*y)!*cos(two*pi*z/Lz)!*oosqrt2
+        v(i) = zero!sin(two*pi*x)*cos(two*pi*y)!*cos(two*pi*z/Lz)    !!c c
+        w(i) = zero!u(i);u(i)=zero
+!        tmp = -half*half*(cos(4.0d0*pi*x) + cos(4.0d0*pi*y))/csq  !! Modify for not(isoT)
+        lnro(i) = log(rho_char)!log(rho_char + tmp)
+!if(x.le.zero) lnro(i) = log(1.2*rho_char)             
+
+        tmp = half*(one+erf(5.0d0*x))
+        T(i) = T_ref    
+        tmp = rho_char*T_ref/T(i)
+        lnro(i) = log(tmp)                                            
+              
+#ifdef ms    
+!        do ispec=1,nspec      
+           tmp = one - half*(one + erf(5.0d0*x))
+           Yspec(i,1) = tmp
+           Yspec(i,2) = one - tmp
+
+!        end do
+#endif         
+                    
+     end do
+     !$OMP END PARALLEL DO
+     
+     !! Values on boundaries
+     if(nb.ne.0)then
+        do j=1,nb
+           i=boundary_list(j)
+           if(node_type(i).eq.0) then !! wall initial conditions
+              u(i)=zero;v(i)=zero;w(i)=zero
+
+              tmp = T_ref*(one + 0.01*sin(two*pi*rp(i,3)/Lz))
+              T_bound(j) = tmp !! Might want changing                
+              T(i) = T_bound(j)
+           end if                 
+           if(node_type(i).eq.1) then !! inflow initial conditions
+              u(i)=u_char
+           end if
+           if(node_type(i).eq.2) then !! outflow initial conditions
+              u(i)=u_char
+           end if
+        end do
+     end if   
+  
+     return
+  end subroutine hardcode_initial_conditions  
+!! ------------------------------------------------------------------------------------------------
+  subroutine load_restart_file(n_restart)
+     !! Load initial conditions from a dump file
+     integer(ikind),intent(in) :: n_restart
+     integer(ikind) :: k,i,j
+     real(rkind) :: tmp,tmpro
+     character(70) :: fname  
+
+#ifdef mp
+     k=10000+iproc
+#else
+     k=10000
+#endif     
+     if( n_restart .lt. 10 ) then 
+        write(fname,'(A17,I5,A1,I1)') './data_out/layer_',k,'_',n_restart
+     else if( n_restart .lt. 100 ) then 
+        write(fname,'(A17,I5,A1,I2)') './data_out/layer_',k,'_',n_restart        
+     else if( n_restart .lt. 1000 ) then
+        write(fname,'(A17,I5,A1,I3)') './data_out/layer_',k,'_',n_restart        
+     else
+        write(fname,'(A17,I5,A1,I4)') './data_out/layer_',k,'_',n_restart        
+     end if 
+     !! Open the file
+     open(14,file=fname)
+     read(14,*) k
+     if(k.ne.npfb) write(6,*) "WARNING, expecting problem in restart"
+     !! Load the initial conditions
+     do i=1,npfb
+#ifdef dim3
+        read(14,*) tmp,tmp,tmp,tmp,h(i),k,tmpro,u(i),v(i),w(i),tmp,T(i),Yspec(i,1:nspec)
+#else
+        read(14,*) tmp,tmp,tmp,h(i),k,tmpro,u(i),v(i),tmp,T(i),Yspec(i,1:nspec)
+#endif        
+        if(k.ne.node_type(i)) then
+           write(6,*) "ERROR: Problem in restart file. STOPPING."
+#ifdef mp
+           call MPI_Abort(MPI_COMM_WORLD, k, ierror)
+#else
+           stop
+#endif
+        end if
+        lnro(i) = log(tmpro)
+     end do
+     
+     !! Re-specify the boundary temperatures
+     if(nb.ne.0) then
+        do j=1,nb
+           i=internal_list(j)
+           T_bound(j) = T(i)
+        end do
+     end if
+      
+     close(14)
+  
+     return
+  end subroutine load_restart_file
 !! ------------------------------------------------------------------------------------------------
 end module setup

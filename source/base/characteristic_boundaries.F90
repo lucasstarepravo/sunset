@@ -37,7 +37,7 @@ contains
 
      !! Store the sound speed
 #ifndef isoT       
-     c=calc_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
+     c=evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
 #else
      c=sqrt(csq)
 #endif 
@@ -96,7 +96,7 @@ contains
 
      !! Store the sound speed
 #ifndef isoT       
-     c=calc_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
+     c=evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
 #else
      c=sqrt(csq)
 #endif 
@@ -193,7 +193,7 @@ contains
 
      !! Store the sound speed
 #ifndef isoT       
-     c=calc_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
+     c=evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
 #else
      c=sqrt(csq)
 #endif 
