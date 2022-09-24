@@ -50,8 +50,6 @@ contains
 
 #ifndef isoT
      allocate(fT_coef_C(polyorder_cp+1),dfT_coef_C(polyorder_cp+1))
-     allocate(Rgas_mix(np))
-     allocate(cp(np))
      
      !! Loop over all nodes
      maxiters = 0;sumiters=0
@@ -61,7 +59,7 @@ contains
      do i=1,np
         
         !! For fluid/boundary nodes, and halo nodes, solve non-linear equation
-        if(i.le.npfb.or.i.gt.np_nohalo)then      
+!        if(i.le.npfb.or.i.gt.np_nohalo)then      
         
            !! Evaluate the gas constant for the mixture
            Rgas_mix(i) = zero
@@ -148,25 +146,25 @@ contains
            !! Evaluate the pressure        
            p(i) = tmpro*Rgas_mix(i)*T(i)
            
-        endif        
+!        endif        
      end do
      !$omp end parallel do
      
-     !! For mirrors, copy properties (as opposed to solving non-linear equation
-     !$omp parallel do private(i)
-#ifdef mp
-     do j=npfb+1,np_nohalo
-#else
-     do j=npfb+1,np
-#endif     
-        i=irelation(j)
-        T(j) = T(i)
-        p(j) = p(i)
-        cp(j) = cp(i)
-        Rgas_mix(j) = Rgas_mix(i)
-     
-     end do
-     !$omp end parallel do
+     !! For mirrors, copy properties (as opposed to solving non-linear equation)
+!     !$omp parallel do private(i)
+!#ifdef mp
+!     do j=npfb+1,np_nohalo
+!#else
+!     do j=npfb+1,np
+!#endif     
+!        i=irelation(j)
+!        T(j) = T(i)
+!        p(j) = p(i)
+!        cp(j) = cp(i)
+!        Rgas_mix(j) = Rgas_mix(i)
+!     
+!     end do
+!     !$omp end parallel do
 
 
      deallocate(fT_coef_C,dfT_coef_C)
@@ -222,11 +220,9 @@ contains
      !! Uses temperature, cp and density to evaluate thermal conductivity, viscosity and 
      !! molecular diffusivity. For isothermal flows, or if not(tdtp), use reference values.
      integer(ikind) :: ispec,i
-     real(rkind) :: tmp
-     
-     allocate(visc(npfb),Mdiff(npfb,nspec))
+     real(rkind) :: tmp   
+       
 #ifndef isoT     
-     allocate(lambda_th(npfb))
      !$omp parallel do private(ispec,tmp)
      do i=1,npfb
      
@@ -239,18 +235,22 @@ contains
      
         !! Thermal conductivity
         lambda_th(i) = cp(i)*visc(i)/Pr
-       
+
+#ifdef ms       
         !! Molecular diffusivity
         tmp = visc(i)/(exp(lnro(i))*Pr)
         do ispec=1,nspec
            Mdiff(i,ispec) = tmp*one_over_Lewis_number(ispec)
         end do        
+#endif        
    
      end do
      !$omp end parallel do
 #else
      visc(:) = visc_ref
+#ifdef ms
      Mdiff(:,:) = Mdiff_ref
+#endif     
 #endif     
   
      return

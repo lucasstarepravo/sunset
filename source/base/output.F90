@@ -78,12 +78,10 @@ contains
            write(6,*) "Max |w|:",max(maxphi(3),abs(minphi(3)))
            write(6,*) "max/min ro:",maxphi(4),minphi(4)
            write(6,*) "max/min ro*E:",maxphi(5),minphi(5)
-           write(6,*) "max/min T:",maxphi(6),minphi(6)
-           write(6,*) "max/min Y0:",maxphi(7),minphi(7)
-    
+           write(6,*) "max/min T:",maxphi(6),minphi(6)   
            write(6,*) "There are",n_threads_global,"threads spread over ",nprocs,"MPI tasks"
            write(6,*) "Wall clock run time=",t_run_global
-           write(6,*) "run-time/dt=",t_per_dt_global,"Moving avg=",t_last_X_global/dble(scr_freq)
+           write(6,*) "run-time/itime=",t_per_dt_global,"Moving avg=",t_last_X_global/dble(scr_freq)
 
            !! Profiling
            write(6,*) "  "
@@ -96,7 +94,7 @@ contains
            write(6,*) "Divergence                :",segment_time_global(6)/sum(segment_time_global(1:8))
            write(6,*) "Boundary 2nd derivatives  :",segment_time_global(7)/sum(segment_time_global(1:8))
            write(6,*) "RHS building              :",segment_time_global(8)/sum(segment_time_global(1:8))           
-           write(6,'(/,A)') "  "
+           write(6,'(/,/,A)') "  "
                                          
         end if
 
@@ -111,7 +109,7 @@ contains
         write(6,*) "Max/min T:",maxval(T(1:npfb)),minval(T(1:npfb))        
         write(6,*) "max/min ro:",exp(maxval(lnro(1:npfb))),exp(minval(lnro(1:npfb)))   
         write(6,*) "Number of threads=",n_threads,"Run time=",t_run
-        write(6,*) "run-time/dt=",t_per_dt,"Moving avg=",t_last_X/dble(scr_freq)
+        write(6,*) "run-time/itime=",t_per_dt,"Moving avg=",t_last_X/dble(scr_freq)
         t_last_X = 0.0d0
         
         !! Profiling
@@ -651,33 +649,34 @@ contains
      integer(ikind) :: i,j,k
      real(rkind) :: x,y
      character(70) :: fname
-#ifndef mp           
-        !! set the name of the file...
-        !! first number is processor number, second is dump number (allowed up to 9999 processors)
-        if( n_out .lt. 10 ) then 
-           write(fname,'(A16,I1)') './data_out/flame_',n_out        
-        else if( n_out .lt. 100 ) then 
-           write(fname,'(A16,I2)') './data_out/flame_',n_out          
-        else if( n_out .lt. 1000 ) then
-           write(fname,'(A16,I3)') './data_out/flame_',n_out         
-        else
-           write(fname,'(A16,I4)') './data_out/flame_',n_out           
-        end if   
+   
+     !! set the name of the file...
+     !! first number is processor number, second is dump number (allowed up to 9999 processors)
+     k = 10000        
+#ifdef mp
+     k = k + iproc
+#endif                
+     if( n_out .lt. 10 ) then 
+        write(fname,'(A16,I5,A1,I1)') './data_out/flame',k,'_',n_out        
+     else if( n_out .lt. 100 ) then 
+        write(fname,'(A16,I5,A1,I2)') './data_out/flame',k,'_',n_out          
+     else if( n_out .lt. 1000 ) then
+        write(fname,'(A16,I5,A1,I3)') './data_out/flame',k,'_',n_out         
+     else
+        write(fname,'(A16,I5,A1,I4)') './data_out/flame',k,'_',n_out           
+     end if   
         
-        !! Write the main dump files
-        open(unit = 20,file=fname)  
+     !! Write the main dump files
+     open(unit = 20,file=fname)  
         
-!        !$omp parallel do private(x,y)
-        do i=1,npfb
-           x=rp(i,1);y=rp(i,2)
-           if(abs(y).le.s(i)) then  !! For nodes within a node-spacing of y=0
-              write(20,*) x,y,u(i),v(i),w(i),exp(lnro(i)),roE(i),T(i),p(i),Yspec(i,1:nspec)
+     do i=1,npfb
+        x=rp(i,1);y=rp(i,2)
+        if(abs(y).le.s(i)) then  !! For nodes within a node-spacing of y=0
+           write(20,*) x,y,u(i),v(i),w(i),exp(lnro(i)),roE(i),T(i),p(i),Yspec(i,1:nspec)
 !write(511,*) x,y,u(i),v(i),w(i),exp(lnro(i)),roE(i),T(i),p(i),Yspec(i,1:nspec)              
-           end if
-        end do
-!        !$omp end parallel do
-        
-#endif  
+        end if
+     end do
+
     return
   end subroutine output_laminar_flame_structure  
 !! ------------------------------------------------------------------------------------------------ 

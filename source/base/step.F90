@@ -70,8 +70,10 @@ contains
 
      !! Temporary storage of time
      time0=time
+     iRKstep=0
 
      do k=1,3
+        iRKstep = iRKstep + 1
         !! Calculate the RHS
         call calc_all_rhs
      
@@ -121,6 +123,7 @@ contains
      
      !! Final substep: returns solution straight to lnro,u,v,E (register 2)
      !! and doesn't update S
+     iRKstep = iRKstep + 1
      call calc_all_rhs  
      
      !$omp parallel do private(ispec)
@@ -215,9 +218,11 @@ contains
 
      !! Temporary storage of time
      time0=time
+     iRKstep = 0
 
      do k=1,3
-        !! Calculate the RHS
+        iRKstep = iRKstep + 1
+        !! Calculate the RHS        
         call calc_all_rhs      
 
         !! Set the intermediate time
@@ -283,6 +288,7 @@ contains
      
      !! Final substep: returns solution straight to lnro,u,v,E (register 2)
      !! and doesn't update S
+     iRKstep = iRKstep + 1
      call calc_all_rhs    
      
      enrm_ro=zero;enrm_u=zero;enrm_v=zero;enrm_E=zero;enrm_Yspec=zero;enrm_w=zero
@@ -395,7 +401,11 @@ contains
      !$omp reduction(max:cmax,umax)
      do i=1,npfb
         !! Sound speed 
+#ifndef isoT        
         c = evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i))    
+#else
+        c = sqrt(csq)
+#endif                
  
         !! Max velocity and sound speed
         umax = sqrt(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))
@@ -415,8 +425,10 @@ contains
         dt_therm = s(i)*s(i)*exp(lnro(i))*cp(i)/lambda_th(i)
 #endif        
         
+#ifdef ms        
         !! Molecular diffusivity::  s*s*ro/Mdiff
         dt_spec = s(i)*s(i)*exp(lnro(i))/maxval(Mdiff(i,1:nspec))
+#endif        
      end do
      !$omp end parallel do
 

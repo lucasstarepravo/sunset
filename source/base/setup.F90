@@ -40,7 +40,7 @@ contains
      !! Time begins at zero
      time = zero;itime=0
      dt_out = 0.001d0*Time_char         !! Frequency to output fields
-     time_end = 1.0d2*Time_char
+     time_end = 1.0d0*Time_char
   
      !! Particles per smoothing length and supportsize/h
      hovs = 2.7   !! 2.4 for 6th order, 2.7 for 8th?
@@ -327,10 +327,21 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      allocate(u(np),v(np),w(np),lnro(np),roE(np),divvel(np))
      allocate(Yspec(np,nspec))
      u=zero;v=zero;w=zero;lnro=zero;roE=one;Yspec=one;divvel=zero
-     !! Secondary
+
+     !! Secondary properties
      allocate(alpha_out(np));alpha_out = zero
      allocate(T(np));T=T_ref
      allocate(p(np));p=zero
+     
+     !! Transport properties
+     allocate(visc(npfb));visc = visc_ref
+#ifndef isoT
+     allocate(lambda_th(npfb))
+#endif
+#ifdef ms     
+     allocate(Mdiff(npfb,nspec))
+#endif     
+     allocate(cp(np),Rgas_mix(np))
      
      !! Allocate the boundary temperatures
      if(nb.ne.0) then
@@ -341,8 +352,8 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      !! Choose initial conditions
 #ifndef restart     
 #ifdef react
-     call make_1d_1step_flame
-!     call load_flame_file    
+!     call make_1d_1step_flame
+     call load_flame_file    
 #else
      call hardcode_initial_conditions     
 #endif
@@ -786,7 +797,6 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 !        lnro(i) = log(p(i)/(Rgas_mix(i)*T(i)))
 !     end do
 !     !$omp end parallel do
-     deallocate(Rgas_mix,cp)     
                 
      !! Values on boundaries
      if(nb.ne.0)then

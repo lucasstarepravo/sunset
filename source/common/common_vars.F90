@@ -68,7 +68,7 @@ module common_vars
   real(rkind) :: time,dt,dt_previous,time_end,dt_out
   real(rkind) :: time_star !! Dimensionless time (for outputs...)
   real(rkind) :: umax,smax,cmax,smin                  !! maximum velocity,node-spacing,sound speed
-  integer(ikind) :: itime
+  integer(ikind) :: itime,iRKstep
   real(rkind) :: emax_nm1,emax_n,emax_np1  !! errors for PID controller
   real(rkind) :: eflow_nm1,eflow_n,sum_eflow !! errors for PID to control <u> (constant-ish flow rate)
   real(rkind), dimension(dims) :: driving_force

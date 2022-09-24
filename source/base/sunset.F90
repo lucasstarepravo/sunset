@@ -50,7 +50,9 @@ program sunset
   call filter_coefficients   
   
   !! Load data and create initial fields for primary variables
+#ifndef isoT
   call load_chemistry_data
+#endif  
   call initial_solution
 
   !! Initialise time profiling and output counter...
@@ -68,7 +70,7 @@ program sunset
 
      !! Output, conditionally: at start, subsequently every dt_out
      if(itime.eq.0.or.time.gt.n_out*dt_out) then 
-!     if(itime.eq.0.or.mod(itime,20).eq.0)then
+!     if(itime.eq.0.or.mod(itime,5).eq.0)then
         n_out = n_out + 1
         call output_layer(n_out)
         call output_laminar_flame_structure(n_out)
@@ -109,8 +111,20 @@ subroutine deallocate_everything
   !! Tell the screen we've reached the end
   write(6,*) iproc,"Reached the end of simulation. Cleaning up and stopping!"
   
-  !! Main arrays
-  deallocate(rp,u,v,w,lnro,roE,Yspec,s)
+  !! Discretisation arrays
+  deallocate(rp,s)
+  
+  !! Primary properties
+  deallocate(u,v,w,lnro,roE,Yspec)
+  
+  !! Secondary properties & transport vars
+  deallocate(T,p,cp,visc,Rgas_mix)
+#ifndef isoT
+  deallocate(lambda_th)
+#endif
+#ifdef ms
+  deallocate(Mdiff)
+#endif    
 
   !! Neighbours lists and link lists
   deallocate(ij_count,ij_link)

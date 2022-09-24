@@ -70,14 +70,13 @@ contains
      if(nb.ne.0) allocate(L(nb,5+nspec)) 
 #endif  
 
+
      !! Determine secondary thermodynamic quantities and transport properties
      !! N.B. These are also calculated when setting time step, so not necessary for the first call
      !! to calc_all_rhs in the RK scheme.
-     if(.not.(allocated(visc))) then
-   
+     if(iRKstep.ne.1) then   
         call evaluate_temperature_and_pressure
-        call evaluate_transport_properties
-      
+        call evaluate_transport_properties      
      end if
 
      !! Initialise right hand sides to zero
@@ -101,6 +100,7 @@ contains
      call calc_gradient(T,gradT)   
      
 #endif          
+
      !! Call individual routines to build the RHSs
      !! N.B. second derivatives and derivatives of secondary variables are calculated within
      !! these subroutines
@@ -109,7 +109,7 @@ contains
      call calc_rhs_vel
      call calc_rhs_roE
      if(nb.ne.0) call calc_rhs_nscbc   
-     
+
      !! Calculate chemical production rates and add these to rhs of species equation
 #ifdef react     
      call calculate_chemical_production_rates  
@@ -119,12 +119,9 @@ contains
      deallocate(gradlnro,gradu,gradv,gradw,gradp)
 #ifndef isoT     
      deallocate(gradroE)
-     deallocate(Rgas_mix,cp)
      deallocate(gradT)
-     deallocate(lambda_th)
 #endif     
-     deallocate(visc,Mdiff)
-
+  
      !! Profiling - time spent doign RHS minus time spent doing gradients for RHS
      segment_tend_rhs = omp_get_wtime()
      segment_tend_subtract = segment_time_local(4) + segment_time_local(5) + segment_time_local(7)     
@@ -188,7 +185,6 @@ contains
      real(rkind),dimension(:,:),allocatable :: speciessum_DgradY,speciessum_hgradY
      real(rkind),dimension(:),allocatable :: speciessum_divrhoDgradY,speciessum_hY
 
-
      !! Allocate space for gradients and stores
      allocate(store_diff_E(npfb));store_diff_E = zero
 #ifndef isoT     
@@ -204,12 +200,11 @@ contains
      
      !! Loop over all species
      do ispec=1,nspec
-     
+    
         !! Calculate gradient and Laplacian for Yspec for this species     
         call calc_gradient(Yspec(:,ispec),gradYspec(:,:,ispec))
         call calc_laplacian(Yspec(:,ispec),lapYspec)
-        
-
+      
         !$omp parallel do private(i,tmp_vec,tmp_scal,tmpY,gradmdiff,molec_diff,enthalpy,grad_enthalpy, &
         !$omp dcpdT,cpispec,tmpro)
         do j=1,npfb-nb
@@ -262,7 +257,6 @@ contains
            rhs_Yspec(i,ispec) = tmp_scal + molec_diff ! + SOURCE
         end do
         !$omp end parallel do
-             
 
         !! Make L5+ispec and boundary RHS
         if(nb.ne.0)then
@@ -338,20 +332,19 @@ contains
                        
         end if       
 
-
      end do
   
   
      
      !! Deallocate any stores no longer required    
      deallocate(lapYspec)
+
   
      !! Run through species again and finalise rhs and diffusion store for energy
      !$omp parallel do private(enthalpy,grad_enthalpy,tmpro,ispec)
      do i=1,npfb
         tmpro = exp(lnro(i))
-        do ispec=1,nspec                
-                
+        do ispec=1,nspec                                
 
            !! Add the diffusion correction term to the rhs
            rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) - Yspec(i,ispec)*speciessum_divrhoDgradY(i) &
@@ -564,7 +557,7 @@ contains
      !! Deallocate any stores no longer required
      deallocate(lapu,lapv,lapw)
      deallocate(graddivvel) 
-                   
+
      return
   end subroutine calc_rhs_vel
 !! ------------------------------------------------------------------------------------------------  
