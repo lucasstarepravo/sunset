@@ -216,6 +216,30 @@ contains
      return
   end subroutine evaluate_enthalpy_at_node
 !! ------------------------------------------------------------------------------------------------
+  subroutine evaluate_gibbs_at_node(Temp,logT,ispec,gibbs)
+     !! Evaluate the gibbs function of species ispec at a node, given T,logT and ispec
+     !! N.B. actually returns molar_gibbs/(R0*T)
+     integer(ikind),intent(in) :: ispec
+     real(rkind),intent(in) :: Temp,logT
+     real(rkind),intent(out) :: gibbs
+     integer(ikind) :: iorder
+     
+     !! Polynomial (in T) terms            
+     gibbs = -Temp*coef_gibbs(ispec,polyorder_cp+1)
+     do iorder=polyorder_cp,2,-1
+        gibbs = (gibbs - coef_gibbs(ispec,iorder))*Temp
+     end do
+
+     !! Non-poly terms
+     gibbs = gibbs + coef_gibbs(ispec,polyorder_cp+2)/Temp - &
+                     coef_gibbs(ispec,1)*logT + &
+                     coef_gibbs(ispec,1) - &
+                     coef_gibbs(ispec,polyorder_cp+3)
+     
+                      
+     return
+  end subroutine evaluate_gibbs_at_node
+!! ------------------------------------------------------------------------------------------------
   subroutine evaluate_transport_properties
      !! Uses temperature, cp and density to evaluate thermal conductivity, viscosity and 
      !! molecular diffusivity. For isothermal flows, or if not(tdtp), use reference values.

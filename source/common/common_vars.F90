@@ -33,13 +33,21 @@ module common_vars
   
   !! Transport properties - arrays covering the species
   real(rkind), dimension(:), allocatable :: molar_mass,one_over_Lewis_number
-  real(rkind), dimension(:,:),allocatable :: coef_cp,coef_h,coef_dcpdT !! indexing: ispec,j-exponent
+  real(rkind), dimension(:,:),allocatable :: coef_cp,coef_h,coef_dcpdT,coef_gibbs !! indexing: ispec,j-exponent
   integer(ikind) :: polyorder_cp,ncoefs_cp  !! polynomial order,number of coefs
   real(rkind) :: T_low,T_high
   
   !! Chemical kinetics control data
   integer(ikind) :: nsteps
   real(rkind),dimension(:,:), allocatable :: Arrhenius_coefs
+  integer(ikind),dimension(:),allocatable :: num_reactants,num_products
+  integer(ikind),dimension(:,:),allocatable :: reactant_list,product_list,stepspecies_list
+  real(rkind),dimension(:,:),allocatable :: nu_dash,nu_ddash,delta_nu
+  integer(ikind),dimension(:),allocatable :: gibbs_rate_flag,lindemann_form_flag,third_body_flag
+  real(rkind),dimension(:,:),allocatable :: third_body_efficiencies
+  
+    
+  
   
   !! Right-hand-sides
   real(rkind),dimension(:),allocatable :: rhs_lnro,rhs_u,rhs_v,rhs_w,rhs_roE

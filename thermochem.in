@@ -57,13 +57,41 @@
 1
 
 !! Chemical mechanism step list
-1 1 1     !! Reaction number, number of reactants, number of products
-1 1       !! Identity of reactants, and molar stoichiometric coefficients
-2 1       !! Identity of products, and molar stoichiometric coefficients
+1         !! Reaction number
+1         !! Number of reactants
+1 1.0d0   !! Identity of reactants, and molar stoichiometric coefficients
+1         !! Number of products
+2 1.0d0   !! Identity of products, and molar stoichiometric coefficients
 2.7500d+07  0.0000d+00  1.0000d+08 !! The three coefficients which give the rate constant
+0         !! Include gibbs-based backwards rate (1) or not (0)
+0         !! Include Lindeman form (1) or not (0)
+0         !! Third bodies?
 
 !! Another example of the above (2H2 + O2 ==> 2H2O )
 1 2 1     !! Reaction number, number of reactants, number of products
 1 2       !! 2*H2
 2 1       !! 1*O2 
 3 2       !! 2*H2O
+
+!! Chemical mechanism step list
+1         !! Reaction number
+1         !! Number of reactants
+1 1.0d0   !! Identity of reactants, and molar stoichiometric coefficients
+1         !! Number of products
+2 1.0d0   !! Identity of products, and molar stoichiometric coefficients
+2.7500d+07  0.0000d+00  1.0000d+08 !! The three coefficients which give the rate constant
+1         !! Include gibbs-based backwards rate (1) or not (0)
+0         !! Include Lindeman form (1) or not (0)
+1         !! Third bodies?
+1.0d0     !! list of third body efficiencies 
+1.0d0
+
+
+
+
+
+
+
+
+
+

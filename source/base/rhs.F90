@@ -112,7 +112,7 @@ contains
 
      !! Calculate chemical production rates and add these to rhs of species equation
 #ifdef react     
-     call calculate_chemical_production_rates  
+     call calculate_chemical_production_rate  
 #endif     
 
      !! Clear space no longer required

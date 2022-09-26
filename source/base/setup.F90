@@ -39,7 +39,7 @@ contains
 
      !! Time begins at zero
      time = zero;itime=0
-     dt_out = 0.001d0*Time_char         !! Frequency to output fields
+     dt_out = 0.0001d0*Time_char         !! Frequency to output fields
      time_end = 1.0d0*Time_char
   
      !! Particles per smoothing length and supportsize/h
@@ -564,13 +564,14 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
   end subroutine load_control_data
 !! ------------------------------------------------------------------------------------------------  
   subroutine load_chemistry_data
-     integer(ikind) :: ispec,iorder
+     integer(ikind) :: ispec,iorder,istep,dummy_int
+     real(rkind) :: dummy_real
      
      !! Load data from the thermochemistry control file
      open(unit=12,file='thermochem.in')
      read(12,*)                       !! Ignore header and blank line
      read(12,*)
-
+     
      !! Number of chemical species
      read(12,*)
      read(12,*) nspec
@@ -579,6 +580,8 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      nspec = 1  !! If not multispecies, nspec must be 1
 #endif          
 
+     !! This section reads in transport data for all species.
+     
      !! Number of coefs and order of polynomial for cp(T)
      read(12,*)
      read(12,*) ncoefs_cp
@@ -594,6 +597,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      !! Allocate space for molar mass, Lewis number, and polynomial fitting for cp(T)   
      allocate(molar_mass(nspec),one_over_Lewis_number(nspec))
      allocate(coef_cp(nspec,ncoefs_cp),coef_h(nspec,ncoefs_cp),coef_dcpdT(nspec,ncoefs_cp))
+     allocate(coef_gibbs(nspec,ncoefs_cp))
           
      !! Load molar mass, Lewis, and polynomial fits   
      read(12,*) !! Read comment line  
@@ -608,6 +612,12 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
            read(12,*) coef_cp(ispec,iorder)
         end do
         read(12,*) !! Blank line                            
+                           
+        !! Pre-divide gibbs coefficients (and leave in molar form)
+        coef_gibbs(ispec,:) = coef_cp(ispec,:)
+        do iorder = 2,polyorder_cp+1
+           coef_gibbs(ispec,iorder) = coef_gibbs(ispec,iorder)/dble(iorder*(iorder-1))
+        end do                           
                            
         !! Convert cp coefficients from molar to mass based
         coef_cp(ispec,:) = coef_cp(ispec,:)*Rgas_universal/molar_mass(ispec)
@@ -625,20 +635,74 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
                 
      end do     
 
+     !! Next section reads in reaction mechanism. Data is not stored in the most efficient way at present
+     !! i.e. we use some arrays (nsteps x nspec), of which most entries are zero. However, given only 
+     !! considering fairly small mechanisms, this is OK for now.
      read(12,*) !! Read comment line    
      !! Number of steps
      read(12,*)
      read(12,*) nsteps
      read(12,*)
      
-     !! Space for rate constants
+     !! Space for rate constants and coefficients etc
      allocate(Arrhenius_coefs(nsteps,3))
      
-     read(12,*) !! Blank lines TBC
-     read(12,*)
-     read(12,*)     
-     read(12,*)
-     read(12,*) Arrhenius_coefs(1,1:3)
+     !! Numbers of r and p, and lists
+     allocate(num_reactants(nsteps),num_products(nsteps))
+     allocate(reactant_list(nsteps,3),product_list(nsteps,3))  !! Limit of 3 reactants and 3 products in any given step
+     allocate(stepspecies_list(nsteps,6)) !! List of all species in reaction (reactants then products)
+     
+     !! Stoichiometric coefficients
+     allocate(nu_dash(nsteps,nspec),nu_ddash(nsteps,nspec),delta_nu(nsteps,nspec)) 
+     nu_dash = zero;nu_ddash = zero;delta_nu = zero
+     
+     allocate(gibbs_rate_flag(nsteps),lindemann_form_flag(nsteps)) !! Flags for backwards and lindemann
+     allocate(third_body_flag(nsteps))
+     allocate(third_body_efficiencies(nsteps,nspec))
+     
+     
+     read(12,*) !! Comment line
+     do istep = 1,nsteps
+        read(12,*) dummy_int  !! Reaction number
+        if(dummy_int.ne.istep) write(6,*) "Warning, error reading reaction mech. Expect seg fault."
+
+        read(12,*) num_reactants(istep)            !! Number of reactants
+        do ispec = 1,num_reactants(istep)  !! Loop over all reactants
+           read(12,*) dummy_int,dummy_real
+           reactant_list(istep,ispec) = dummy_int !! Identity of reactant
+           stepspecies_list(istep,ispec) = dummy_int
+           nu_dash(istep,dummy_int) = dummy_real  !! Stoichiometric coefficient
+        end do
+
+        read(12,*) num_products(istep)            !! Number of products
+        do ispec = 1,num_products(istep)  !! Loop over all products
+           read(12,*) dummy_int,dummy_real
+           product_list(istep,ispec) = dummy_int !! Identity of product
+           stepspecies_list(istep,num_reactants(istep) + ispec) = dummy_int
+           nu_ddash(istep,dummy_int) = dummy_real  !! Stoichiometric coefficient
+        end do
+        
+        !! Calculate deltas
+        delta_nu(istep,:) = nu_ddash(istep,:) - nu_dash(istep,:)
+        
+        !! Coefficients for arrhenius rate constant
+        read(12,*) Arrhenius_coefs(istep,1:3)
+        
+        !! Gibbs based backwards rate?
+        read(12,*) gibbs_rate_flag(istep)
+        
+        !! Lindemann form?
+        read(12,*) lindemann_form_flag(istep)
+        
+        !! Third bodies?
+        read(12,*) third_body_flag(istep)        
+        if(third_body_flag(istep).eq.1) then
+           do ispec = 1,nspec
+              read(12,*) third_body_efficiencies(istep,ispec)         !! List of efficiencies
+           end do
+        end if
+        
+     end do
 
      !! Take logarithm of pre-exponential factor
      Arrhenius_coefs(1,1) = log(Arrhenius_coefs(1,1))

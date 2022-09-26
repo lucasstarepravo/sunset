@@ -85,6 +85,7 @@ module common_parameter
   real(rkind), parameter :: rho_char = 1.15622d0        !! Reference density
   real(rkind), parameter :: T_ref = 2.98d2            !! Reference temperature (for TDTP)
   real(rkind), parameter :: visc_ref = 1.806d-5        !! Viscosity at ref T,ro
+  real(rkind), parameter :: p_ref = 1.0d5             !! Reference pressure
   
   !! Primary dimensionless groups -----------------------------------------------------------------
   real(rkind), parameter :: Pr = 0.7d0             !! Prandtl number
