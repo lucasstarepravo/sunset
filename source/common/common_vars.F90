@@ -15,6 +15,17 @@ module common_vars
 
   implicit none
 
+  !! Control parameters 
+  real(rkind) :: L_char,U_char          !! read from file
+  real(rkind) :: u_inflow,Lz,Time_char  !! build from L_char,U_char
+  real(rkind), dimension(dims) :: grav !! Gravity    
+  real(rkind) :: rho_char,T_ref,visc_ref,p_ref
+  real(rkind) :: Pr,Ma,Re,Mdiff_ref
+#ifdef isoT
+  real(rkind) :: csq
+#endif  
+  real(rkind) :: r_temp_dependence
+  
   !! Evolved fluid quantities
   real(rkind), dimension(:), allocatable, target :: u,v,w,lnro,roE
   real(rkind), dimension(:,:), allocatable :: Yspec  
@@ -38,7 +49,7 @@ module common_vars
   real(rkind) :: T_low,T_high
   
   !! Chemical kinetics control data
-  integer(ikind) :: nsteps
+  integer(ikind) :: nsteps,nthirdbodies
   real(rkind),dimension(:,:), allocatable :: Arrhenius_coefs
   integer(ikind),dimension(:),allocatable :: num_reactants,num_products
   integer(ikind),dimension(:,:),allocatable :: reactant_list,product_list,stepspecies_list

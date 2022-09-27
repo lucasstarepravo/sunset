@@ -34,8 +34,7 @@ contains
 #endif
 
      !! Load data from the control file
-     call load_control_data
-     
+     call load_control_data_LUonly     
 
      !! Time begins at zero
      time = zero;itime=0
@@ -322,6 +321,8 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      integer(ikind) :: i,j,k,ispec
      real(rkind) :: x,y,z,tmp,tmpro
      
+     !! Load the remaining control data
+     call load_control_data_all     
      
      !! Allocate arrays for properties - primary
      allocate(u(np),v(np),w(np),lnro(np),roE(np),divvel(np))
@@ -538,7 +539,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      return
   end subroutine reduce_arrays
 !! ------------------------------------------------------------------------------------------------
-  subroutine load_control_data
+  subroutine load_control_data_LUonly
      integer(ikind) :: dummy_int
      real(rkind) :: dummy_real
      
@@ -550,18 +551,101 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 
      !! Length-scale
      read(12,*)
+     read(12,*) L_char
+     read(12,*)
+     
+     !! Velocity-scale
+     read(12,*) 
+     read(12,*) U_char
+     read(12,*)
+     
+     !! Set inflow velocity, Z-length-scale and characteristic time-scale
+     u_inflow = u_char
+     Lz = L_char
+     Time_char = L_char/u_char
+     
+     close(12)
+          
+     return
+  end subroutine load_control_data_LUonly
+!! ------------------------------------------------------------------------------------------------  
+  subroutine load_control_data_all
+     integer(ikind) :: dummy_int
+     real(rkind) :: dummy_real
+     
+     !! Load data from the control file
+     open(unit=12,file='control.in')
+     read(12,*)                       !! Ignore header and blank line
+     read(12,*)
+
+     !! Length-scale
+     read(12,*)
      read(12,*) dummy_real
      read(12,*)
      
+     !! Velocity-scale
+     read(12,*) 
+     read(12,*) dummy_real
+     read(12,*)
      
+     !! Gravity?
+     read(12,*)
+     read(12,*) grav(:)
+     read(12,*)
      
+     !! Characteristic density
+     read(12,*)
+     read(12,*) rho_char
+     read(12,*)
+     
+     !! Reference temp
+     read(12,*)
+     read(12,*) T_ref
+     read(12,*) 
+     
+     !! Reference viscosity
+     read(12,*)
+     read(12,*) visc_ref
+     read(12,*) 
+     
+     !! Reference pressure
+     read(12,*)
+     read(12,*) p_ref
+     read(12,*) 
+     
+     !! Prandtl number
+     read(12,*)
+     read(12,*) Pr
+     read(12,*) 
+     
+     !! Mach number (only used for isothermal flows)
+     read(12,*)
+     read(12,*) Ma
+     read(12,*) 
+     
+     !! Set the Reynolds number (never used, just nice to calculate it)
+     Re = rho_char*u_char*L_char/visc_ref
+
+     !! Set a reference molecular diffusivity
+     Mdiff_ref = visc_ref/rho_char/Pr/one   !! the 1 represents Lewis number
+     
+     !! set the sound speed squared
+#ifdef isoT
+     csq = (u_char/Ma)**two
+#endif      
+
+     !! Read in T-exponent for TDTP if required
+     read(12,*)
+     read(12,*) r_temp_dependence
+     read(12,*)     
+#ifndef tdtp
+     r_temp_dependence = zero  !! zero it if not required
+#endif 
      
      close(12)
-     
-     write(6,*) iproc,dummy_real  
-     
+          
      return
-  end subroutine load_control_data
+  end subroutine load_control_data_all
 !! ------------------------------------------------------------------------------------------------  
   subroutine load_chemistry_data
      integer(ikind) :: ispec,iorder,istep,dummy_int
@@ -639,10 +723,17 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      !! i.e. we use some arrays (nsteps x nspec), of which most entries are zero. However, given only 
      !! considering fairly small mechanisms, this is OK for now.
      read(12,*) !! Read comment line    
+     
      !! Number of steps
      read(12,*)
      read(12,*) nsteps
      read(12,*)
+     
+     !! Number of different third body efficiencies
+     read(12,*)
+     read(12,*) nthirdbodies
+     read(12,*)
+     
      
      !! Space for rate constants and coefficients etc
      allocate(Arrhenius_coefs(nsteps,3))
@@ -658,7 +749,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      
      allocate(gibbs_rate_flag(nsteps),lindemann_form_flag(nsteps)) !! Flags for backwards and lindemann
      allocate(third_body_flag(nsteps))
-     allocate(third_body_efficiencies(nsteps,nspec))
+     if(nthirdbodies.ne.0) allocate(third_body_efficiencies(nthirdbodies,nspec))
      
      
      read(12,*) !! Comment line
@@ -687,6 +778,10 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         
         !! Coefficients for arrhenius rate constant
         read(12,*) Arrhenius_coefs(istep,1:3)
+
+        !! Take logarithm of pre-exponential factor
+        Arrhenius_coefs(istep,1) = log(Arrhenius_coefs(istep,1))
+        Arrhenius_coefs(istep,3) = Arrhenius_coefs(istep,3)/(Rgas_universal)                     
         
         !! Gibbs based backwards rate?
         read(12,*) gibbs_rate_flag(istep)
@@ -696,17 +791,21 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         
         !! Third bodies?
         read(12,*) third_body_flag(istep)        
-        if(third_body_flag(istep).eq.1) then
-           do ispec = 1,nspec
-              read(12,*) third_body_efficiencies(istep,ispec)         !! List of efficiencies
-           end do
-        end if
-        
+              
+        read(12,*) !! Blank line      
      end do
 
-     !! Take logarithm of pre-exponential factor
-     Arrhenius_coefs(1,1) = log(Arrhenius_coefs(1,1))
-     Arrhenius_coefs(1,3) = Arrhenius_coefs(1,3)/(Rgas_universal)
+     !! Lists of third body efficiencies
+     if(nthirdbodies.ne.0) then
+        
+        do istep = 1,nthirdbodies
+           read(12,*) !! Comment line
+           do ispec = 1,nspec
+              read(12,*) dummy_int,third_body_efficiencies(istep,ispec)     !! List of efficiencies
+           end do
+        end do
+     end if
+
      
      close(12)               
 
@@ -794,8 +893,8 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      integer(ikind) :: i,ispec,j,nflamein
      real(rkind) :: flame_location,flame_thickness
      real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z
-     real(rkind),dimension(:),allocatable :: flamein_ro,flamein_u,flamein_T,flamein_Y,flamein_roE
-     real(rkind),dimension(:),allocatable :: flamein_p
+     real(rkind),dimension(:),allocatable :: flamein_ro,flamein_u,flamein_v,flamein_w,flamein_roE
+     real(rkind),dimension(:,:),allocatable :: flamein_Y
      real(rkind) :: dx_flamein
 
      !! Open a file containing flame profile
@@ -805,15 +904,23 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      P_flame = 1.0d5
 
      !! Read file, then close it.     
-     !! Format of the file is ro,u,T,Y_reactants over 1001 evenly spaced steps covering 
+     !! Format of the file is ro,ro*u,ro*v,ro*w,roE,ro*Y (all ispec) over 1001 evenly spaced steps covering 
      !! a 0.01m long domain.
      nflamein = 1001
      dx_flamein = 0.01/(nflamein-1)
-     allocate(flamein_ro(nflamein),flamein_u(nflamein),flamein_T(nflamein),flamein_Y(nflamein))
-     allocate(flamein_roE(nflamein),flamein_p(nflamein))
+     allocate(flamein_ro(nflamein),flamein_u(nflamein),flamein_v(nflamein),flamein_w(nflamein))
+     allocate(flamein_Y(nflamein,nspec))
+     allocate(flamein_roE(nflamein))
      do i=1,nflamein
-        read(19,*) flamein_ro(i),flamein_u(i),flamein_T(i),flamein_Y(i), &
-                   flamein_roE(i),flamein_p(i)
+        !! Load conservative data
+        read(19,*) flamein_ro(i),flamein_u(i),flamein_v(i),flamein_w(i), &
+                   flamein_roE(i),flamein_Y(i,1:nspec)
+
+        !! Divide by rho as required
+        flamein_u(i) = flamein_u(i)/flamein_ro(i)
+        flamein_v(i) = flamein_v(i)/flamein_ro(i)
+        flamein_w(i) = flamein_w(i)/flamein_ro(i)        
+        flamein_Y(i,:) = flamein_Y(i,:)/flamein_ro(i)                
      end do
      close(19)
      
@@ -830,38 +937,35 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         !! Copy data
         lnro(i) = log(flamein_ro(j))
         u(i) = flamein_u(j)
-        v(i) = zero
-        w(i) = zero
-        T(i) = flamein_T(j)
-        Yspec(i,1) = flamein_Y(j)
-        Yspec(i,2) = one - Yspec(i,1)    
+        v(i) = flamein_v(j)
+        w(i) = flamein_w(j)
         roE(i) = flamein_roE(j)   
-        p(i) = flamein_p(j)   
+        Yspec(i,:) = flamein_Y(j,:)
+
+        !! Temporary assign p and T
+        T(i) = T_ref
+        p(i) = P_flame
         
      end do
      !$omp end parallel do
      
      !! Free up space
-     deallocate(flamein_ro,flamein_u,flamein_T,flamein_Y,flamein_roE,flamein_p)
+     deallocate(flamein_ro,flamein_u,flamein_v,flamein_w,flamein_roE,flamein_Y)
      
-     !! Temporarily copy some energy data to halos and mirrors (it will be later overwritten)
+     !! Temporarily copy some energy data to halos and mirrors (it will be later overwritten, but
+     !! just prevents the NR solver from crashing at set-up)
      !$omp parallel do
      do i=npfb+1,np
         roE(i) = roE(1)
+        lnro(i) = lnro(1)
+        u(i) = u(1);v(i) = v(1);w(i) = w(1)
+        Yspec(i,:) = Yspec(1,:)
      end do
      !$omp end parallel do
      
      !! Re-evaluate temperature from energy.  
      call evaluate_temperature_and_pressure
-
      
-     !! Re-evaluate density from T and read-from-file-Pressure
-!     !$omp parallel do 
-!     do i=1,npfb
-!        lnro(i) = log(p(i)/(Rgas_mix(i)*T(i)))
-!     end do
-!     !$omp end parallel do
-                
      !! Values on boundaries
      if(nb.ne.0)then
         do j=1,nb
@@ -878,9 +982,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
               T_bound(j) = T(i)  !! Outflow temperature is T_hot
            end if
         end do
-     end if
- 
-  
+     end if   
   
      return
   end subroutine load_flame_file

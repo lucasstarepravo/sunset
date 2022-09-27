@@ -13,6 +13,9 @@ module common_parameter
 
   !! Discretisation related parameters
   integer(ikind) ,parameter :: dims = 3
+  
+  !! Maximum possible number of species
+  integer(ikind), parameter :: nspec_max = 20     
 
   !! Numbers --------------------------------------------------------------------------------------
   real(rkind), parameter :: pi=3.141592653589793238462643383279502884197d0
@@ -27,6 +30,10 @@ module common_parameter
   real(rkind), parameter :: half = 0.5d0
   real(rkind), parameter :: oosix = 1.0d0/6.0d0
   real(rkind), parameter :: verysmall = 1.0d-30
+  
+  !! Physical constants ---------------------------------------------------------------------------
+  real(rkind), parameter :: Rgas_universal = 8.3144626181d3         !! Universal gas constant  
+  
   
   !! Runge Kutta coefficients ---------------------------------------------------------------------
   !! classic RK4 (from Wikipedia...)  
@@ -62,51 +69,6 @@ module common_parameter
   real(rkind), parameter :: ev_norm = 1.0d-6 
   real(rkind), parameter :: ew_norm = 1.0d-6 
   real(rkind), parameter :: eroE_norm = 1.0d-2 
-  real(rkind), parameter :: eY_norm = 1.0d-10            
-
-  !! Maximum possible number of species
-  integer(ikind), parameter :: nspec_max = 20   
-  
-  !! Universal (or assumed to be universal) constants ---------------------------------------------
-  real(rkind), parameter :: Rgas_universal = 8.3144626181d3         !! Universal gas constant  
-#ifdef tdtp
-  real(rkind), parameter :: r_temp_dependence = 7.0d-1     !! T-exponent for TDTP
-#else
-  real(rkind), parameter :: r_temp_dependence = zero       !! zero exponent for not(TDTP) 
-#endif  
-   
-  !! SIMULATION PARAMETERS ========================================================================
-  !! Primary domain parameters (i.e. those we can specify) ----------------------------------------
-  real(rkind), parameter :: L_char = 0.01d0    !! Characteristic lengthscale
-  real(rkind), dimension(dims), parameter :: grav = (/zero,zero,zero/) !! Gravity  
-  real(rkind), parameter :: U_char = 0.39d0    !! Characteristic (often inflow) velocity
-  
-  !! Primary physical fluid properties ------------------------------------------------------------
-  real(rkind), parameter :: rho_char = 1.15622d0        !! Reference density
-  real(rkind), parameter :: T_ref = 2.98d2            !! Reference temperature (for TDTP)
-  real(rkind), parameter :: visc_ref = 1.806d-5        !! Viscosity at ref T,ro
-  real(rkind), parameter :: p_ref = 1.0d5             !! Reference pressure
-  
-  !! Primary dimensionless groups -----------------------------------------------------------------
-  real(rkind), parameter :: Pr = 0.7d0             !! Prandtl number
-  real(rkind), parameter :: Ma = 0.02d0          !! Mach number (only used for isothermal)      
- 
-  !! Secondary properties -------------------------------------------------------------------------
-  real(rkind), parameter :: u_inflow = u_char                         !! Inflow velocity 
-  real(rkind), parameter :: Lz = L_char                               !! 3rd dim length-scale
-  real(rkind), parameter :: Time_char= L_char/u_char                  !! reference time-scale
- 
-  !! Secondary dimensionless groups
-  real(rkind), parameter :: Re = rho_char*u_char*L_char/visc_ref      !! Reynolds number
-
-  !! Reference molecular diffusivity assuming unity Lewis number
-  real(rkind), parameter :: Mdiff_ref = visc_ref/rho_char/Pr/one      !! one is Lewis #               
-
-    
-#ifdef isoT
-  real(rkind), parameter :: csq = (u_char/Ma)**two  !! Sound speed squared
-#endif
-
-
+  real(rkind), parameter :: eY_norm = 1.0d-10       
 
 end module common_parameter

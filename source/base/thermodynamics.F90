@@ -337,8 +337,6 @@ contains
         !! Multiply to get roE
         roE(i) = roE(i)*tmpro
         
-write(499,*) rp(i,1),roE(i),tmpro
-
      end do
      !$omp end parallel do
           

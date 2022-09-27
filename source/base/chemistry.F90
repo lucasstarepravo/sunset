@@ -52,23 +52,26 @@ alpha_out(i) = production_rate
   end subroutine calculate_chemical_production_rates
 !! ------------------------------------------------------------------------------------------------  
   subroutine calculate_chemical_production_rate
-     integer(ikind) :: i,ispec,istep,jspec
+     integer(ikind) :: i,ispec,istep,jspec,ithirdbody
      real(rkind) :: tmpro,production_rate,arrhenius_rate,tmpT,logT
      real(rkind) :: arrhenius_rate_back,gibbs,logP0ovR0
-     real(rkind) :: molar_production_rate,product_of_reactants,kforward_prod
-     real(rkind) :: product_of_products,kbackward_prod
-     real(rkind),dimension(:),allocatable :: logYspec_local
+     real(rkind) :: molar_production_rate,forward_rate
+     real(rkind) :: backward_rate,third_body_conc
+     real(rkind),dimension(:),allocatable :: logYspec_local,Yspec_local
+     real(rkind),dimension(:),allocatable :: rateYspec
      
      !! Part of gibbs term (saves time doing outside loop)
      logP0ovR0 = log(P_ref/Rgas_universal)
      
-     !! space of log(Y)
+     !! space of Y and ln(Y) local
      allocate(logYspec_local(nspec));logYspec_local = zero
+     allocate(Yspec_local(nspec));Yspec_local=one
+     allocate(rateYspec(nspec));rateYspec = zero
      
      !! Loop over all nodes
      !$omp parallel do private(istep,ispec,jspec,tmpro,tmpT,logT,production_rate,arrhenius_rate, &
-     !$omp molar_production_rate,product_of_reactants,arrhenius_rate_back,gibbs,kforward_prod, &
-     !$omp product_of_products,kbackward_prod,logYspec_local)
+     !$omp molar_production_rate,arrhenius_rate_back,gibbs,forward_rate,ithirdbody, &
+     !$omp backward_rate,logYspec_local,Yspec_local,third_body_conc,rateYspec)
      do i=1,npfb
      
         !! Density, temperature
@@ -78,8 +81,12 @@ alpha_out(i) = production_rate
         
         !! Store logarithm of species mass fraction for each species
         do ispec = 1,nspec
-           logYspec_local(ispec) = log(max(Yspec(i,ispec),verysmall))
+           Yspec_local(ispec) = max(Yspec(i,ispec),verysmall)
+           logYspec_local(ispec) = log(Yspec_local(ispec))
         end do
+        
+        !! Initialise rate to zero
+        rateYspec(:) = zero
         
         !! Loop over all steps
         do istep = 1,nsteps
@@ -89,16 +96,18 @@ alpha_out(i) = production_rate
                           + arrhenius_coefs(istep,2)*logT &
                           - arrhenius_coefs(istep,3)/tmpT
 
-           !! Loop over all reactants and build log of product_of_reactants
-           product_of_reactants = zero
+           !! Loop over all reactants and build log of forward rate
+           forward_rate = arrhenius_rate
+           !! forward_rate contains ln(k_{f,m})
+           
            do jspec = 1,num_reactants(istep)
               ispec = reactant_list(istep,jspec)  !! ispec is the jspec-th reactant of step istep
               
-              product_of_reactants = product_of_reactants + nu_dash(istep,ispec)* &
-                                     (logYspec_local(ispec) + lnro(i) - log(molar_mass(ispec)))
+              forward_rate = forward_rate + nu_dash(istep,ispec)* &
+                            (logYspec_local(ispec) + lnro(i) - log(molar_mass(ispec)))
            end do
-           !! forward rate * product_of_reactants
-           kforward_prod = exp(arrhenius_rate + product_of_reactants)
+           !! exponential
+           forward_rate = exp(forward_rate)
 
 
            !! Backwards reactions
@@ -106,32 +115,48 @@ alpha_out(i) = production_rate
 
               !! Evaluate backwards rate                           
               !! Initialise ln(backwards rate) = ln(forwards rate)
-              arrhenius_rate_back = arrhenius_rate
+              backward_rate = arrhenius_rate
            
               !! Loop over all species in step
               do jspec = 1,num_reactants(istep) + num_products(istep)
                  ispec = stepspecies_list(istep,jspec)
                  
                  call evaluate_gibbs_at_node(tmpT,logT,ispec,gibbs)
-                 
-                 arrhenius_rate_back = arrhenius_rate_back + delta_nu(istep,ispec)*( &
-                                       gibbs + logP0ovR0 - logT)                                
+                                 
+                 backward_rate = backward_rate + delta_nu(istep,ispec)*( &
+                                  gibbs + logP0ovR0 - logT)                                
               end do          
+              !! backward_rate contains k_{b,m}
               
-              !! Loop over all products and build log of product_of_products
-              product_of_products = zero
+              !! Loop over all products and build log of backward_rate
               do jspec = 1,num_products(istep)
                  ispec = product_list(istep,jspec)
                  
-                 product_of_products = product_of_products + nu_ddash(istep,ispec)* &
-                                       (logYspec_local(ispec) + lnro(i) - log(molar_mass(ispec)))
+                 backward_rate = backward_rate + nu_ddash(istep,ispec)* &
+                                (logYspec_local(ispec) + lnro(i) - log(molar_mass(ispec)))
               
               end do
-              !! backward rate * product_of_products
-              kbackward_prod = exp(arrhenius_rate_back + product_of_products)     
+              !! exponential
+              backward_rate = exp(backward_rate)
            else                    
               !! No backward production otherwise       
-              kbackward_prod = zero                               
+              backward_rate = zero                               
+           end if
+           
+           !! If third bodies
+           if(third_body_flag(istep).ne.0) then
+              ithirdbody = third_body_flag(istep) !! This is the type of third body for step istep
+           
+              !! Build third-body concentration
+              third_body_conc = zero
+              do ispec = 1,nspec
+                 third_body_conc = third_body_conc + third_body_efficiencies(ithirdbody,ispec)* &
+                                                     Yspec_local(ispec)/ &
+                                                     molar_mass(ispec)
+              end do
+              third_body_conc = third_body_conc*tmpro !! Multiply out by ro
+           else
+              third_body_conc = one
            end if
            
            !! Loop over all species in step and calculate production rate of ispec
@@ -139,19 +164,25 @@ alpha_out(i) = production_rate
               ispec = stepspecies_list(istep,jspec)
            
               !! Molar production rate   
-              molar_production_rate = delta_nu(istep,ispec)*(kforward_prod - kbackward_prod)
+              molar_production_rate = delta_nu(istep,ispec)* &
+                                      (forward_rate - backward_rate)* &
+                                      third_body_conc
            
               !! Mass production rate
               production_rate = molar_production_rate*molar_mass(ispec)
-
-alpha_out(i) = -molar_mass(ispec)*delta_nu(istep,ispec)*kbackward_prod
               
-              !! Add to to right hand side
-              rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) + production_rate/tmpro           
+              !! Add to rate for this species
+              rateYspec(ispec) = rateYspec(ispec) + molar_production_rate
+!              rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) + production_rate/tmpro
            end do
            
         end do
 
+        !! Loop over all species and add rate to rhs
+        do ispec = 1,nspec
+           rhs_yspec(i,ispec) = rhs_Yspec(i,ispec) + molar_mass(ispec)*rateYspec(ispec)/tmpro           
+        end do
+alpha_out(i) = rateYspec(2)*molar_mass(2)/tmpro           
      end do
      !$omp end parallel do
      

@@ -4,13 +4,13 @@
 0.01d0
 
 !! Characteristic velocity scale (U_char)
-0.39
+2.05d0
 
 !! Gravity vector (grav)
 0.0d0 0.0d0 0.0d0
 
 !! Characteristic density (rho_char)
-1.5622d0
+0.837900d0
 
 !! Reference temp (for TDTP)
 2.98d2
