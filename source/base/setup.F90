@@ -38,7 +38,7 @@ contains
 
      !! Time begins at zero
      time = zero;itime=0
-     dt_out = 0.0001d0*Time_char         !! Frequency to output fields
+     dt_out = 0.00001d0*Time_char         !! Frequency to output fields
      time_end = 1.0d0*Time_char
   
      !! Particles per smoothing length and supportsize/h
@@ -747,9 +747,11 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      allocate(nu_dash(nsteps,nspec),nu_ddash(nsteps,nspec),delta_nu(nsteps,nspec)) 
      nu_dash = zero;nu_ddash = zero;delta_nu = zero
      
+     !! Flags, efficiencies and coefficients
      allocate(gibbs_rate_flag(nsteps),lindemann_form_flag(nsteps)) !! Flags for backwards and lindemann
      allocate(third_body_flag(nsteps))
      if(nthirdbodies.ne.0) allocate(third_body_efficiencies(nthirdbodies,nspec))
+     allocate(lindemann_coefs(nsteps,4));lindemann_coefs = zero
      
      
      read(12,*) !! Comment line
@@ -805,7 +807,20 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
            end do
         end do
      end if
-
+     read(12,*) !! Blank line
+     
+     !! Lists of Lindemann coefficients
+     nlindemann = maxval(lindemann_form_flag(1:nsteps))
+     if(nlindemann.ne.0) then
+        read(12,*) !! Comment line
+        do istep = 1,nlindemann
+           read(12,*) dummy_int,lindemann_coefs(istep,1:4)
+           !! Take logarithm of pre-exponential factor etc
+           lindemann_coefs(istep,1) = log(lindemann_coefs(istep,1))
+           lindemann_coefs(istep,3) = lindemann_coefs(istep,3)/(Rgas_universal)
+           lindemann_coefs(istep,4) = log(lindemann_coefs(istep,4))
+        end do         
+     end if
      
      close(12)               
 

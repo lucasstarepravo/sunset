@@ -49,15 +49,14 @@ module common_vars
   real(rkind) :: T_low,T_high
   
   !! Chemical kinetics control data
-  integer(ikind) :: nsteps,nthirdbodies
+  integer(ikind) :: nsteps,nthirdbodies,nlindemann
   real(rkind),dimension(:,:), allocatable :: Arrhenius_coefs
   integer(ikind),dimension(:),allocatable :: num_reactants,num_products
   integer(ikind),dimension(:,:),allocatable :: reactant_list,product_list,stepspecies_list
   real(rkind),dimension(:,:),allocatable :: nu_dash,nu_ddash,delta_nu
   integer(ikind),dimension(:),allocatable :: gibbs_rate_flag,lindemann_form_flag,third_body_flag
   real(rkind),dimension(:,:),allocatable :: third_body_efficiencies
-  
-    
+  real(rkind),dimension(:,:),allocatable :: lindemann_coefs    
   
   
   !! Right-hand-sides
