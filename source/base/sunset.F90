@@ -50,6 +50,7 @@ program sunset
   call filter_coefficients   
   
   !! Load data and create initial fields for primary variables
+  call load_control_data_all
 #ifndef isoT
   call load_chemistry_data
 #endif  

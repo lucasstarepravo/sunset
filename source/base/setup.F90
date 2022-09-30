@@ -38,7 +38,7 @@ contains
 
      !! Time begins at zero
      time = zero;itime=0
-     dt_out = 0.00001d0*Time_char         !! Frequency to output fields
+     dt_out = 0.0005d0*Time_char         !! Frequency to output fields
      time_end = 1.0d0*Time_char
   
      !! Particles per smoothing length and supportsize/h
@@ -319,10 +319,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      use thermodynamics
      !! Temporary subroutine whilst developing. Initialises all fields
      integer(ikind) :: i,j,k,ispec
-     real(rkind) :: x,y,z,tmp,tmpro
-     
-     !! Load the remaining control data
-     call load_control_data_all     
+     real(rkind) :: x,y,z,tmp,tmpro     
      
      !! Allocate arrays for properties - primary
      allocate(u(np),v(np),w(np),lnro(np),roE(np),divvel(np))
@@ -354,6 +351,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 #ifndef restart     
 #ifdef react
 !     call make_1d_1step_flame
+!     call make_1d_21step_flame
      call load_flame_file    
 #else
      call hardcode_initial_conditions     
@@ -697,11 +695,18 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         end do
         read(12,*) !! Blank line                            
                            
-        !! Pre-divide gibbs coefficients (and leave in molar form)
+        !! Pre-divide gibbs coefficients (and leave in molar form). Also include log(P_ref/R0)
+        !! and a log(T) term, so result of creating gibbs includes all terms required for
+        !! backwards rate calculation
         coef_gibbs(ispec,:) = coef_cp(ispec,:)
         do iorder = 2,polyorder_cp+1
            coef_gibbs(ispec,iorder) = coef_gibbs(ispec,iorder)/dble(iorder*(iorder-1))
         end do                           
+        coef_gibbs(ispec,1) = coef_cp(ispec,polyorder_cp+3) &
+                            - coef_cp(ispec,1) &
+                            + log(P_ref/Rgas_universal)
+        coef_gibbs(ispec,polyorder_cp+3) = coef_cp(ispec,1) - one
+                     
                            
         !! Convert cp coefficients from molar to mass based
         coef_cp(ispec,:) = coef_cp(ispec,:)*Rgas_universal/molar_mass(ispec)
@@ -902,6 +907,94 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
   
      return
   end subroutine make_1d_1step_flame
+!! ------------------------------------------------------------------------------------------------
+  subroutine make_1d_21step_flame
+     integer(ikind) :: i,ispec,j
+     real(rkind) :: flame_location,flame_thickness
+     real(rkind) :: T_reactants,T_products
+     real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z
+     real(rkind) :: Yin_H2,Yin_O2,Yin_N2,Yout_H2O
+
+     !! Position and scale     
+     flame_location = zero
+     flame_thickness = 5.0d-4/L_char !! Scale thickness because position vectors are scaled...
+
+     !! Inlet composition
+     Yin_H2 = 0.0283126
+     Yin_O2 = 0.226501
+     Yin_N2 = 0.745187
+     
+     !! Outlet composition
+     Yout_H2O = one - Yin_N2     
+
+     !! Temperatures
+     T_reactants = 3.0d2
+     T_products = 2.366d3
+     
+     !! Pressure through flame
+     P_flame = rho_char*Rgas_universal*T_reactants* &
+             (Yin_H2/molar_mass(1) + Yin_O2/molar_mass(2) + Yin_N2/molar_mass(9))
+     
+     !! Inflow speed
+     u_reactants = u_inflow
+     
+     !$omp parallel do private(x,y,z,c,Rmix_local,ispec)
+     do i=1,npfb
+        x = rp(i,1);y=rp(i,2);z=rp(i,3)
+        
+        !! Error function based progress variable
+        c = half*(one + erf((x-flame_location)/flame_thickness))
+        
+        !! Temperature profile
+        T(i) = T_reactants + (T_products - T_reactants)*c
+        
+        !! Composition
+        Yspec(i,1) = (one - c)*Yin_H2
+        Yspec(i,2) = (one - c)*Yin_O2
+        Yspec(i,3) = c*Yout_H2O
+        Yspec(i,4:8) = zero
+        Yspec(i,9) = Yin_N2
+        
+        !! Local mixture gas constant
+        Rmix_local = zero
+        do ispec=1,nspec
+           Rmix_local = Rmix_local + Yspec(i,ispec)/molar_mass(ispec)
+        end do
+        Rmix_local = Rmix_local*Rgas_universal
+        
+        !! Density
+        lnro(i) = log(P_flame) - log(Rmix_local) - log(T(i))
+        
+        !! Velocity
+        u(i) = u_reactants*rho_char/exp(lnro(i))
+        v(i) = zero
+        w(i) = zero
+                        
+     end do
+     !$omp end parallel do
+     
+     !! Values on boundaries
+     if(nb.ne.0)then
+        do j=1,nb
+           i=boundary_list(j)
+           if(node_type(i).eq.0) then !! wall initial conditions
+              u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
+              T_bound(j) = T(i)
+           end if                 
+           if(node_type(i).eq.1) then !! inflow initial conditions
+              u(i)=u_char
+              T_bound(j) = T(i) !! Inflow temperature is T_cold
+           end if
+           if(node_type(i).eq.2) then !! outflow initial conditions
+              T_bound(j) = T(i)  !! Outflow temperature is T_hot
+           end if
+        end do
+     end if
+ 
+  
+  
+     return
+  end subroutine make_1d_21step_flame
 !! ------------------------------------------------------------------------------------------------
   subroutine load_flame_file
      use thermodynamics

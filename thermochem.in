@@ -97,7 +97,7 @@
 
 !! Species 6 - H
 1.0000d+00
-1.8d0
+1.8d-1
 ! polynomial coefs 
  2.5000000d+00
  0.0d0
@@ -411,7 +411,7 @@
 0         !! Third bodies?
 
 !! Third-body efficiencies #1
-1 2.0d0
+1 2.5d0
 2 1.0d0
 3 1.2d1
 4 1.0d0

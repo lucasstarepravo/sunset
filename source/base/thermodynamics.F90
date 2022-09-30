@@ -225,18 +225,14 @@ contains
      integer(ikind) :: iorder
      
      !! Polynomial (in T) terms            
-     gibbs = -Temp*coef_gibbs(ispec,polyorder_cp+1)
-     do iorder=polyorder_cp,2,-1
-        gibbs = (gibbs - coef_gibbs(ispec,iorder))*Temp
+     gibbs = coef_gibbs(ispec,polyorder_cp+1)
+     do iorder=polyorder_cp,1,-1
+        gibbs = coef_gibbs(ispec,iorder) + gibbs*Temp
      end do
-
-     !! Non-poly terms
-     gibbs = gibbs + coef_gibbs(ispec,polyorder_cp+2)/Temp - &
-                     coef_gibbs(ispec,1)*logT + &
-                     coef_gibbs(ispec,1) - &
-                     coef_gibbs(ispec,polyorder_cp+3)
+     gibbs = coef_gibbs(ispec,polyorder_cp+2)/Temp &
+           - coef_gibbs(ispec,polyorder_cp+3)*logT &
+           - gibbs
      
-                      
      return
   end subroutine evaluate_gibbs_at_node
 !! ------------------------------------------------------------------------------------------------
