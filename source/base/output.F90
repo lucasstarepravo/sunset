@@ -211,7 +211,7 @@ contains
         !! Number of species out
         nspec_out = 1
 #ifdef output_composition
-        nspec_out = nspec
+        nspec_out = nspec 
 #endif                
         
         !! Write the main dump files

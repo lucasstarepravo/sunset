@@ -128,6 +128,7 @@ module common_vars
   integer(ikind),dimension(:),allocatable :: fd_parent !! pointer to the boundary node which is parent 
   real(rkind),dimension(:),allocatable :: T_bound
   real(rkind) :: p_outflow   !! Desired pressure on outflow boundary
+  real(rkind),dimension(:),allocatable :: sumoverspecies_homega
   
   !! Profiling and openMP parallelisation
   real(rkind) ts_start,ts_end,t_run,t_per_dt,t_last_X

@@ -216,6 +216,25 @@ contains
      return
   end subroutine evaluate_enthalpy_at_node
 !! ------------------------------------------------------------------------------------------------
+  subroutine evaluate_enthalpy_only_at_node(Temp,ispec,enthalpy)  
+     !! Evaluate the enthalpy and cp of species ispec based on temperature at one node. As above, 
+     !! but doesn't calculate anything else
+     integer(ikind),intent(in) :: ispec
+     real(rkind),intent(in) :: Temp
+     real(rkind),intent(out) :: enthalpy
+     integer(ikind) :: iorder
+     
+     !! Enthalpy only
+     enthalpy = Temp*coef_h(ispec,polyorder_cp+1)        
+     do iorder=polyorder_cp,1,-1
+        enthalpy = Temp*(enthalpy + coef_h(ispec,iorder))     
+     end do    
+     enthalpy = enthalpy + coef_h(ispec,polyorder_cp+2)
+    
+                 
+     return
+  end subroutine evaluate_enthalpy_only_at_node  
+!! ------------------------------------------------------------------------------------------------
   subroutine evaluate_gibbs_at_node(Temp,logT,ispec,gibbs)
      !! Evaluate the gibbs function of species ispec at a node, given T,logT and ispec
      !! N.B. actually returns molar_gibbs/(R0*T)

@@ -130,6 +130,19 @@ The backwards rate constant is related to the forward rate constant via
 in which $P_{0}$ is a reference pressure, and $\hat{g}_{\alpha}$ is the Gibbs function for species $\alpha$, which is given by
 \begin{equation}\frac{\hat{g}_{\alpha}}{W_{\alpha}T}=\frac{a_{\alpha,J+1}}{T}-a_{\alpha,1}\ln{T}+\left(a_{\alpha,1}-a_{\alpha,J+2}\right)-\displaystyle\sum_{j=2}^{J}\frac{a_{\alpha,j}}{j\left(j-1\right)}T^{j-1}.\end{equation}
 
+\subsubsection{Third bodies}
+
+For a step $m$ including third bodies $\mathcal{M}$, reaction rates are scaled by the third-body concentration $c_{M,m}$, which is given by
+\begin{equation}c_{M,m}=\displaystyle\sum_{\alpha}\eta_{\alpha,m}\frac{\rho{Y}_{\alpha}}{W_{\alpha}},\end{equation}
+and $\eta_{\alpha,m}$ are the third-body efficiencies for species $\alpha$ for step $m$.
+
+\subsubsection{Lindemann forms}
+
+Where the Arrhenius form is insufficient to describe the reaction rate, a pressure (partial pressure/concentration) dependancy is introduced, and the forward reaction rate takes the Lindemann form:
+\begin{equation}k_{f,m}=k_{\infty,m}\left(\frac{P_{r}}{1+P_{r}}\right)F_{m},\end{equation}
+where $F_{m}$ is the Troe fall-off rate, and a constant for steps with Lindemann form. $P_{r}$ is a reduced pressure given by
+\begin{equation}P_{r}=\frac{k_{0,m}}{k_{\infty,m}},\end{equation}
+$k_{0,m}$ is the Arrhenius rate of the reaction, and $k_{\infty,m}$ is a second Arrhenius rate. Hence for Lindemann steps, in addition to the three Arrhenius coefficients, the constant $F_{m}$ is prescribed, along with the pre-exponential factor, the temperature dependence of the pre-exponential factor and the activation energy for $k_{\infty,m}$. Note that after evaluation of the rate constants for Lindemann steps, the third-body concentration of the step is reset to unity.
 
 \section{Numerical implementation}
 

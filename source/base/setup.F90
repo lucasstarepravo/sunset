@@ -38,7 +38,7 @@ contains
 
      !! Time begins at zero
      time = zero;itime=0
-     dt_out = 0.0005d0*Time_char         !! Frequency to output fields
+     dt_out = 0.00005d0*Time_char         !! Frequency to output fields
      time_end = 1.0d0*Time_char
   
      !! Particles per smoothing length and supportsize/h
@@ -149,12 +149,13 @@ contains
      nl_ini = 1;nl_end = npfb
 #endif    
 
+
      !! Allocate local node arrays
      nm = 10
      allocate(rp(nm*npfb,dims),rnorm(nm*npfb,dims),h(nm*npfb),s(nm*npfb));rp=zero;rnorm=zero
      allocate(node_type(nm*npfb));node_type=0
      allocate(fd_parent(nm*npfb));fd_parent=0
-          
+         
      !! Load all nodes. Build FD stencils near boundaries on the fly.
      npfb_tmp = npfb
      nb = 0;ii = 0
@@ -327,9 +328,9 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      u=zero;v=zero;w=zero;lnro=zero;roE=one;Yspec=one;divvel=zero
 
      !! Secondary properties
-     allocate(alpha_out(np));alpha_out = zero
      allocate(T(np));T=T_ref
      allocate(p(np));p=zero
+     allocate(alpha_out(np));alpha_out = zero     
      
      !! Transport properties
      allocate(visc(npfb));visc = visc_ref
@@ -610,7 +611,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      read(12,*)
      read(12,*) p_ref
      read(12,*) 
-     
+         
      !! Prandtl number
      read(12,*)
      read(12,*) Pr
@@ -999,7 +1000,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
   subroutine load_flame_file
      use thermodynamics
      integer(ikind) :: i,ispec,j,nflamein
-     real(rkind) :: flame_location,flame_thickness
+     real(rkind) :: flame_location,flame_thickness,cell_pos
      real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z
      real(rkind),dimension(:),allocatable :: flamein_ro,flamein_u,flamein_v,flamein_w,flamein_roE
      real(rkind),dimension(:,:),allocatable :: flamein_Y
@@ -1014,12 +1015,12 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
      !! Read file, then close it.     
      !! Format of the file is ro,ro*u,ro*v,ro*w,roE,ro*Y (all ispec) over 1001 evenly spaced steps covering 
      !! a 0.01m long domain.
-     nflamein = 1001
-     dx_flamein = 0.01/(nflamein-1)
+     nflamein = 1002
+     dx_flamein = 0.01/(nflamein-2)
      allocate(flamein_ro(nflamein),flamein_u(nflamein),flamein_v(nflamein),flamein_w(nflamein))
      allocate(flamein_Y(nflamein,nspec))
      allocate(flamein_roE(nflamein))
-     do i=1,nflamein
+     do i=1,nflamein-1
         !! Load conservative data
         read(19,*) flamein_ro(i),flamein_u(i),flamein_v(i),flamein_w(i), &
                    flamein_roE(i),flamein_Y(i,1:nspec)
@@ -1030,25 +1031,34 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
         flamein_w(i) = flamein_w(i)/flamein_ro(i)        
         flamein_Y(i,:) = flamein_Y(i,:)/flamein_ro(i)                
      end do
+     flamein_ro(nflamein) = flamein_ro(nflamein-1)   !! Data for extra point at end
+     flamein_u(nflamein) = flamein_u(nflamein-1)
+     flamein_v(nflamein) = flamein_v(nflamein-1)
+     flamein_w(nflamein) = flamein_w(nflamein-1)
+     flamein_roE(nflamein) = flamein_roE(nflamein-1)
+     flamein_Y(nflamein,:) = flamein_Y(nflamein-1,:)   
      close(19)
      
        
      !! Loop through all particles. Find the "cell" the particle resides in. Copy data.     
-     !$omp parallel do private(j,x,y,z,c,Rmix_local,ispec)
+     !$omp parallel do private(j,x,y,z,c,Rmix_local,ispec,cell_pos)
      do i=1,npfb
         x = (rp(i,1)+half)*L_char  !! Scale x - this requires L_char to match the length
         !! also needs shifting depending on set up.
         
-        !! Nearest index in flame-in data
-        j = floor(x/dx_flamein) + 1
+        !! Nearest index in flame-in data (to left of x)
+        j = floor(x/dx_flamein) + 1      
+        
+        !! proportion along cell
+        cell_pos= x/dx_flamein - dble(j-1)
         
         !! Copy data
-        lnro(i) = log(flamein_ro(j))
-        u(i) = flamein_u(j)
-        v(i) = flamein_v(j)
-        w(i) = flamein_w(j)
-        roE(i) = flamein_roE(j)   
-        Yspec(i,:) = flamein_Y(j,:)
+        lnro(i) = log(flamein_ro(j)*(one - cell_pos) + flamein_ro(j+1)*cell_pos)
+        u(i) = flamein_u(j)*(one - cell_pos) + flamein_u(j+1)*cell_pos
+        v(i) = flamein_v(j)*(one - cell_pos) + flamein_v(j+1)*cell_pos
+        w(i) = flamein_w(j)*(one - cell_pos) + flamein_w(j+1)*cell_pos
+        roE(i) = flamein_roE(j)*(one - cell_pos) + flamein_roE(j+1)*cell_pos   
+        Yspec(i,:) = flamein_Y(j,:)*(one - cell_pos) + flamein_Y(j+1,:)*cell_pos
 
         !! Temporary assign p and T
         T(i) = T_ref
@@ -1120,7 +1130,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 !        do ispec=1,nspec      
            tmp = one - half*(one + erf(5.0d0*x))
            Yspec(i,1) = tmp
-           Yspec(i,2) = one - tmp
+!           Yspec(i,2) = one - tmp
 
 !        end do
 #endif         

@@ -66,6 +66,9 @@ contains
 #endif     
      Lchar(2) = gammagasm1*(Lchar(5)+Lchar(1))/c/c &
                  - gammagasm1*tmpro*gradv(2) - gammagasm1*tmpro*gradw(3) !! Compatible with fixing dT/dt=0?  
+#ifdef react
+     !! Add chemistry source terms to L2
+#endif                 
 #else          
      !! THERMAL FLOWS, ADIABATIC WALLS (imposed heat flux)
      !Lchar(1) is outgoing, and so is unchanged    
@@ -148,6 +151,13 @@ contains
     Lchar(5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &      !! Track u_inflow
              - half*(v(i)*gradp(2)+gammagas*p(i)*gradv(2)+tmpro*c*v(i)*gradu(2))  & !! transverse 1 conv. terms
              - half*(w(i)*gradp(3)+gammagas*p(i)*gradw(3)+tmpro*c*w(i)*gradu(3))    !! transverse 2 conv. terms  
+
+    !! Add source terms for chemical reactions
+#ifdef react
+    Lchar(2) = Lchar(2) + (gammagas-one)*sumoverspecies_homega(j)/c/c
+    Lchar(5) = Lchar(5) - half*(gammagas-one)*sumoverspecies_homega(j)
+#endif
+             
 #ifdef ms
     Lchar(5+1:5+nspec) = zero                 
 #endif    
@@ -183,13 +193,16 @@ contains
      real(rkind),dimension(:),intent(inout) :: Lchar
      real(rkind),dimension(:),intent(in) :: gradp,gradu,gradv,gradw
      integer(ikind) :: i,ispec
-     real(rkind) :: tmpro,c,gammagasm1,gammagas
+     real(rkind) :: tmpro,c,gammagasm1,gammagas,Lexact
      
      !! Index of this boundary node
      i = boundary_list(j)
 
      !! Store the density
      tmpro = exp(lnro(i))
+     
+     !! Store the initial value (computed from derivs, L1exact in Yoo & Im)
+     Lexact = Lchar(1)
 
      !! Store the sound speed
 #ifndef isoT       
@@ -218,6 +231,12 @@ contains
         Lchar(1) = (p(i)-p_outflow)*0.278d0*c*(one)/two/L_domain_x &                               !! track p_outflow
                  - (one-u(i)/c)*half*(v(i)*gradp(2)+gammagas*p(i)*gradv(2)-tmpro*c*v(i)*gradu(2)) & !! trans1 conv.
                  - (one-u(i)/c)*half*(w(i)*gradp(3)+gammagas*p(i)*gradw(3)-tmpro*c*w(i)*gradu(3))   !! trasn2 conv.
+     
+       !! Add source terms for reacting flows
+#ifdef react
+        Lchar(1) = Lchar(1) - half*(gammagas-one)*sumoverspecies_homega(j)
+#endif
+
                  
      end if
      !Lchar(2) is outgoing

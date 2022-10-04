@@ -108,12 +108,19 @@ contains
      call calc_rhs_Yspec
      call calc_rhs_vel
      call calc_rhs_roE
-     if(nb.ne.0) call calc_rhs_nscbc   
 
      !! Calculate chemical production rates and add these to rhs of species equation
 #ifdef react     
-     call calculate_chemical_production_rate  
+     call calculate_chemical_production_rate 
 #endif     
+
+     !! Evaluate RHS for boundaries
+     if(nb.ne.0) then 
+        call calc_rhs_nscbc   
+#ifdef react
+        deallocate(sumoverspecies_homega)
+#endif                
+     end if
 
      !! Clear space no longer required
      deallocate(gradlnro,gradu,gradv,gradw,gradp)
@@ -675,7 +682,7 @@ contains
        i=boundary_list(j)  
        
        !! WALL BOUNDARY 
-       if(node_type(i).eq.0) then 
+       if(node_type(i).eq.0) then      
           call specify_characteristics_wall(j,L(j,:),gradv(i,:),gradw(i,:))
 
 
@@ -752,7 +759,7 @@ contains
           end do
 #endif          
        !! OUTFLOW BOUNDARY ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-       else if(node_type(i).eq.2)then    
+       else if(node_type(i).eq.2)then   
           rhs_u(i) = rhs_u(i) - (L(j,5)-L(j,1))/(tmpro*c)       
           rhs_v(i) = rhs_v(i) - L(j,3)
           rhs_w(i) = rhs_w(i) - L(j,4)
@@ -770,10 +777,9 @@ contains
        end if
     end do
     !$omp end parallel do
-  
     !! De-allocate L
     deallocate(L)
-    
+
     return  
   end subroutine calc_rhs_nscbc
 !! ------------------------------------------------------------------------------------------------  

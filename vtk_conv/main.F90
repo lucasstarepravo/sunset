@@ -19,7 +19,7 @@ program main
   integer :: itn,ifi,ifo,di,dim_flag
   real :: dr
       
-  real,allocatable,dimension(:):: xp,zp,up,vp,wp,ro,vort,h,Temp,Y0,yp
+  real,allocatable,dimension(:):: xp,zp,up,vp,wp,ro,vort,h,Temp,yp
   real,allocatable,dimension(:,:) :: Yspec
   real time(i_PART_counter_max), DT(i_PART_counter_max)
   integer np_all(i_PART_counter_max), IT(i_PART_counter_max)
@@ -39,7 +39,6 @@ program main
   allocate(vort(np_max))
   allocate(h(np_max))
   allocate(Temp(np_max))
-  allocate(Y0(np_max))
 
   DQ=CHAR(34)
    
@@ -79,14 +78,13 @@ program main
   write(6,*) "Enter starting frame"
   read(*,*) N_start
   
+  !! Can only load 9 species + all thermo-chem data...
+  nspecs = min(nspecs,9) 
+  
   allocate(Yspec(np_max,nspecs))
   ngrab = N_start-1
         
   !! Loop over each frame   
-!  !$omp parallel do private(name_vtu,ngrab,npp,iproc,name_orig,supp1,supp2,supp3,supp, &
-!  !$omp xp,zp,h,node_type,ro,up,vp,vort,Temp,Y0,np_ini,np_end,np,i,processor, &
-!  !$omp string1,string2,string3,string4,np_string3,np_string4,np_string5,np_string6,np_string7,np_string8, &
-!  !$omp itn,ifi,ifo,proc5)
   do iframe=N_start,Nframes+1
 
      !! Each thread needs a different io number for in and out files
@@ -241,7 +239,7 @@ program main
         string3 = '    </DataArray>'
         write(ifo,202) string3
         
-        !! Y0 mass frac
+        !! Y mass frac
         do iii=1,nspecs
            write(ispec_string1,'(A1,i1.1)') 'Y',iii
            string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//ispec_string1//DQ//' format='//DQ//'ascii'//DQ//'>'
@@ -383,7 +381,7 @@ program main
 
 
   deallocate(xp,zp,up,vp,wp)
-  deallocate(ro,vort,h,Temp,Y0)  
+  deallocate(ro,vort,h,Temp)  
 
 
   stop
