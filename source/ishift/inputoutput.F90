@@ -13,6 +13,9 @@ module inputoutput
 
   !! Start and end indices for domain decomposition
   integer(ikind),dimension(:),allocatable :: nstart,nend
+  
+  !! Local hovs for shifting
+  real(rkind),parameter :: hovs_local = 2.5d0
 
 contains
 !! ------------------------------------------------------------------------------------------------  
@@ -55,7 +58,7 @@ contains
               dr_tmp = zero
               do k=1,ij_count(i)
                  j=ij_link(i,k)
-                 rij = rp(i,:)-rp(j,:);rad=sqrt(dot_product(rij,rij));qq=hovs*rad/h(i)
+                 rij = rp(i,:)-rp(j,:);rad=sqrt(dot_product(rij,rij));qq=hovs_local*rad/h(i)
 
                  gradw(:) = qkd_mag*((half*qq - one)**1.0)*rij(:)/max(rad,epsilon(rad))
                  if(qq.gt.2.0) gradw(:) = zero            
@@ -127,7 +130,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      read(13,*) xmin,xmax,ymin,ymax
      read(13,*) xbcond,ybcond
      !! Calculate some useful constants
-     smax = dummy;h0 = hovs*dummy;sup_size = ss*h0;h2=h0*h0;h3=h2*h0
+     smax = dummy;h0 = hovs_local*dummy;sup_size = ss*h0;h2=h0*h0;h3=h2*h0
         
     
      allocate(rp(4*npfb,dims),rnorm(4*npfb,dims),h(4*npfb),s(4*npfb));rp=0.0d0;rnorm=0.0d0
@@ -141,7 +144,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      do i=1,npfb_tmp
         ii = ii + 1
         read(13,*) rp(ii,1:2),jj,rnorm(ii,1:2),dummy
-        h(ii) = dummy*hovs
+        h(ii) = dummy*hovs_local
         s(ii) = dummy
         node_type(ii) = jj
         if(jj.ge.0.and.jj.le.2) then !! If it is a boundary node

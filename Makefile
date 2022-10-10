@@ -17,7 +17,18 @@
 # -------------------------------------------------------------------------------------------------
 #
 # EXAMPLE USAGE:
-# make thermo=0 react=0 mpi=1 etc...
+# For isothermal flows:
+# make thermo=0 dim3=X mpi=X pgrad=X
+#
+# For standard combustion problems, react=1 will overwrite any thermo, tdtp and multispec flags:
+# make react=1 dim3=X mpi=X yout=X wisot=X       <---------- standard combustion make
+#
+# For thermal flows with real gas properties:
+# make thermo=1 dim3=X mpi=X pgrad=X tdtp=1
+#
+# For thermal flows with fixed cp, visc, lambda
+# make thermo=1 dim3=X mpi=X pgrad=X tdtp=0
+
 #
 # Choose compiler depending on whether mpi
 ifeq ($(mpi),1)
@@ -32,49 +43,63 @@ endif
 CFLAGS := -Wall -O3 -g -m64
 FFLAGS := -fopenmp -fbounds-check -ffpe-trap=zero -O3 -Wall -g -J./obj -I./obj -m64
 
-# Isothermal or not. tdtp can only happen if not(isoT)
+# Isothermal or not. tdtp can only happen if not(isoT). isoT can only happen if not(react)
 ifeq ($(thermo), 0)
+ifneq ($(react), 1)
 FFLAGS += -DisoT
+endif
 else
 ifeq ($(tdtp),1)
 FFLAGS += -Dtdtp
 endif
 endif
+
 # Multi-species?
 ifeq ($(multispec), 1)
 FFLAGS += -Dms
 endif
-# Reacting, and if so, force multispeces
+
+# Reacting? set react if so, also force multispecies and tdtp
 ifeq ($(react), 1)
 FFLAGS += -Dreact
-ifeq ($multispec),0)
+ifneq ($(multispec),1)
 FFLAGS += -Dms
 endif
+ifneq ($(tdtp),1)
+FFLAGS += -Dtdtp
 endif
+endif
+
 # Restart from dump file.
 ifeq ($(restart), 1)
 FFLAGS += -Drestart
 endif
+
 # Inflow boundary types
 ifeq ($(hardinf), 1)
 FFLAGS += -Dhardinf
 endif
+
 # Multiprocessor? (use mpi?)
 ifeq ($(mpi),1)
 FFLAGS += -Dmp
 endif
+
 # Wall boundary types
 ifneq ($(wisot),0)
 FFLAGS += -Dwall_isoT
 endif
+
 # Three dimensional?
 ifeq ($(dim3),1)
 FFLAGS += -Ddim3
 endif
+
 # Flow driven by pressure gradient?
 ifeq ($(pgrad),1)
 FFLAGS += -Dpgrad
 endif
+
 # Output full chemical composition?
 ifneq ($(yout),0)
 FFLAGS += -Doutput_composition
@@ -90,17 +115,14 @@ SRC_DIR  := $(addprefix source/,$(SUB_DIRS))
 OBJ_FILES := obj/kind_parameters.o obj/common_parameter.o obj/common_vars.o
 OBJ_FILES += obj/rbfs.o obj/mirror_boundaries.o obj/derivatives.o 
 OBJ_FILES += obj/mpi_transfers.o obj/thermodynamics.o
-OBJ_FILES += obj/neighbours.o obj/output.o obj/setup.o
+OBJ_FILES += obj/neighbours.o obj/output.o obj/statistics.o 
+OBJ_FILES += obj/setup_domain.o obj/setup_flow.o
 OBJ_FILES += obj/labf.o obj/fd.o obj/chemistry.o
 OBJ_FILES += obj/characteristic_boundaries.o obj/rhs.o
 OBJ_FILES += obj/step.o
 OBJ_FILES += $(foreach sdir,$(SRC_DIR),$(patsubst $(sdir)/%.F90,obj/%.o,$(wildcard $(sdir)/*.F90)))
-OBJ_FILES += $(foreach sdir,$(SRC_DIR),$(patsubst $(sdir)/%.cpp,obj/%.o,$(wildcard $(sdir)/*.cpp)))
-
-HDEPS := $(OBJ_FILES:.o=.d)
 
 vpath %.F90 $(SRC_DIR)
-vpath %.cpp $(SRC_DIR)
 
 #-------
 default: sunset
@@ -109,8 +131,6 @@ sunset: $(OBJ_FILES)
 
 obj/%.o: %.F90
 	$(FC) $(FFLAGS) -c -o $@ $<
-
-#-include $(HDEPS)
 
 clean:
 	rm -vf ./obj/*.o

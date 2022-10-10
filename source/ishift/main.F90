@@ -62,9 +62,7 @@ subroutine initial_setup
   use omp_lib
   
   !! Particles per smoothing length and supportsize/h
-  hovs = 2.5   !! 2.2 normally, 2.5 can be safer...
-  ss = 2.0
-  nplink = 2*4*ceiling(ss*hovs)**2  !! # square stencil w/ side length 2*dr*hovs*ss
+  nplink = 2*4*ceiling(ss*2.5d0)**2  !! # square stencil w/ side length 2*dr*hovs*ss
   
 end subroutine initial_setup
 !! ------------------------------------------------------------------------------------------------

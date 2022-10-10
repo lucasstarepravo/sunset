@@ -15,6 +15,7 @@ module step
   use common_parameter
   use common_vars
   use mirror_boundaries
+  use characteristic_boundaries
   use rhs
   use mpi_transfers
 #ifdef mp  
@@ -111,6 +112,7 @@ contains
         !$omp end parallel do
               
         !! Apply BCs and update halos
+        call apply_time_dependent_bounds        
         call reapply_mirror_bcs
         call halo_exchanges_all
         
@@ -152,6 +154,7 @@ contains
      time = time0 + dt
      
      !! Apply BCs and update halos
+     call apply_time_dependent_bounds     
      call reapply_mirror_bcs
      call halo_exchanges_all
               
@@ -159,6 +162,7 @@ contains
      call filter_variables
 
      !! Apply BCs and update halos
+     call apply_time_dependent_bounds
      call reapply_mirror_bcs
      call halo_exchanges_all
 
@@ -276,6 +280,7 @@ contains
         !$omp end parallel do
        
         !! Apply BCs and update halos
+        call apply_time_dependent_bounds        
         call reapply_mirror_bcs
         call halo_exchanges_all
         
@@ -363,6 +368,7 @@ contains
      time = time0 + dt
      
      !! Apply BCs and update halos
+     call apply_time_dependent_bounds     
      call reapply_mirror_bcs
      call halo_exchanges_all
           
@@ -370,6 +376,7 @@ contains
      call filter_variables
 
      !! Apply BCs and update halos
+     call apply_time_dependent_bounds
      call reapply_mirror_bcs
      call halo_exchanges_all
      
@@ -385,20 +392,17 @@ contains
      use thermodynamics
      integer(ikind) :: i
      real(rkind) :: umag,dt_local
-     real(rkind) :: dt_visc,dt_therm,dt_spec,dt_cfl,dt_parabolic     
-     real(rkind) :: c,uplusc
-     
-     !! Store the last time-step in dt_previous in case we're using PID controller later
-     dt_previous = dt
-     
+     real(rkind) :: dt_visc,dt_therm,dt_spec  
+     real(rkind) :: c,uplusc,dt_cfl_local,dt_parabolic_local
+         
      call evaluate_temperature_and_pressure
      call evaluate_transport_properties   
      
-     !! Find minimum values for cfl, visc, thermal, and molecular diffusive steps
+     !! Find minimum values for cfl, visc, thermal diff terms
      dt_cfl = 1.0d10;dt_visc = 1.0d10;dt_therm=1.0d10;dt_spec=1.0d10
      cmax = zero;umax = zero
-     !$omp parallel do private(c,uplusc) reduction(min:dt_cfl,dt_visc,dt_therm,dt_spec) &
-     !$omp reduction(max:cmax,umax)
+!     !$omp parallel do private(c,uplusc) reduction(min:dt_cfl,dt_visc,dt_therm,dt_spec) &
+!     !$omp reduction(max:cmax,umax)
      do i=1,npfb
         !! Sound speed 
 #ifndef isoT        
@@ -409,58 +413,71 @@ contains
  
         !! Max velocity and sound speed
         umax = sqrt(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))
-        cmax = c
+        cmax = max(c,cmax)
         
         !! Max speed of information propagation
         uplusc = umax + c
         
         !! Acoustic:: s/(u+c)
-        dt_cfl = s(i)/uplusc
+        !! Slightly reduce on outflows for stability
+        if(node_type(i).eq.2) then
+           dt_cfl = min(dt_cfl,0.8d0*s(i)/uplusc)
+        else
+           dt_cfl = min(dt_cfl,s(i)/uplusc)
+        endif
 
         !! Viscous:: s*s*ro/visc
-        dt_visc = s(i)*s(i)*exp(lnro(i))/visc(i)
+        dt_visc = min(dt_visc,s(i)*s(i)*exp(lnro(i))/visc(i))
         
 #ifndef isoT        
         !! Thermal:: s*s*ro*cp/lambda_th
-        dt_therm = s(i)*s(i)*exp(lnro(i))*cp(i)/lambda_th(i)
-#endif        
-        
+        dt_therm = min(dt_therm,s(i)*s(i)*exp(lnro(i))*cp(i)/lambda_th(i))
+#endif      
+
 #ifdef ms        
         !! Molecular diffusivity::  s*s*ro/Mdiff
-        dt_spec = s(i)*s(i)*exp(lnro(i))/maxval(Mdiff(i,1:nspec))
-#endif        
+        dt_spec = min(dt_spec,s(i)*s(i)*exp(lnro(i))/maxval(Mdiff(i,1:nspec)))
+#endif   
+         
      end do
-     !$omp end parallel do
+!     !$omp end parallel do
 
-     !! Scale by characteristic lengths
-     dt_cfl = dt_cfl*L_char
-     dt_visc = dt_visc*L_char*L_char
-     dt_therm = dt_therm*L_char*L_char
-     dt_spec = dt_spec*L_char*L_char          
-
+     !! Scale by characteristic lengths and coefficients
+     dt_cfl = one*dt_cfl*L_char
+     dt_visc = 0.3d0*dt_visc*L_char*L_char
+     dt_therm = 0.3d0*dt_therm*L_char*L_char
+     dt_spec = 1.5d0*dt_spec*L_char*L_char
                            
      !! Find smallest node spacing
      smin = minval(s(1:npfb))*L_char
 
-     !! Set time step
-     dt_parabolic = 0.3d0*min(dt_visc,min(dt_therm,dt_spec)) !! Parabolic=diffusive constraints
-     dt = min(dt_parabolic,one*dt_cfl)
-
-      
+     !! Find most restrictive parabolic constraint
+     dt_parabolic = min(dt_visc,min(dt_therm,dt_spec)) 
+     
+     !! Set dt if not reacting. If reacting, it will be set later by PID.
+#ifndef react
+     dt = min(dt_parabolic,dt_cfl)
+#endif     
+     
 #ifdef mp     
-     !! Find global time-step
-     dt_local = dt
-     call MPI_ALLREDUCE(dt_local,dt,1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror) 
+     !! Global cfl-based time-step and parabolic parts based time-step
+     dt_cfl_local = dt_cfl;dt_parabolic_local=dt_parabolic
+     call MPI_ALLREDUCE(dt_cfl_local,dt_cfl,1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(dt_parabolic_local,dt_parabolic,1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)       
+                 
      !! Output time-step (only if not reacting)
 #ifndef react
+     !! Global time step
+     dt_local = dt
+     call MPI_ALLREDUCE(dt_local,dt,1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
      if(iproc.eq.0) then
-        write(192,*) time,dt
+        write(192,*) time,dt,one
         flush(192)
      end if
 #endif     
 #else
 #ifndef react
-     write(192,*) time,dt
+     write(192,*) time,dt,one
      flush(192)         
 #endif     
 #endif     
@@ -469,70 +486,52 @@ contains
   end subroutine set_tstep
 !! ------------------------------------------------------------------------------------------------  
   subroutine set_tstep_PID
+     !! Adapt the time-step using the PID controller based on intergation errors.
+     !! This routine is generally only called for reacting flows, and *presumes* that 
+     !! the CFL-type time-step constraints have been calculated already.
      integer(ikind) :: i
      real(rkind) :: dtfactor,emax_local
      real(rkind) :: facA,facB,facC
-     real(rkind) :: kappa,alph,beta,gamm,eps
      real(rkind) :: tratio_min,tratio_max
      real(rkind) :: umag2,umag
-     real(rkind) :: dtmax,c,dt_local
-     
-     !! Set the upper limit of dt to that based on CFL-type conditions (currently stored in dt), and
-     !! pass the old value back into dt
-     dtmax = dt
-     dt = dt_previous
-     
+     real(rkind) :: c,dt_local,dt_max
+        
+                  
 #ifdef mp     
      !! Parallel transfer to obtain the global maximum error          
      emax_local = emax_np1
      call MPI_ALLREDUCE(emax_local,emax_np1,1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror) 
 #endif     
-          
-     !! PID parameters...
-     kappa=0.9
-     alph=0.7/2.0;beta=0.4/2.0;gamm=0.1/2.0
-     !0.7,0.4,0.1
-     !0.49/p,0.34/p,0.1/p !! SENGA2
-     eps = 1.0d-3
    
      !! P, I and D factors..  Calculation done in log space...
-     facA = alph*log(eps/emax_np1)
-     facB = beta*log(emax_n/eps)
-     facC = gamm*log(eps/emax_nm1)
+     facA = pid_a*log(pid_tol/emax_np1)
+     facB = pid_b*log(emax_n/pid_tol)
+     facC = pid_c*log(pid_tol/emax_nm1)
          
      !! Combined factor
-     dtfactor = kappa*exp(facA+facB+facC)
+     dtfactor = pid_k*exp(facA+facB+facC)
      
      !! Suppress big changes in time step (especially increases). N.B. this significantly reduces
      !! the stiffness of the PID system, and seems faster so far.
      dtfactor = one + one*atan((dtfactor-one)/one)
-
-     !! Old approach to limiting change in dt - hard cut-offs
-!     tratio_min = 1.0d-1
-!     tratio_max = 1.01d0
-!     if(dtfactor.lt.tratio_min) dtfactor = tratio_min
-!     if(dtfactor.gt.tratio_max) dtfactor = tratio_max     
-     
+       
      !! Set time new step
      dt = dt*dtfactor
      
-     !! Impose upper limit
-     if(dt.gt.dtmax) dt = dtmax
-     
-!! Force time-step
-!dt = 1.0d-9     
-     
+     !! Impose upper limit based on CFL-type constraints
+     dt_max = min(dt_cfl,dt_parabolic)
+     if(dt.gt.dt_max) dt = dt_max
+
 #ifdef mp     
      !! Find global time-step
      dt_local = dt
      call MPI_ALLREDUCE(dt_local,dt,1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror) 
      if(iproc.eq.0) then
-        write(192,*) time,dt
+        write(192,*) time,dt,dt/dt_cfl
         flush(192)
-!write(6,*) itime,dtmax,dt        
      end if
 #else
-     write(192,*) time,dt
+     write(192,*) time,dt,dt/dt_cfl
      flush(192)         
 #endif 
  

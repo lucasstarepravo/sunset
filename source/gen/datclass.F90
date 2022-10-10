@@ -512,7 +512,7 @@ case(4) !! A sort of porous media... for porous Rayleigh-Taylor stuff
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.0125!25d0!0125d0  ! channel width
+     yl=0.0125!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
      dx0=xl/1000.0       !15
      xbcond=0;ybcond=1     
@@ -737,10 +737,10 @@ endif
 !! ------------------------------------------------------------------------------------------------
 case(6) !! Channel flows, propagating front
 
-     h0=0.5d0       !cylinder radius
+     xl=1.0d0 ! channel length
+     h0=xl/48.0d0   !cylinder radius
      yl=4.0d0*h0  ! channel width
-     xl=12.0d0*h0 ! channel length
-     dx0=h0/120.0       !15
+     dx0=xl/800.0       !15
      xbcond=0;ybcond=1     
      
      nb_patches = 4
@@ -756,7 +756,7 @@ case(6) !! Channel flows, propagating front
      b0=2.5d0*h0;b1=b0*sqrt(3.0d0)/2.0d0;b2=b0/2.0d0
      blob_centre(1,:)=(/0.d0,0.d0/); !! Central
      do i=1,nb_blobs
-        blob_coeffs(i,:)=h0*(/1.0d0,0.4d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0;blob_ellipse(i)=1
+        blob_coeffs(i,:)=h0*(/1.0d0,1.0d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0;blob_ellipse(i)=1
      end do
 
      call make_boundary_edge_vectors

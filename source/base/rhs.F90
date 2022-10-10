@@ -63,13 +63,12 @@ contains
      segment_tstart_rhs = omp_get_wtime()     
      segment_tstart_subtract = segment_time_local(4) + segment_time_local(5) + segment_time_local(7)
   
-     !! Some initial allocation of space
+     !! Some initial allocation of space for boundaries
 #ifndef ms
      if(nb.ne.0) allocate(L(nb,5)) 
 #else
      if(nb.ne.0) allocate(L(nb,5+nspec)) 
 #endif  
-
 
      !! Determine secondary thermodynamic quantities and transport properties
      !! N.B. These are also calculated when setting time step, so not necessary for the first call
@@ -118,10 +117,10 @@ contains
      if(nb.ne.0) then 
         call calc_rhs_nscbc   
 #ifdef react
-        deallocate(sumoverspecies_homega)
+        deallocate(sumoverspecies_homega,reaction_rate_bound)
 #endif                
      end if
-
+     
      !! Clear space no longer required
      deallocate(gradlnro,gradu,gradv,gradw,gradp)
 #ifndef isoT     
@@ -156,7 +155,7 @@ contains
      end do
      !$omp end parallel do
 
-     !! For any boundary nodes, begin population of L2 and make transverse part of rhs
+     !! For any boundary nodes make transverse part of rhs
      if(nb.ne.0)then
         !$omp parallel do private(i,tmp_scal,xn,yn,un,ut,dutdt)
         do j=1,nb
@@ -171,10 +170,7 @@ contains
               rhs_lnro(i) = - dutdt - gradw(i,3)
            else !! In x-y coords for inflow, outflow
               rhs_lnro(i) = -v(i)*gradlnro(i,2) - gradv(i,2) - w(i)*gradlnro(i,3) - gradw(i,3)
-           end if
-#ifndef isoT           
-           L(j,2) = tmp_scal*gradlnro(i,1)  !! First bit of L2 (where non-isothermal)          
-#endif           
+           end if         
         end do
         !$omp end parallel do 
      end if       
@@ -234,6 +230,9 @@ contains
            !! Add this term to the diffusion correction store
            speciessum_divrhoDgradY(i) = speciessum_divrhoDgradY(i) + molec_diff
 
+           !! Augment speciessum_DgradY
+           speciessum_DgradY(i,:) = speciessum_DgradY(i,:) + Mdiff(i,ispec)*gradYspec(i,:,ispec)
+
 #ifndef isoT                                 
            !! Evaluate enthalpy, cp and dcp/dT for species ispec
            call evaluate_enthalpy_at_node(T(i),ispec,enthalpy,cpispec,dcpdT)
@@ -257,11 +256,9 @@ contains
                                      + cpispec*gradYspec(i,:,ispec)
 #endif                    
                       
-           !! Augment speciessum_DgradY
-           speciessum_DgradY(i,:) = speciessum_DgradY(i,:) + Mdiff(i,ispec)*gradYspec(i,:,ispec)
                       
-           !! Build the RHS
-           rhs_Yspec(i,ispec) = tmp_scal + molec_diff ! + SOURCE
+           !! Build the RHS (source terms added later)
+           rhs_Yspec(i,ispec) = tmp_scal + molec_diff 
         end do
         !$omp end parallel do
 
@@ -282,19 +279,25 @@ contains
 #endif                              
                            
               !! Slight difference here depending on type of boundary           
-              if(node_type(i).eq.0)then  !! WALLS: no diffusive flux in normal
+              if(node_type(i).eq.0)then  !! WALLS: no diffusive mass flux through walls
 
                  lapYspec_tmp = grad2Yspec(j,2) + grad2Yspec(j,3) !! Transverse terms only 
                  molec_diff = Mdiff(i,ispec)*lapYspec_tmp &
                             + Mdiff(i,ispec)*dot_product(gradYspec(i,2:3,ispec),gradlnro(i,2:3)) &
                             + dot_product(gradYspec(i,2:3,ispec),gradmdiff(2:3))
+
+                 !! Augment speciessum_DgradY
+                 speciessum_DgradY(i,2:3) = speciessum_DgradY(i,2:3) + Mdiff(i,ispec)*gradYspec(i,2:3,ispec)
            
-              else                 !! Inflow or outflow
+              else            !! Inflow or outflow
                  lapYspec_tmp = grad2Yspec(j,1) + grad2Yspec(j,2) + grad2Yspec(j,3)
 
                  molec_diff = Mdiff(i,ispec)*lapYspec_tmp &
                             + Mdiff(i,ispec)*dot_product(gradYspec(i,:,ispec),gradlnro(i,:)) &
-                            + dot_product(gradYspec(i,:,ispec),gradmdiff(:))                            
+                            + dot_product(gradYspec(i,:,ispec),gradmdiff(:))   
+                            
+                 !! Augment speciessum_DgradY
+                 speciessum_DgradY(i,:) = speciessum_DgradY(i,:) + Mdiff(i,ispec)*gradYspec(i,:,ispec)
               end if              
 
               !! Add this term to the diffusion correction store
@@ -323,9 +326,6 @@ contains
                                            + cpispec*gradYspec(i,:,ispec)
 #endif                   
                  
-              !! Augment speciessum_DgradY
-              speciessum_DgradY(i,:) = speciessum_DgradY(i,:) + Mdiff(i,ispec)*gradYspec(i,:,ispec)
-
               !! Construct RHS (transverse convective and diffusive) (v(i)=w(i)=zero if WALL)
               rhs_Yspec(i,ispec) = -v(i)*gradYspec(i,2,ispec) - w(i)*gradYspec(i,3,ispec) &
                                     + molec_diff 
@@ -387,7 +387,7 @@ contains
      integer(ikind) :: i,j
      real(rkind),dimension(dims) :: tmp_vec,gradvisc
      real(rkind) :: tmp_scal_u,tmp_scal_v,tmp_scal_w,f_visc_u,f_visc_v,f_visc_w
-     real(rkind) :: tmpro,body_force_u,body_force_v,body_force_w
+     real(rkind) :: tmpro,body_force_u,body_force_v,body_force_w,one_over_ro
      real(rkind) :: c
 
      
@@ -422,7 +422,7 @@ contains
          
      !! Build RHS for internal nodes
      !$omp parallel do private(i,tmp_vec,tmp_scal_u,tmp_scal_v,tmp_scal_w,f_visc_u,f_visc_v,f_visc_w,tmpro &
-     !$omp ,body_force_u,body_force_v,body_force_w,gradvisc)
+     !$omp ,body_force_u,body_force_v,body_force_w,gradvisc,one_over_ro)
      do j=1,npfb-nb
         i=internal_list(j)
         tmp_vec(1) = u(i);tmp_vec(2) = v(i);tmp_vec(3) = w(i) !! tmp_vec holds (u,v,w) for node i
@@ -450,12 +450,12 @@ contains
 #endif        
       
         !! Local density 
-        tmpro = exp(lnro(i))  
+        tmpro = exp(lnro(i));one_over_ro = one/tmpro
 
         !! Body force
-        body_force_u = grav(1) + driving_force(1)/tmpro
-        body_force_v = grav(2) + driving_force(2)/tmpro
-        body_force_w = grav(3) + driving_force(3)/tmpro 
+        body_force_u = grav(1) + driving_force(1)*one_over_ro
+        body_force_v = grav(2) + driving_force(2)*one_over_ro
+        body_force_w = grav(3) + driving_force(3)*one_over_ro
 
         !! Store u.(F_visc + F_body/ro) for use in energy eqn later 
         store_diff_E(i) = store_diff_E(i) + u(i)*(f_visc_u + body_force_u*tmpro) &
@@ -464,10 +464,10 @@ contains
                         
                         
         !! RHS 
-        rhs_u(i) = -tmp_scal_u - gradp(i,1)/tmpro + body_force_u + f_visc_u/tmpro 
-        rhs_v(i) = -tmp_scal_v - gradp(i,2)/tmpro + body_force_v + f_visc_v/tmpro
+        rhs_u(i) = -tmp_scal_u - gradp(i,1)*one_over_ro + body_force_u + f_visc_u*one_over_ro 
+        rhs_v(i) = -tmp_scal_v - gradp(i,2)*one_over_ro + body_force_v + f_visc_v*one_over_ro
 #ifdef dim3
-        rhs_w(i) = -tmp_scal_w - gradp(i,3)/tmpro + body_force_w + f_visc_w/tmpro
+        rhs_w(i) = -tmp_scal_w - gradp(i,3)*one_over_ro + body_force_w + f_visc_w*one_over_ro
 #else
         rhs_w(i) = zero
 #endif                       
@@ -475,14 +475,14 @@ contains
      !$omp end parallel do
 
         
-     !! Finalise L2, make L1,L3,L4, and populate viscous + body force part of rhs' and save transverse
+     !! Make L1,L2,L3,L4,L5 and populate viscous + body force part of rhs' and save transverse
      !! parts of convective terms for later...
      if(nb.ne.0)then
         !$omp parallel do private(i,tmpro,c,xn,yn,un,ut,f_visc_u,f_visc_v,body_force_u,body_force_v &
-        !$omp ,dpdn,dundn,dutdn,gradvisc)
+        !$omp ,dpdn,dundn,dutdn,gradvisc,one_over_ro)
         do j=1,nb
            i=boundary_list(j)
-           tmpro = exp(lnro(i))
+           tmpro = exp(lnro(i));one_over_ro = one/tmpro
 #ifndef isoT           
            c=evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
 #else
@@ -496,13 +496,12 @@ contains
               dundn = xn*gradu(i,1)+yn*gradv(i,1)
               dutdn = -yn*gradu(i,1)+xn*gradv(i,1)
 
-              L(j,2) = zero !! Because the boundary is stationary, and L2 has u in it.
-
               L(j,1) = half*(un-c)*(dpdn - tmpro*c*dundn) !! L1 
-              L(j,5) = half*(un+c)*(dpdn + tmpro*c*dundn) !! L5 
+              L(j,2) = un*(tmpro*gradlnro(i,1) - gradp(i,1)/c/c)
               L(j,3) = un*dutdn !! L3 
               L(j,4) = un*(gradw(i,1)*xn + gradw(i,2)*yn) !! L4
-
+              L(j,5) = half*(un+c)*(dpdn + tmpro*c*dundn) !! L5 
+              
               !! Should evaluate viscous terms here, but a) rhs_u,v =0, and b) they aren't needed for
               !! subsequent energy equation 
               rhs_u(i) = zero
@@ -513,16 +512,13 @@ contains
 !              store_diff_E(i) = store_diff_E(i) + zero 
               
            else    !! In/out is in x-y coord system
-#ifdef isoT           
-              L(j,2) = zero !! No entropy wave in isothermal flow
-#else           
-              L(j,2) = (c*c*L(j,2) - dpdn*u(i))/c/c !! L2 now completely built
-#endif
+
               L(j,1) = half*(u(i)-c)*(dpdn - tmpro*c*gradu(i,1))
-              L(j,5) = half*(u(i)+c)*(dpdn + tmpro*c*gradu(i,1))
+              L(j,2) = un*(tmpro*gradlnro(i,1) - gradp(i,1)/c/c)
               L(j,3) = u(i)*gradv(i,1)
               L(j,4) = u(i)*gradw(i,1)
-
+              L(j,5) = half*(u(i)+c)*(dpdn + tmpro*c*gradu(i,1))
+              
               !! Viscous forces
               f_visc_u = visc(i)*(lapu(i) + onethird*graddivvel(i,1))
               f_visc_v = visc(i)*(lapv(i) + onethird*graddivvel(i,2))
@@ -543,9 +539,9 @@ contains
              
      
               !! Body force
-              body_force_u = grav(1) + driving_force(1)/tmpro
-              body_force_v = grav(2) + driving_force(2)/tmpro
-              body_force_w = grav(3) + driving_force(3)/tmpro              
+              body_force_u = grav(1) + driving_force(1)*one_over_ro
+              body_force_v = grav(2) + driving_force(2)*one_over_ro
+              body_force_w = grav(3) + driving_force(3)*one_over_ro            
                 
               !! Viscous dissipation term for energy equation   
               store_diff_E(i) = store_diff_E(i) + u(i)*(f_visc_u + body_force_u*tmpro) &
@@ -553,9 +549,9 @@ contains
                                                 + w(i)*(f_visc_w + body_force_w*tmpro)
 
               !! Transverse + visc + source terms only
-              rhs_u(i) = -v(i)*gradu(i,2) - w(i)*gradu(i,3) + f_visc_u/tmpro + body_force_u  
-              rhs_v(i) = -v(i)*gradv(i,2) - w(i)*gradv(i,3) - gradp(i,2)/tmpro + f_visc_v/tmpro + body_force_v
-              rhs_w(i) = -v(i)*gradw(i,2) - w(i)*gradw(i,3) - gradp(i,3)/tmpro + f_visc_w/tmpro + body_force_w 
+              rhs_u(i) = -v(i)*gradu(i,2) - w(i)*gradu(i,3) + f_visc_u*one_over_ro + body_force_u  
+              rhs_v(i) = -v(i)*gradv(i,2) - w(i)*gradv(i,3) - gradp(i,2)*one_over_ro + f_visc_v*one_over_ro + body_force_v
+              rhs_w(i) = -v(i)*gradw(i,2) - w(i)*gradw(i,3) - gradp(i,3)*one_over_ro + f_visc_w*one_over_ro + body_force_w 
            end if
         end do
         !$omp end parallel do          
@@ -572,20 +568,20 @@ contains
      !! Construct the RHS for energy equation. Do (almost) nothing if isothermal
 #ifndef isoT     
      integer(ikind) :: i,j
-     real(rkind) :: tmp_conv,tmp_visc,tmpro,tmp_p,tmp_E
+     real(rkind) :: tmp_conv,tmp_visc,tmp_p,tmp_E
      real(rkind),dimension(dims) :: gradlambda
      real(rkind),dimension(:,:),allocatable :: grad2T
      real(rkind),dimension(:),allocatable :: lapT
+     real(rkind) :: lapT_tmp
          
      !! Allocation and calculation of temperature laplacian     
      allocate(lapT(npfb))
      call calc_laplacian(T,lapT)
      
      !! Build RHS
-     !$omp parallel do private(i,tmpro,tmp_p,tmp_conv,tmp_visc,tmp_E,gradlambda)
+     !$omp parallel do private(i,tmp_p,tmp_conv,tmp_visc,tmp_E,gradlambda)
      do j=1,npfb-nb
         i=internal_list(j)
-        tmpro = exp(lnro(i))
 
         !! Convection term: -u.grad(roE)
         tmp_conv = -u(i)*gradroE(i,1) - v(i)*gradroE(i,2) - w(i)*gradroE(i,3)
@@ -617,20 +613,31 @@ contains
      if(nb.ne.0)then
         allocate(grad2T(nb,3))
         call calc_grad2bound(T,grad2T)          
-        !$omp parallel do private(i,tmp_visc,gradlambda)
+        !$omp parallel do private(i,tmp_visc,gradlambda,lapT_tmp)
         do j=1,nb
            i=boundary_list(j)
            if(node_type(i).eq.0)then !! Wall
               !! Viscous energy term: div.(tau u) (some bits omitted as u,v,w=0,0 and grad(u/v/w,2/3)=0 )
-              tmp_visc = fourthirds*gradu(i,1)*gradu(i,1) + gradv(i,1)*gradv(i,1) 
+              tmp_visc = fourthirds*gradu(i,1)*gradu(i,1) &
+                       + gradv(i,1)*gradv(i,1) &
+                       + gradw(i,1)*gradw(i,1)
               store_diff_E(i) = store_diff_E(i) + visc(i)*tmp_visc
 
+              lapT_tmp = grad2T(j,2) + grad2T(j,3)
+#ifdef wall_isoT
+              lapT_tmp = lapT_tmp + grad2T(j,1)   !! Isothermal walls can have heat flux in normal
+#endif              
+
               !! Add thermal diffusion term: div.(lambda*gradT)
-              store_diff_E(i) = store_diff_E(i) + lambda_th(i)*(grad2T(j,2)+grad2T(j,3)) 
+              store_diff_E(i) = store_diff_E(i) + lambda_th(i)*lapT_tmp
               gradlambda(:) = lambda_th(i)*r_temp_dependence*gradT(i,:)/T(i)  + lambda_th(i)*gradcp(i,:)/cp(i)
-              store_diff_E(i) = store_diff_E(i) + dot_product(gradlambda(2:3),gradT(i,2:3)) 
+#ifdef wall_isoT
+              store_diff_E(i) = store_diff_E(i) + dot_product(gradlambda(:),gradT(i,:))!! isoT-walls can have normal heat flux
+#else
+              store_diff_E(i) = store_diff_E(i) + dot_product(gradlambda(2:3),gradT(i,2:3))!! adiabatic
+#endif              
                         
-              !! RHS (visc + cond + transverse + source). N.B. normal element of lap(T)=0... (adiabatic!)
+              !! RHS (visc + cond + transverse + source)
               rhs_roE(i) = -roE(i)*gradv(i,2) - roE(i)*gradw(i,3) &
                            -p(i)*gradv(i,2) - p(i)*gradw(i,3) &
                            + store_diff_E(i)             
@@ -685,11 +692,9 @@ contains
        if(node_type(i).eq.0) then      
           call specify_characteristics_wall(j,L(j,:),gradv(i,:),gradw(i,:))
 
-
        !! INFLOW BOUNDARY
        else if(node_type(i).eq.1) then 
           call specify_characteristics_inflow(j,L(j,:),gradlnro(i,:),gradp(i,:),gradu(i,:),gradv(i,:),gradw(i,:))       
-
  
        !! OUTFLOW BOUNDARY 
        else if(node_type(i).eq.2) then   
@@ -716,65 +721,27 @@ contains
        !! This quantity appears in rhs_lnro and rhs_roE, so save in tmp_scal
        tmp_scal = (c*c*L(j,2) + L(j,5) + L(j,1))/c/c
        
-       !! The RHS of the density equation is independent of BC type
+       !! RHS for density logarithm
        rhs_lnro(i) = rhs_lnro(i) - tmp_scal/tmpro
-       
-       !! WALL BOUNDARY +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-       if(node_type(i).eq.0)then      
-          rhs_u(i) = zero
-          rhs_v(i) = zero
-          rhs_w(i) = zero
-#ifndef isoT          
-#ifdef wall_isoT
-          rhs_roE(i) = rhs_lnro(i)*roE(i)  !! This if isothermal wall...
-#else
-          rhs_roE(i) = rhs_roE(i) - (L(j,5)+L(j,1))/gammagasm1 !This if adiabatic wall
-#endif
-#endif
-#ifdef ms
-          do ispec=1,nspec
-             rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) - L(j,5+ispec)
-          end do
-#endif          
-       !! INFLOW BOUNDARY +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-       else if(node_type(i).eq.1)then 
-          rhs_u(i) = rhs_u(i) - (L(j,5)-L(j,1))/(tmpro*c)       
-          rhs_v(i) = rhs_v(i) - L(j,3)
-          rhs_w(i) = rhs_w(i) - L(j,4)
 
-#ifndef isoT          
-          cv = cp(i) - Rgas_mix(i)
-          rhs_roE(i) = rhs_roE(i) - u(i)*(L(j,5)-L(j,1))/c - tmpro*v(i)*L(j,3) - tmpro*w(i)*L(j,4) &
-                                - (roE(i)/tmpro - cv*T(i))*tmp_scal - (L(j,5)+L(j,1))/gammagasm1         
-#endif
+       !! Velocity components       
+       rhs_u(i) = rhs_u(i) - (L(j,5)-L(j,1))/(tmpro*c)       
+       rhs_v(i) = rhs_v(i) - L(j,3)
+       rhs_w(i) = rhs_w(i) - L(j,4)
 
-#ifdef hardinf
-          rhs_u(i) = zero
-          rhs_v(i) = zero
-          rhs_w(i) = zero
-#endif
-#ifdef ms
-          do ispec=1,nspec
-             rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) - L(j,5+ispec) 
-          end do
-#endif          
-       !! OUTFLOW BOUNDARY ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-       else if(node_type(i).eq.2)then   
-          rhs_u(i) = rhs_u(i) - (L(j,5)-L(j,1))/(tmpro*c)       
-          rhs_v(i) = rhs_v(i) - L(j,3)
-          rhs_w(i) = rhs_w(i) - L(j,4)
+       !! Energy
 #ifndef isoT
-          cv = cp(i) - Rgas_mix(i)
-          rhs_roE(i) = rhs_roE(i) - u(i)*(L(j,5)-L(j,1))/c - tmpro*v(i)*L(j,3) -tmpro*w(i)*L(j,4) &
-                                - (roE(i)/tmpro - cv*T(i))*tmp_scal - (L(j,5)+L(j,1))/gammagasm1
+       cv = cp(i) - Rgas_mix(i)
+       rhs_roE(i) = rhs_roE(i) - u(i)*(L(j,5)-L(j,1))/c - tmpro*v(i)*L(j,3) -tmpro*w(i)*L(j,4) &
+                               - (roE(i)/tmpro - cv*T(i))*tmp_scal - (L(j,5)+L(j,1))/gammagasm1
 #endif           
+       
+       !! Species mass fractions
 #ifdef ms
-          do ispec=1,nspec
-             rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) - L(j,5+ispec) 
-          end do
+       do ispec=1,nspec
+          rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) - L(j,5+ispec) 
+       end do
 #endif          
-
-       end if
     end do
     !$omp end parallel do
     !! De-allocate L
@@ -786,23 +753,10 @@ contains
   subroutine filter_variables
      !! This routine calls the specific filtering routine (within derivatives module) for each
      !! variable - lnro,u,v,w,roE,Yspec - and forces certain values on boundaries as required.
-     integer(ikind) :: i,j,ispec
-     real(rkind) :: tmp
-     real(rkind), dimension(:), allocatable :: store_E
+     integer(ikind) :: ispec
       
      segment_tstart = omp_get_wtime()
      
-     !! Store boundary values of energy before filtering
-     if(nb.ne.0)then
-        allocate(store_E(nb))
-        !$omp parallel do private(i)
-        do j=1,nb
-           i=boundary_list(j)
-           store_E(j) = roE(i)/exp(lnro(i))
-        end do
-        !$omp end parallel do
-     end if
-        
      !! Filter variables
      call calc_filtered_var(lnro)
      call calc_filtered_var(u)
@@ -818,33 +772,7 @@ contains
        call calc_filtered_var(Yspec(:,ispec))
      end do
 #endif   
-
-     !! Reset values (velocity and sometimes Energy) on boundaries as required...  
-     if(nb.ne.0)then   
-        !$omp parallel do private(i)
-        do j=1,nb
-           i=boundary_list(j)
-           
-           if(node_type(i).eq.0)then       !! Walls
-              u(i)=zero;v(i)=zero;w(i)=zero
-#ifdef wall_isoT
-              roE(i)=exp(lnro(i))*store_E(j) !! Needs to be modified to account for possible variation in composition
-#endif
-           else if(node_type(i).eq.1)then  !! Inflow   
-#ifdef hardinf
-              u(i)=u_inflow;v(i)=zero;w(i)=zero
-!              roE(i)=exp(lnro(i))*store_E(j)
-#else
-              !! DO NOTHING              
-#endif                            
-           else if(node_type(i).eq.2)then  !! Outflow
-              !! DO NOTHING
-           end if
-        end do
-        !$omp end parallel do
-        deallocate(store_E)
-     end if
-     
+   
      
      !! Profiling
      segment_tend = omp_get_wtime()

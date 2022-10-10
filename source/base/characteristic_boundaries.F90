@@ -11,7 +11,7 @@ module characteristic_boundaries
   !! gradient terms, and modify the characteristics to specify the desired boundary condition.
 
     
-  !! Boundary framework follows (with newest taking precedence):: 
+  !! Boundary framework follows a mixture of:: 
   !! Sutherland & Kennedy (2003)
   !! Yoo & Im (2007)
   !! Coussement et al. (2012)    
@@ -27,7 +27,7 @@ contains
      real(rkind),dimension(:),intent(inout) :: Lchar
      real(rkind),dimension(:),intent(in) :: gradv,gradw
      integer(ikind) :: i,ispec
-     real(rkind) :: tmpro,c,gammagasm1
+     real(rkind) :: tmpro,c,gammagasm1,psource,Ysource
      
      !! Index of this boundary node
      i = boundary_list(j)
@@ -58,26 +58,40 @@ contains
      !! THERMAL FLOWS, ISOTHERMAL WALLS
      gammagasm1 = Rgas_mix(i)/(cp(i)-Rgas_mix(i))
      !Lchar(1) is outgoing, and so is unchanged    
-     Lchar(3) = zero
-     Lchar(4) = zero
-     Lchar(5)= Lchar(1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro) 
-#ifdef ms
-     Lchar(5+1:5+nspec) = zero     
-#endif     
-     Lchar(2) = gammagasm1*(Lchar(5)+Lchar(1))/c/c &
-                 - gammagasm1*tmpro*gradv(2) - gammagasm1*tmpro*gradw(3) !! Compatible with fixing dT/dt=0?  
+     !Lchar(3) is zero, and unchanged
+     !Lchar(4) is zero, and unchanged
+     Lchar(5)= Lchar(1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro)
+     
+     !! Pressure source term:
+     psource = - half*gammagasm1*sumoverspecies_homega(j)
+     
+     !! Loop over species
 #ifdef react
-     !! Add chemistry source terms to L2
-#endif                 
+     Ysource = zero
+     do ispec = 1,nspec
+        !Lchar(5+ispec) is zero (hopefully!) and unchanged
+        Ysource = Ysource + one_over_molar_mass(ispec)* &
+                          ( reaction_rate_bound(j,ispec) - &
+                            Lchar(5+ispec))
+     end do
+     Ysource = Ysource*Rgas_universal/Rgas_mix(i)                                       
+#else
+     psource = zero;ysource=zero
+#endif     
+     Lchar(2) = gammagasm1*(Lchar(1)+Lchar(5))/c/c &
+              + tmpro*psource/p(i) &            !! Pressure source terms
+              + tmpro*Ysource         !! species source terms
+              !+ additional dT/dt source terms TBC
+                           
 #else          
      !! THERMAL FLOWS, ADIABATIC WALLS (imposed heat flux)
      !Lchar(1) is outgoing, and so is unchanged    
-     Lchar(2) = zero
-     Lchar(3) = zero
-     Lchar(4) = zero
-     Lchar(5)= Lchar(1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro) 
+     !Lchar(2) is zero, and unchanged
+     !Lchar(3) is zero, and unchanged
+     !Lchar(4) is zero, and unchanged
+     Lchar(5)= Lchar(1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro)
 #ifdef ms     
-     Lchar(5+1:5+nspec) = zero     
+     !Lchar(5+1:5+nspec) is zero, and unchanged
 #endif     
 #endif                             
 #endif          
@@ -193,7 +207,7 @@ contains
      real(rkind),dimension(:),intent(inout) :: Lchar
      real(rkind),dimension(:),intent(in) :: gradp,gradu,gradv,gradw
      integer(ikind) :: i,ispec
-     real(rkind) :: tmpro,c,gammagasm1,gammagas,Lexact
+     real(rkind) :: tmpro,c,gammagasm1,gammagas
      
      !! Index of this boundary node
      i = boundary_list(j)
@@ -201,9 +215,6 @@ contains
      !! Store the density
      tmpro = exp(lnro(i))
      
-     !! Store the initial value (computed from derivs, L1exact in Yoo & Im)
-     Lexact = Lchar(1)
-
      !! Store the sound speed
 #ifndef isoT       
      c=evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
@@ -227,6 +238,7 @@ contains
 #else
      !! THERMAL FLOWS, PARTIALLY NON-REFLECTING
      if(u(i).le.c) then !! Subsonic. If supersonic, just use L1 from definition...
+     
         gammagas = cp(i)/(cp(i)-Rgas_mix(i))     
         Lchar(1) = (p(i)-p_outflow)*0.278d0*c*(one)/two/L_domain_x &                               !! track p_outflow
                  - (one-u(i)/c)*half*(v(i)*gradp(2)+gammagas*p(i)*gradv(2)-tmpro*c*v(i)*gradu(2)) & !! trans1 conv.
@@ -236,8 +248,7 @@ contains
 #ifdef react
         Lchar(1) = Lchar(1) - half*(gammagas-one)*sumoverspecies_homega(j)
 #endif
-
-                 
+              
      end if
      !Lchar(2) is outgoing
      !Lchar(3) is outgoing
@@ -256,4 +267,47 @@ contains
 
   end subroutine specify_characteristics_outflow
 !! ------------------------------------------------------------------------------------------------
+  subroutine apply_time_dependent_bounds
+     integer(ikind) :: i,j
+  
+     !! Loop over all boundary nodes
+     !$omp parallel do private(i)
+     do j=1,nb
+        i=boundary_list(j)
+        
+        !! Wall boundaries
+        if(node_type(i).eq.0) then
+           !! In all cases, velocity on wall is zero
+           u(i) = zero
+           v(i) = zero
+           w(i) = zero
+
+           !! For isothermal walls, evaluate the energy given the prescribed temperature
+#ifdef wall_isoT        
+           call set_energy_on_bound(i,T_bound(j))        
+#endif           
+        
+        !! Inflow boundaries
+        else if(node_type(i).eq.1) then 
+#ifdef hardinf
+              !! Prescribed velocity for hardinflow
+              u(i)=u_inflow
+              v(i)=zero
+              w(i)=zero        
+              
+              !! Optional fixed T or fixed ro.
+#endif
+        
+        !! Outflow boundaries
+        else if(node_type(i).eq.2) then
+           !! Do nothing, generally
+        end if
+        
+     end do
+     !$omp end parallel do
+  
+  
+     return
+  end subroutine apply_time_dependent_bounds
+!! ------------------------------------------------------------------------------------------------  
 end module characteristic_boundaries

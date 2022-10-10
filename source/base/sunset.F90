@@ -11,8 +11,10 @@ program sunset
   use kind_parameters
   use common_parameter
   use common_vars
-  use setup
-  use output 
+  use setup_domain
+  use setup_flow
+  use output
+  use statistics 
   use neighbours
   use labf
   use fd
@@ -28,9 +30,10 @@ program sunset
   call MPI_INIT(ierror)
 #endif  
 
-  !! Load primary control data and initial conditions
+  !! Load a little control data, node data, and build MPI decomposition etc
+  call load_control_data_LUonly   
   call initial_setup  
-  call setup_domain
+  call build_domain
 
   !! Build the neighbour lists
   call find_neighbours
@@ -71,7 +74,7 @@ program sunset
 
      !! Output, conditionally: at start, subsequently every dt_out
      if(itime.eq.0.or.time.gt.n_out*dt_out) then 
-!     if(itime.eq.0.or.mod(itime,1).eq.0)then
+!     if(itime.eq.0.or.mod(itime,10).eq.0)then
         n_out = n_out + 1
         call output_layer(n_out)
         call output_laminar_flame_structure(n_out)
@@ -89,7 +92,7 @@ program sunset
      call output_to_screen
 
      !! Call routines to evaluate global statistics and adjust forcing terms if desired
-     call statistics
+     call statistics_control
      
   end do
   !! END MAIN TIME LOOP -----------------------------------------------
@@ -146,7 +149,7 @@ subroutine deallocate_everything
   end if
   
   !! Transport properties
-  deallocate(molar_mass,one_over_Lewis_number)
+  deallocate(molar_mass,one_over_Lewis_number,one_over_molar_mass)
   
   
   return

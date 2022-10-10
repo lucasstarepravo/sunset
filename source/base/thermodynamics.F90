@@ -64,7 +64,7 @@ contains
            !! Evaluate the gas constant for the mixture
            Rgas_mix(i) = zero
            do ispec = 1,nspec
-              Rgas_mix(i) = Rgas_mix(i) + Yspec(i,ispec)/molar_mass(ispec)
+              Rgas_mix(i) = Rgas_mix(i) + Yspec(i,ispec)*one_over_molar_mass(ispec)
            end do
            Rgas_mix(i) = Rgas_mix(i)*Rgas_universal     
           
@@ -305,6 +305,44 @@ contains
      c = dsqrt(cp_local*Rgm_local*T_local/(cp_local-Rgm_local))
 #endif      
   end function evaluate_sound_speed_at_node
+!! ------------------------------------------------------------------------------------------------  
+  subroutine set_energy_on_bound(i,tmpT)
+     !! Evaluate roE based on u,lnro,T at a specific node
+     integer(ikind),intent(in) :: i
+     real(rkind),intent(in) :: tmpT
+     integer(ikind) :: ispec,j,nsum
+     real(rkind) :: enthalpy,Rgas_mix_local,p_local,psum,tmpro,cpispec,dummy_real
+     
+#ifndef isoT              
+        !! Initialise roE with K.E. term
+        roE(i) = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))
+        
+        !! Evaluate density from its logarithm
+        tmpro = exp(lnro(i))
+
+        !! Loop over species
+        Rgas_mix_local = zero
+        do ispec=1,nspec       
+           !! Evaluate local species enthalpy
+           call evaluate_enthalpy_at_node(T(i),ispec,enthalpy,cpispec,dummy_real)
+           
+           !! Add species enthalpy contribution
+           roE(i) = roE(i) + Yspec(i,ispec)*enthalpy
+           
+           !! Build the local mixture gas constant
+           Rgas_mix_local = Rgas_mix_local + Yspec(i,ispec)*Rgas_universal*one_over_molar_mass(ispec)
+        end do           
+
+        !! Subtract RgasT
+        roE(i) = roE(i) - Rgas_mix_local*T(i)     
+                  
+        !! Multiply to get roE
+        roE(i) = roE(i)*tmpro        
+#endif
+
+       
+     return
+  end subroutine set_energy_on_bound 
 !! ------------------------------------------------------------------------------------------------
   subroutine initialise_energy
      !! Evaluate roE based on u,lnro,T, over the whole domain. 
@@ -337,7 +375,7 @@ contains
            roE(i) = roE(i) + Yspec(i,ispec)*enthalpy
            
            !! Build the local mixture gas constant
-           Rgas_mix_local = Rgas_mix_local + Yspec(i,ispec)*Rgas_universal/molar_mass(ispec)
+           Rgas_mix_local = Rgas_mix_local + Yspec(i,ispec)*Rgas_universal*one_over_molar_mass(ispec)
         end do           
 
         !! Evaluate the pressure           

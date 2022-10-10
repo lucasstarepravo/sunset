@@ -43,20 +43,21 @@ module common_vars
   real(rkind), dimension(:,:), allocatable :: Mdiff
   
   !! Transport properties - arrays covering the species
-  real(rkind), dimension(:), allocatable :: molar_mass,one_over_Lewis_number
+  real(rkind), dimension(:), allocatable :: molar_mass,one_over_Lewis_number,one_over_molar_mass
   real(rkind), dimension(:,:),allocatable :: coef_cp,coef_h,coef_dcpdT,coef_gibbs !! indexing: ispec,j-exponent
   integer(ikind) :: polyorder_cp,ncoefs_cp  !! polynomial order,number of coefs
   real(rkind) :: T_low,T_high
   
   !! Chemical kinetics control data
-  integer(ikind) :: nsteps,nthirdbodies,nlindemann
+  integer(ikind) :: nsteps,nthirdbodies,nlindemann,num_gibbs_species
   real(rkind),dimension(:,:), allocatable :: Arrhenius_coefs
   integer(ikind),dimension(:),allocatable :: num_reactants,num_products
   integer(ikind),dimension(:,:),allocatable :: reactant_list,product_list,stepspecies_list
   real(rkind),dimension(:,:),allocatable :: nu_dash,nu_ddash,delta_nu
   integer(ikind),dimension(:),allocatable :: gibbs_rate_flag,lindemann_form_flag,third_body_flag
   real(rkind),dimension(:,:),allocatable :: third_body_efficiencies
-  real(rkind),dimension(:,:),allocatable :: lindemann_coefs    
+  real(rkind),dimension(:,:),allocatable :: lindemann_coefs
+  integer(ikind),dimension(:),allocatable :: gibbs_flag_species    
   
   
   !! Right-hand-sides
@@ -80,11 +81,13 @@ module common_vars
 
 
   !! Variables related to stencil sizes 
-  real(rkind) :: h0,sup_size,h3,hovs,ss,h2,hovs_bound
+  real(rkind) :: h0,sup_size,h3,h2
 
   !! Parameters related to time and some forces etc
-  real(rkind) :: time,dt,dt_previous,time_end,dt_out
-  real(rkind) :: time_star !! Dimensionless time (for outputs...)
+  real(rkind) :: time,time_end !! Start/current, and end time
+  real(rkind) :: time_star !! Dimensionless time - outputs are scaled by this
+  real(rkind) :: dt,dt_cfl,dt_parabolic  !! Various time-steps
+  real(rkind) :: dt_out !! Time interval between outputs
   real(rkind) :: umax,smax,cmax,smin                  !! maximum velocity,node-spacing,sound speed
   integer(ikind) :: itime,iRKstep
   real(rkind) :: emax_nm1,emax_n,emax_np1  !! errors for PID controller
@@ -129,6 +132,7 @@ module common_vars
   real(rkind),dimension(:),allocatable :: T_bound
   real(rkind) :: p_outflow   !! Desired pressure on outflow boundary
   real(rkind),dimension(:),allocatable :: sumoverspecies_homega
+  real(rkind),dimension(:,:),allocatable :: reaction_rate_bound 
   
   !! Profiling and openMP parallelisation
   real(rkind) ts_start,ts_end,t_run,t_per_dt,t_last_X

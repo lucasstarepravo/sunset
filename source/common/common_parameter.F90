@@ -11,12 +11,6 @@ module common_parameter
   use kind_parameters
   implicit none 
 
-  !! Discretisation related parameters
-  integer(ikind) ,parameter :: dims = 3
-  
-  !! Maximum possible number of species
-  integer(ikind), parameter :: nspec_max = 20     
-
   !! Numbers --------------------------------------------------------------------------------------
   real(rkind), parameter :: pi=3.141592653589793238462643383279502884197d0
   real(rkind), parameter :: pi4 = pi**4.0
@@ -32,8 +26,16 @@ module common_parameter
   real(rkind), parameter :: verysmall = 1.0d-30
   
   !! Physical constants ---------------------------------------------------------------------------
-  real(rkind), parameter :: Rgas_universal = 8.3144626181d3         !! Universal gas constant  
-  
+  real(rkind), parameter :: Rgas_universal = 8.3142d3         !! Universal gas constant  
+
+  !! (NODE-SET) Discretisation related parameters
+  integer(ikind) ,parameter :: dims = 3
+  real(rkind), parameter :: hovs = 2.7d0   !! stencil scale over discretisation scale (h/s)
+  real(rkind), parameter :: hovs_bound = 2.4d0 !! as above, reduced near bounds for stability
+  real(rkind), parameter :: ss = 2.0d0       !! Stencil size (radius, in multiples of h)
+
+  !! Maximum allowable number of species
+  integer(ikind), parameter :: nspec_max = 20     
   
   !! Runge Kutta coefficients ---------------------------------------------------------------------
   !! classic RK4 (from Wikipedia...)  
@@ -63,12 +65,17 @@ module common_parameter
   real(rkind),dimension(4),parameter :: rk3_4s_2r_bh=(/rk3_4s_2r_bh1,rk3_4s_2r_bh2,rk3_4s_2r_bh3,rk3_4s_2r_bh4/)
   real(rkind),dimension(4),parameter :: rk3_4s_2r_bmbh = rk3_4s_2r_b - rk3_4s_2r_bh
 
-  !! Normalisation constants for PID error estimators (OK for combustion at standard P,T)
+  !! Normalisation constants and parameters for PID error estimators (OK for combustion at standard P,T)
   real(rkind), parameter :: elnro_norm = 1.0d-10
   real(rkind), parameter :: eu_norm = 1.0d-6 
   real(rkind), parameter :: ev_norm = 1.0d-6 
   real(rkind), parameter :: ew_norm = 1.0d-6 
   real(rkind), parameter :: eroE_norm = 1.0d-2 
   real(rkind), parameter :: eY_norm = 1.0d-10       
-
+  real(rkind), parameter :: pid_tol = 1.0d-4        !! Error tolerance
+  real(rkind), parameter :: pid_a=0.6d0/two  !! P-coefficient   ! 0.7
+  real(rkind), parameter :: pid_b=0.2d0/two  !! I-coefficient   ! 0.4
+  real(rkind), parameter :: pid_c=0.0d0/two  !! D-coefficient   ! 0.1
+  real(rkind), parameter :: pid_k=0.9d0      !! kappa coefficient !0.9
+  
 end module common_parameter

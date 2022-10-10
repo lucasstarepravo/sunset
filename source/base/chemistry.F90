@@ -21,11 +21,11 @@ contains
 #ifdef react
 !! ------------------------------------------------------------------------------------------------  
   subroutine calculate_chemical_production_rate
-     integer(ikind) :: j,i,ispec,istep,jspec,jstep,ithirdbody
-     real(rkind) :: arrhenius_rate_back,gibbs
+     integer(ikind) :: j,i,ispec,istep,jspec,jstep,ithirdbody,kspec
+     real(rkind) :: arrhenius_rate_back,gibbs_tmp,tmpro
      real(rkind) :: molar_production_rate,arrhenius_rate0,arrhenius_rate
-     real(rkind) :: p_reduced,net_rate,logY,enthalpy
-     real(rkind),dimension(:,:),allocatable :: rateYspec
+     real(rkind) :: p_reduced,net_rate,logYovW,enthalpy
+     real(rkind),dimension(:,:),allocatable :: rateYspec,gibbs
      real(rkind),dimension(:),allocatable :: forward_rate,third_body_conc,backward_rate
          
      
@@ -33,7 +33,32 @@ contains
      allocate(forward_rate(npfb));forward_rate=zero
      allocate(third_body_conc(npfb));third_body_conc=one
      allocate(backward_rate(npfb));backward_rate = zero
-
+     
+     !! Pre-evaluate gibbs functions as required ==============================
+     if(num_gibbs_species.ne.0) then
+        !! Allocate space
+        allocate(gibbs(npfb,num_gibbs_species));gibbs=zero
+        
+        !! Loop over all species 
+        do ispec = 1,nspec
+           if(gibbs_flag_species(ispec).ne.0) then !! If this species needs gibbs evaluation
+              jspec = gibbs_flag_species(ispec)  !! jspec is the species index within the gibbs-list
+              
+              !! Loop over all nodes
+              !$omp parallel do private(gibbs_tmp)
+              do i=1,npfb
+                 !! Evaluate gibbs
+                 call evaluate_gibbs_at_node(T(i),log(T(i)),ispec,gibbs_tmp)                 
+                 
+                 !! Store in gibbs array
+                 gibbs(i,jspec) = gibbs_tmp
+              end do
+              !$omp end parallel do
+           
+           end if
+        end do            
+     end if
+     !! =======================================================================
 
      !! Loop over all steps ===================================================
      do istep = 1,nsteps       
@@ -64,8 +89,8 @@ contains
               do ispec = 1,nspec
                  third_body_conc(i) = third_body_conc(i) &
                                     + third_body_efficiencies(ithirdbody,ispec)* &
-                                      Yspec(i,ispec)/ &
-                                      molar_mass(ispec)
+                                      Yspec(i,ispec)* &
+                                      one_over_molar_mass(ispec)
               end do
               third_body_conc(i) = third_body_conc(i)*exp(lnro(i))
            end do
@@ -107,16 +132,16 @@ contains
         !! At this stage, forward rate contains ln(k) for both regular and Lindemann steps
                    
         !! Finalise forward rate ==============================================
-        !$omp parallel do private(jspec,ispec,logY)
+        !$omp parallel do private(jspec,ispec,logYovW)
         do i=1,npfb
            !! Multiply up each reactant contrib (in log space)
            do jspec = 1,num_reactants(istep)
               ispec = reactant_list(istep,jspec)  !! ispec is the jspec-th reactant of step istep
               
-              logY = log(max(Yspec(i,ispec),verysmall))
+              logYovW = log(max(Yspec(i,ispec),verysmall)*one_over_molar_mass(ispec))
               
               forward_rate(i) = forward_rate(i) + nu_dash(istep,ispec)* &
-                                (logY + lnro(i) - log(molar_mass(ispec)))
+                                (lnro(i)+logYovW)
            end do
            !! exponential
            forward_rate(i) = exp(forward_rate(i))     
@@ -127,16 +152,17 @@ contains
         if(gibbs_rate_flag(istep).eq.1) then
 
            !! Evaluate backwards rate                           
-           !$omp parallel do private(jspec,ispec,gibbs,logY)
+           !$omp parallel do private(jspec,ispec,logYovW)
            do i=1,npfb
            
               !! Loop over all species in step
               do jspec = 1,num_reactants(istep) + num_products(istep)
                  ispec = stepspecies_list(istep,jspec)
-                 
-                 call evaluate_gibbs_at_node(T(i),log(T(i)),ispec,gibbs)
                                  
-                 backward_rate(i) = backward_rate(i) + delta_nu(istep,ispec)*gibbs
+                 !! index of this species in gibbs list
+                 kspec = gibbs_flag_species(ispec)
+                                 
+                 backward_rate(i) = backward_rate(i) + delta_nu(istep,ispec)*gibbs(i,kspec)
               end do          
               !! backward_rate contains k_{b,m}
               
@@ -144,10 +170,10 @@ contains
               do jspec = 1,num_products(istep)
                  ispec = product_list(istep,jspec)
                  
-                 logY = log(max(Yspec(i,ispec),verysmall))
+                 logYovW = log(max(Yspec(i,ispec),verysmall)*one_over_molar_mass(ispec))
                  
                  backward_rate(i) = backward_rate(i) + nu_ddash(istep,ispec)* &
-                                    (logY + lnro(i) - log(molar_mass(ispec)))           
+                                    (lnro(i) + logYovW)           
               end do
               !! exponential
               backward_rate(i) = exp(backward_rate(i))
@@ -180,44 +206,54 @@ contains
            
      end do !! End of steps loop ==============================================
      
-     !! add rate onto RHS
-     !$omp parallel do private(ispec)
+     !! Add rate onto RHS =====================================================
+     !$omp parallel do private(ispec,tmpro)
      do i=1,npfb       
+        tmpro = exp(-lnro(i))    !! N.B. tmpro holds 1/ro here.
+     
         !! Loop over all species and add rate to rhs
         do ispec = 1,nspec
         
            rhs_yspec(i,ispec) = rhs_Yspec(i,ispec) &
-                              + molar_mass(ispec)*rateYspec(i,ispec)/exp(lnro(i))           
+                              + molar_mass(ispec)*rateYspec(i,ispec)*tmpro           
         end do
-alpha_out(i) = rateYspec(i,3)*molar_mass(3)/exp(lnro(i))           
+!alpha_out(i) = -(rateYspec(i,1)*molar_mass(1)+rateYspec(i,2)*molar_mass(2))*tmpro
+alpha_out(i) = -(rateYspec(i,1)*molar_mass(1))*tmpro
 
      end do
      !$omp end parallel do     
      
-     !! Build contribution to source terms for boundary conditions
+     !! Build contribution to source terms for boundary conditions ============
      if(nb.ne.0) then
         allocate(sumoverspecies_homega(nb))
+        allocate(reaction_rate_bound(nb,nspec))
         !$omp parallel do private(j,ispec,enthalpy)
         do j=1,nb
            i=boundary_list(j)
               
            sumoverspecies_homega(j) = zero
            !! Loop over species
-           do ispec=1,nspec
+           do ispec=1,nspec                                    
+              !! Store the reaction rate on the boundary
+              reaction_rate_bound(j,ispec) = rateYspec(i,ispec)*molar_mass(ispec)                                      
+              
               !! Evaluate enthalpy of species ispec
               call evaluate_enthalpy_only_at_node(T(i),ispec,enthalpy)           
            
               !! Evaluate "reduced enthalpy"
               enthalpy = enthalpy - cp(i)*T(i)*Rgas_universal/(Rgas_mix(i)*molar_mass(ispec))
            
-              !! Augment sum
+              !! Augment sum of reduced_h*omega
               sumoverspecies_homega(j) = sumoverspecies_homega(j) + &
-                                      enthalpy*rateYspec(i,ispec)*molar_mass(ispec)        
+                                      enthalpy*reaction_rate_bound(j,ispec)        
+              
            end do
         end do
         !$omp end parallel do
      end if           
      
+     !! De-allocation of arrays
+     if(num_gibbs_species.ne.0) deallocate(gibbs)
      deallocate(rateYspec,forward_rate,backward_rate,third_body_conc)
   
      return
