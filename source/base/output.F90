@@ -267,6 +267,7 @@ contains
   subroutine output_laminar_flame_structure(n_out)
      !! Output data for a laminar 1D flame profile.
      integer(ikind),intent(in) :: n_out !! Number of output file
+#ifdef output_composition     
      integer(ikind) :: i,j,k
      real(rkind) :: x,y
      character(70) :: fname
@@ -297,7 +298,7 @@ contains
 !write(511,*) x,y,u(i),v(i),w(i),exp(lnro(i)),roE(i),T(i),p(i),Yspec(i,1:nspec)              
         end if
      end do
-
+#endif
     return
   end subroutine output_laminar_flame_structure 
 !! ------------------------------------------------------------------------------------------------  

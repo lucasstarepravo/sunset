@@ -24,7 +24,7 @@ contains
      integer(ikind) :: j,i,ispec,istep,jspec,jstep,ithirdbody,kspec
      real(rkind) :: arrhenius_rate_back,gibbs_tmp,tmpro
      real(rkind) :: molar_production_rate,arrhenius_rate0,arrhenius_rate
-     real(rkind) :: p_reduced,net_rate,logYovW,enthalpy
+     real(rkind) :: p_reduced,net_rate,logYovW,enthalpy,heat_release
      real(rkind),dimension(:,:),allocatable :: rateYspec,gibbs
      real(rkind),dimension(:),allocatable :: forward_rate,third_body_conc,backward_rate
          
@@ -207,18 +207,26 @@ contains
      end do !! End of steps loop ==============================================
      
      !! Add rate onto RHS =====================================================
-     !$omp parallel do private(ispec,tmpro)
+     !$omp parallel do private(ispec,tmpro,heat_release)
      do i=1,npfb       
         tmpro = exp(-lnro(i))    !! N.B. tmpro holds 1/ro here.
      
-        !! Loop over all species and add rate to rhs
+        !! Zero heat release
+        heat_release = zero
+     
+        !! Loop over all species and add rate to rhs        
         do ispec = 1,nspec
         
+           !! Augment the RHS of Yspec for species ispec
            rhs_yspec(i,ispec) = rhs_Yspec(i,ispec) &
                               + molar_mass(ispec)*rateYspec(i,ispec)*tmpro           
+                              
+           !! Augment the heat release (production rate x enthalpy of formation)
+           heat_release = heat_release - molar_mass(ispec)*rateYspec(i,ispec) &
+                                         *coef_h(ispec,polyorder_cp+2)
+                              
         end do
-!alpha_out(i) = -(rateYspec(i,1)*molar_mass(1)+rateYspec(i,2)*molar_mass(2))*tmpro
-alpha_out(i) = -(rateYspec(i,1)*molar_mass(1))*tmpro
+alpha_out(i) = heat_release
 
      end do
      !$omp end parallel do     

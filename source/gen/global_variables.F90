@@ -5,7 +5,7 @@
       integer(ikind), parameter :: npar=9999999  !! Only used in source/gen/datclass.F90 (up to npar in a slice)
       integer(ikind) :: np, npfb, nb,nbio
 
-      real(rkind) :: dx,dx0,dxb,dxio
+      real(rkind) :: dx,dx0,dxb,dxio,dx_in,dx_out,dx_wall
       real(rkind) :: grx, gry
       real(rkind) :: xb_min, xb_max, yb_min, yb_max, xl
       real(rkind), dimension(:), allocatable :: xp, yp,thta,xnorm,ynorm,dxp

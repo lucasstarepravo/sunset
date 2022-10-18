@@ -365,7 +365,7 @@ contains
      end do   
      deallocate(ijlink_tmp)      
 
-     !! PART 1: Normal derivatives (5 point finite differences)  
+     !! Normal derivatives (5 point finite differences)  
      !! Loop boundary nodes
      !! TO DO: re-arrange so computationally faster (fewer ifs) but harder to read...
      !! Not crucial, as this is preprocessing!
@@ -374,11 +374,13 @@ contains
         dx = s(i)
         dx2=dx*dx;dx4=dx2*dx2
         
+        !! Zero the operators
         ij_w_grad(:,:,i) = zero;ij_wb_grad2(:,:,jj) = zero;ij_w_hyp(:,i)=zero
+        
+        !! Build new FD operators
         do k=1,ij_count(i)
            j=ij_link(k,i)       
-           if(node_type(j).eq.1000) cycle !! Not interested in ghost nodes
-           if(j.gt.npfb) cycle !! Eliminate halos from search (entire FD stencil in one processor)
+           if(j.gt.npfb) cycle !! Eliminate halos and ghosts from search (entire FD stencil in one processor)
            if(fd_parent(j).eq.i) then !! Only look for nodes with i as the fd_parent   
            !! Normal derivatives
            if(j.eq.i)              ij_w_grad(1,k,i) =  zero         !! FIRST DERIV
@@ -413,8 +415,7 @@ contains
            ij_w_grad(:,:,i) = zero   
            do k=1,ij_count(i)
               j=ij_link(k,i)   
-              if(node_type(j).eq.1000) cycle !! Not interested in ghost nodes
-              if(j.gt.npfb) cycle !! Eliminate halos from search (entire FD stencil in one processor)              
+              if(j.gt.npfb) cycle !! Eliminate halos and ghosts from search (entire FD stencil in one processor)              
               !! Normal derivatives
               if(j.eq.fd_parent(i))                                   ij_w_grad(1,k,i) = -0.25d0/dx     !! FIRST DERIV
               if(j.eq.i)                                              ij_w_grad(1,k,i) =  zero
@@ -429,8 +430,7 @@ contains
            do k=1,ij_count(i)
               j=ij_link(k,i)          
               !! Normal derivatives
-              if(node_type(j).eq.1000) cycle !! Not interested in ghost nodes
-              if(j.gt.npfb) cycle !! Eliminate halos from search (entire FD stencil in one processor)              
+              if(j.gt.npfb) cycle !! Eliminate halos and ghosts from search (entire FD stencil in one processor)              
               if(j.eq.fd_parent(i))                                   ij_w_grad(1,k,i) =  one/12.0d0/dx     !! FIRST DERIV
               if(node_type(j).eq.-1.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) = -twothirds/dx    
               if(j.eq.i)                                              ij_w_grad(1,k,i) =  zero

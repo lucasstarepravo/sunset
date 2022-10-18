@@ -84,7 +84,7 @@ case(1) !! Box for Rayleigh Taylor
      varresratio = 1.0d0
      dxmax = dx0
      dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dxio=dxmax
+     dxb=dx0/varresratio;dx_in=dxmax;dx_out=dxmax
      call make_boundary_particles
      call make_boundary_blobs               
      ipart = nb   
@@ -202,7 +202,7 @@ case(1) !! Box for Rayleigh Taylor
      dxmax = dx0  
      dxmin = dx0
      dxb=dx0
-     dxio=dx0
+     dx_in=dx0;dx_out=dx0
      call make_boundary_particles
      call make_boundary_blobs               
      ipart = nb   
@@ -252,7 +252,7 @@ case(1) !! Box for Rayleigh Taylor
      xb_min = minval(b_node(:,1));xb_max = maxval(b_node(:,1));yb_min = minval(b_node(:,2));yb_max = maxval(b_node(:,2))
 
      !! outsource making wall particles... JRCK
-     dxb=dx0;dxio=dx0
+     dxb=dx0;dx_in=dx0;dx_out=dx0
      call make_boundary_particles
      ipart = nb   
 
@@ -321,7 +321,7 @@ case(4) !! A sort of porous media... for porous Rayleigh-Taylor stuff
      varresratio = 3.0d0  !! Ratio for scaling near the solid objects
      dxmax = dx0  
      dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dxio=4.0d0*dxmax  !! dx for solids and in/outs...!! Ratio for scaling far field...
+     dxb=dx0/varresratio;dx_in=4.0d0*dxmax;dx_out=dx_in !! dx for solids and in/outs...!! Ratio for scaling far field...
      call make_boundary_particles
      call make_boundary_blobs               
      ipart = nb   
@@ -369,10 +369,10 @@ case(4) !! A sort of porous media... for porous Rayleigh-Taylor stuff
            dx = dxmin                     
         else if(dist2bound.le.b1*dx0)then  !! A bit further out, smoothly vary from dxmin to dx0
            dx = 0.5d0*(dx0+dxmin) - 0.5d0*(dx0-dxmin)*cos((dist2bound-b0*dx0)*pi/((b1-b0)*dx0))  
-        else if(dist2bound.le.b1*dx0+b2*dxio)then  !! Further still: linearly vary from dx0 to dxio
-           dx = dx0 + (dxio-dx0)*((dist2bound-b1*dx0)/(b2*dxio))
-        else     !! Far out: set to dxio
-           dx = dxio
+        else if(dist2bound.le.b1*dx0+b2*dx_in)then  !! Further still: linearly vary from dx0 to dx_in
+           dx = dx0 + (dx_in-dx0)*((dist2bound-b1*dx0)/(b2*dx_in))
+        else     !! Far out: set to dx_in
+           dx = dx_in
         end if       
       
                
@@ -540,7 +540,7 @@ case(5) !! Inflow/outflow tube for simple flames
      varresratio = 1.0d0  !! Ratio for scaling near the solid objects
      dxmax = dx0  
      dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dxio=1.0d0*dxmax  !! dx for solids and in/outs...!! Ratio for scaling far field...
+     dxb=dx0/varresratio;dx_in=1.0d0*dxmax;dx_out=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...
      call make_boundary_particles
      call make_boundary_blobs               
      ipart = nb   
@@ -596,10 +596,10 @@ endif
            dx = dxmin                     
         else if(dist2bound.le.b1*dx0)then  !! A bit further out, smoothly vary from dxmin to dx0
            dx = 0.5d0*(dx0+dxmin) - 0.5d0*(dx0-dxmin)*cos((dist2bound-b0*dx0)*pi/((b1-b0)*dx0))  
-        else if(dist2bound.le.b1*dx0+b2*dxio)then  !! Further still: linearly vary from dx0 to dxio
-           dx = dx0 + (dxio-dx0)*((dist2bound-b1*dx0)/(b2*dxio))
-        else     !! Far out: set to dxio
-           dx = dxio
+        else if(dist2bound.le.b1*dx0+b2*dx_in)then  !! Further still: linearly vary from dx0 to dx_in
+           dx = dx0 + (dx_in-dx0)*((dist2bound-b1*dx0)/(b2*dx_in))
+        else     !! Far out: set to dx_in
+           dx = dx_in
         end if               
       
                
@@ -738,9 +738,9 @@ endif
 case(6) !! Channel flows, propagating front
 
      xl=1.0d0 ! channel length
-     h0=xl/48.0d0   !cylinder radius
+     h0=xl/24.0d0   !cylinder radius
      yl=4.0d0*h0  ! channel width
-     dx0=xl/800.0       !15
+     dx0=xl/1200.0       !15
      xbcond=0;ybcond=1     
      
      nb_patches = 4
@@ -754,7 +754,7 @@ case(6) !! Channel flows, propagating front
      nb_blobs = 1
      allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,6),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
      b0=2.5d0*h0;b1=b0*sqrt(3.0d0)/2.0d0;b2=b0/2.0d0
-     blob_centre(1,:)=(/0.d0,0.d0/); !! Central
+     blob_centre(1,:)=(/-1.0d0*h0,0.d0/); !! Central
      do i=1,nb_blobs
         blob_coeffs(i,:)=h0*(/1.0d0,1.0d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0;blob_ellipse(i)=1
      end do
@@ -763,10 +763,10 @@ case(6) !! Channel flows, propagating front
 
      xb_min = minval(b_node(:,1));xb_max = maxval(b_node(:,1));yb_min = minval(b_node(:,2));yb_max = maxval(b_node(:,2))
 
-     varresratio = 3.0d0  !! Ratio for scaling near the solid objects
+     varresratio = 4.0d0  !! Ratio for scaling near the solid objects
      dxmax = dx0  
      dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dxio=4.0d0*dxmax  !! dx for solids and in/outs...!! Ratio for scaling far field...
+     dxb=dx0/varresratio;dx_in=4.0d0*dxmax;dx_out=0.5*dx_in  !! dx for solids and in/outs...!! 
      call make_boundary_particles
      call make_boundary_blobs               
      ipart = nb   
@@ -808,7 +808,16 @@ case(6) !! Channel flows, propagating front
            if(i.gt.nbio.and.temp.le.dist2bound) dist2bound = temp
            i=i+1
            if(temp.le.4.25*dxp(i-1)) keepgoing = .false. !! Too close to bound, leave it.           
-        end do        
+        end do     
+     
+!! Stretch high-res region downstream of flameholder        
+if(x.gt.0.0d0) then
+ temp = max(exp(-x/h0),0.25d0)
+ dist2bound = dist2bound*temp
+ dxio = dx_out
+else
+ dxio = dx_in 
+endif            
         
         !! And what is the spacing, based on dist2bound?
         if(dist2bound.le.b0*dx0) then  !! Close - set to dxmin
@@ -994,7 +1003,7 @@ case(7) !! Something periodic
      varresratio = 3.0d0  !! Ratio for scaling near the solid objects
      dxmax = dx0  
      dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dxio=2.0d0*dxmax  !! dx for solids and in/outs...!! Ratio for scaling far field...
+     dxb=dx0/varresratio;dx_in=2.0d0*dxmax;dx_out=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...
      call make_boundary_particles
      call make_boundary_blobs               
      ipart = nb   
@@ -1042,10 +1051,10 @@ case(7) !! Something periodic
            dx = dxmin                     
         else if(dist2bound.le.b1*dx0)then  !! A bit further out, smoothly vary from dxmin to dx0
            dx = 0.5d0*(dx0+dxmin) - 0.5d0*(dx0-dxmin)*cos((dist2bound-b0*dx0)*pi/((b1-b0)*dx0))  
-        else if(dist2bound.le.b1*dx0+b2*dxio)then  !! Further still: linearly vary from dx0 to dxio
-           dx = dx0 + (dxio-dx0)*((dist2bound-b1*dx0)/(b2*dxio))
-        else     !! Far out: set to dxio
-           dx = dxio
+        else if(dist2bound.le.b1*dx0+b2*dx_in)then  !! Further still: linearly vary from dx0 to dx_in
+           dx = dx0 + (dx_in-dx0)*((dist2bound-b1*dx0)/(b2*dx_in))
+        else     !! Far out: set to dx_in
+           dx = dx_in
         end if       
       
                
@@ -1252,7 +1261,7 @@ case(7) !! Something periodic
      varresratio = 3.0d0  !! Ratio for scaling near the solid objects
      dxmax = dx0  
      dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dxio=2.0d0*dxmax  !! dx for solids and in/outs...!! Ratio for scaling far field...
+     dxb=dx0/varresratio;dx_in=2.0d0*dxmax;dx_out=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...
      call make_boundary_particles
      call make_boundary_blobs               
      ipart = nb   
@@ -1300,10 +1309,10 @@ case(7) !! Something periodic
            dx = dxmin                     
         else if(dist2bound.le.b1*dx0)then  !! A bit further out, smoothly vary from dxmin to dx0
            dx = 0.5d0*(dx0+dxmin) - 0.5d0*(dx0-dxmin)*cos((dist2bound-b0*dx0)*pi/((b1-b0)*dx0))  
-        else if(dist2bound.le.b1*dx0+b2*dxio)then  !! Further still: linearly vary from dx0 to dxio
-           dx = dx0 + (dxio-dx0)*((dist2bound-b1*dx0)/(b2*dxio))
-        else     !! Far out: set to dxio
-           dx = dxio
+        else if(dist2bound.le.b1*dx0+b2*dx_in)then  !! Further still: linearly vary from dx0 to dx_in
+           dx = dx0 + (dx_in-dx0)*((dist2bound-b1*dx0)/(b2*dx_in))
+        else     !! Far out: set to dx_in
+           dx = dx_in
         end if       
       
                
@@ -1562,6 +1571,9 @@ end subroutine quicksort
         if(abs(b_type(ib)).ne.3)then  ! if it is a wall, inflow or outflow patch
            m_be = dsqrt(dot_product(b_edge(ib,:),b_edge(ib,:)))
            nrm(1)=-b_edge(ib,2)/m_be;nrm(2)=b_edge(ib,1)/m_be
+           if(b_type(ib).eq.1) dxio = dx_in
+           if(b_type(ib).eq.2) dxio = dx_out
+           if(b_type(ib).eq.0) dxio = dx_wall
            tmp = 0.5d0*dxio/m_be
            do while(tmp.lt.1.0-1.0d-10)   ! move along the patch in increments of dx
               ipart = ipart + 1

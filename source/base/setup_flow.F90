@@ -55,10 +55,14 @@ contains
      !! Choose initial conditions
 #ifndef restart     
 #ifdef react
-     call make_1d_1step_flame
-!     call make_1d_21step_flame
-!     call make_1d_25step_flame
-!     call load_flame_file    
+     if(nsteps.eq.1) then
+!        call make_1d_1step_flame
+     else if(nsteps.eq.21) then
+!        call make_1d_21step_flame
+     else if(nsteps.eq.35) then
+!        call make_1d_25step_flame
+     end if
+     call load_flame_file    
 #else
      call hardcode_initial_conditions     
 #endif
@@ -94,7 +98,7 @@ contains
      cputimecheck = zero         
      
      !! Initialise the time-stepping (necessary for PID controlled stepping)
-     dt = 1.0d-10             
+     dt = 1.0d-9             
          
      return
   end subroutine initial_solution   
@@ -484,7 +488,7 @@ contains
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! wall initial conditions
               u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
-              T(i) = T_reactants + 0.8d0*(T_products-T_reactants)
+!              T(i) = T_reactants + half*half*(T_products-T_reactants)
            end if                 
            if(node_type(i).eq.1) then !! inflow initial conditions
               u(i)=u_char                

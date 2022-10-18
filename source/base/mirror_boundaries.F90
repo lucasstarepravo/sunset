@@ -22,7 +22,8 @@ module mirror_boundaries
   !! 2 = outflow
   !! -1,-2,-3,-4 are fluid rows near boundary
   !! 999 = regular fluid
-  !! 1000 = mirror/ghost 
+
+  !! mirror/ghost takes copy of parent node_type
 
   public :: create_mirror_particles,reapply_mirror_bcs,reapply_mirror_bcs_divvel_only
 contains

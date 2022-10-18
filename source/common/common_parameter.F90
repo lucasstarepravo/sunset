@@ -38,16 +38,6 @@ module common_parameter
   integer(ikind), parameter :: nspec_max = 20     
   
   !! Runge Kutta coefficients ---------------------------------------------------------------------
-  !! classic RK4 (from Wikipedia...)  
-  real(rkind),dimension(3),parameter :: rk3_2N_a = (/ 0.0d0, -2.0d0/3.0d0, -1.0d0 /)
-  real(rkind),dimension(3),parameter :: rk3_2N_b = (/ 1.0d0/3.0d0, 1.0d0, 0.5d0 /)
-  real(rkind),dimension(3),parameter :: rk3_2N_c = (/ 0.0d0, 1.0d0/3.0d0, 2.0d0/3.0d0 /)  
-  
-  !! RK3[2N] Symmetric (from PENCIL CODE)
-  real(rkind),dimension(4),parameter :: rk4_a = (/ 1.0d0,0.5d0,0.5d0,1.0d0 /)
-  real(rkind),dimension(4),parameter :: rk4_b = (/ 1.0d0/6.0d0, 1.0d0/3.0d0, 1.0d0/3.0d0, 1.0d0/6.0d0 /)
-  real(rkind),dimension(4),parameter :: rk4_c = (/ 0.0d0,0.5d0,0.5d0,1.0d0 /)
-  
   !! RK3(2)4[2R+]C Kennedy (2000) Appl. Num. Math. 35:177-219
   real(rkind),parameter :: rk3_4s_2r_a21 = 11847461282814.0d0/36547543011857.0d0
   real(rkind),parameter :: rk3_4s_2r_a32 = 3943225443063.0d0/7078155732230.0d0
@@ -67,15 +57,15 @@ module common_parameter
 
   !! Normalisation constants and parameters for PID error estimators (OK for combustion at standard P,T)
   real(rkind), parameter :: elnro_norm = 1.0d-10
-  real(rkind), parameter :: eu_norm = 1.0d-6 
-  real(rkind), parameter :: ev_norm = 1.0d-6 
-  real(rkind), parameter :: ew_norm = 1.0d-6 
+  real(rkind), parameter :: eu_norm = 1.0d-2 
+  real(rkind), parameter :: ev_norm = 1.0d-2 !! 1d-6 might be necessary for steadier flows.
+  real(rkind), parameter :: ew_norm = 1.0d-2 !! 1d-2 is better for dealing with initial shocks
   real(rkind), parameter :: eroE_norm = 1.0d-2 
   real(rkind), parameter :: eY_norm = 1.0d-10       
   real(rkind), parameter :: pid_tol = 1.0d-4        !! Error tolerance
-  real(rkind), parameter :: pid_a=0.6d0/two  !! P-coefficient   ! 0.7
-  real(rkind), parameter :: pid_b=0.2d0/two  !! I-coefficient   ! 0.4
-  real(rkind), parameter :: pid_c=0.0d0/two  !! D-coefficient   ! 0.1
+  real(rkind), parameter :: pid_a=0.7d0/two  !! P-coefficient   ! 0.7
+  real(rkind), parameter :: pid_b=0.4d0/two  !! I-coefficient   ! 0.4
+  real(rkind), parameter :: pid_c=0.1d0/two  !! D-coefficient   ! 0.1
   real(rkind), parameter :: pid_k=0.9d0      !! kappa coefficient !0.9
   
 end module common_parameter

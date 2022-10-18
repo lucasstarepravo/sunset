@@ -327,17 +327,27 @@ contains
         end do
 #endif
         
-        !! Calculating L_infinity of error norms
-        enrm_ro = abs(e_acc_lnro(i))/(lnro(i)+elnro_norm)      
-        enrm_u = abs(e_acc_u(i))/(abs(u(i)) + eu_norm)  !! divide by zero mollification...
-        enrm_v = abs(e_acc_v(i))/(abs(v(i)) + ev_norm)  !! but should be scaled according to
-        enrm_w = abs(e_acc_w(i))/(abs(w(i)) + ew_norm)  !! expected magnitude of each property      
+        !! Calculating L_infinity norm of errors. Variables "eX_norm" provide a value for divide-by-
+        !! zero mollification, and this value is scaled according to the expected magnitude of the
+        !! property. (e.g. eroE_norm is much bigger than eY_norm). They are set in common parameters.
+        !! N.B. for initialising simulations with velocity discontinuities, it's helpful to relax
+        !! the constraint on the velocity a bit by increasing eu_norm, ev_norm & ew_norm.
+        enrm_ro = max(enrm_ro, &
+                     abs(e_acc_lnro(i))/(lnro(i)+elnro_norm))      
+        enrm_u = max(enrm_u, &
+                     abs(e_acc_u(i))/(abs(u(i)) + eu_norm))
+        enrm_v = max(enrm_v, &
+                     abs(e_acc_v(i))/(abs(v(i)) + ev_norm))  
+        enrm_w = max(enrm_w, &
+                     abs(e_acc_w(i))/(abs(w(i)) + ew_norm))      
 #ifndef isoT
-        enrm_E = abs(e_acc_E(i))/(abs(roE(i)) + eroE_norm)
+        enrm_E = max(enrm_E, &
+                     abs(e_acc_E(i))/(abs(roE(i)) + eroE_norm))
 #endif
 #ifdef ms 
         do ispec=1,nspec
-           enrm_Yspec(ispec) = abs(e_acc_Yspec(i,ispec))/(abs(Yspec(i,ispec)) + eY_norm)
+           enrm_Yspec(ispec) = max(enrm_Yspec(ispec), &
+                                   abs(e_acc_Yspec(i,ispec))/(abs(Yspec(i,ispec)) + eY_norm))
         end do
 #endif
      end do
