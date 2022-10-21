@@ -320,21 +320,27 @@ contains
      allocate(tot_Yspec(nspec),tot_Yspec_tmp(nspec))   
      tot_Yspec = zero     
      tot_error = zero
-     !$omp parallel do private(tmpro,dVi,ispec,tmpY,sumY) reduction(+:tot_Yspec,tot_error)
+     tot_vol = zero
+     !$omp parallel do private(tmpro,dVi,ispec,tmpY,sumY) reduction(+:tot_Yspec,tot_error,tot_vol)
      do i=1,npfb
         tmpro = exp(lnro(i))
         dVi = s(i)*s(i)*L_char*L_char !! assume square nodes for now...
 #ifdef dim3
         dVi = dVi*dz*L_char
 #endif        
+        !! The total volume of the domain
+        tot_vol = tot_vol + dVi
         
         sumY = -one
         do ispec=1,nspec
            tmpY = Yspec(i,ispec)
+           !! Total mass of species in domain
            tot_Yspec(ispec) = tot_Yspec(ispec) + dVi*tmpY*tmpro
            
            sumY = sumY + tmpY
         end do
+        
+        !! Error in sumY
         tot_error = tot_error + sumY*sumY
      end do
      !$omp end parallel do
@@ -342,15 +348,25 @@ contains
 #ifdef mp
      tot_Yspec_tmp = tot_Yspec
      tot_error_tmp = tot_error
+     tot_vol_tmp = tot_vol
      call MPI_ALLREDUCE(tot_Yspec_tmp,tot_Yspec,nspec,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(tot_error_tmp,tot_error,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)     
+     call MPI_ALLREDUCE(tot_error_tmp,tot_error,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(tot_vol_tmp,tot_vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)    
+     
+     !! L2 norm for error           
      tot_error = sqrt(tot_error/dble(npfb_global))
+     
+     !! Normalise mass of species by volume
+     tot_Yspec = tot_Yspec/tot_vol
+     
      if(iproc.eq.0)then
         write(199,*) time/Time_char,tot_error,tot_Yspec(:)
         flush(199)
      end if
 #else
-     write(199,*) time/Time_char,tot_Yspec(:)
+     !! Normalise mass of species by volume
+     tot_Yspec = tot_Yspec/tot_vol
+     write(199,*) time/Time_char,sqrt(tot_error/dble(npfb)),tot_Yspec(:)
      flush(199)
 #endif
 

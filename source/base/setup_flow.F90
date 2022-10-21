@@ -55,14 +55,17 @@ contains
      !! Choose initial conditions
 #ifndef restart     
 #ifdef react
-     if(nsteps.eq.1) then
-!        call make_1d_1step_flame
-     else if(nsteps.eq.21) then
-!        call make_1d_21step_flame
-     else if(nsteps.eq.35) then
-!        call make_1d_25step_flame
-     end if
-     call load_flame_file    
+     if(.true.)then
+        if(nsteps.eq.1) then
+           call make_1d_1step_flame
+        else if(nsteps.eq.21) then
+           call make_1d_21step_flame
+        else if(nsteps.eq.35) then
+           call make_1d_25step_flame
+        end if
+      else
+         call load_flame_file    
+      end if
 #else
      call hardcode_initial_conditions     
 #endif
