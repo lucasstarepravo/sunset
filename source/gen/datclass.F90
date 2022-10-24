@@ -181,9 +181,9 @@ case(1) !! Box for Rayleigh Taylor
   case(2) !! GRID!
 
 
-     yl=0.007d0!0.0125d0  ! channel width
+     yl=0.0125d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/2000.0       !15
+     dx0=xl/1000.0       !15
      xbcond=0;ybcond=1     
      
      nb_patches = 4
@@ -512,9 +512,9 @@ case(4) !! A sort of porous media... for porous Rayleigh-Taylor stuff
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.025!0.0125d0  ! channel width
+     yl=0.0125!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/1000.0       !15
+     dx0=xl/2000.0       !15
      xbcond=0;ybcond=1     
      
      nb_patches = 4
@@ -537,10 +537,10 @@ case(5) !! Inflow/outflow tube for simple flames
 
      xb_min = minval(b_node(:,1));xb_max = maxval(b_node(:,1));yb_min = minval(b_node(:,2));yb_max = maxval(b_node(:,2))
 
-     varresratio = 2.0d0  !! Ratio for scaling near the solid objects
+     varresratio = 1.0d0  !! Ratio for scaling near the solid objects
      dxmax = dx0  
      dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dx_in=2.0d0*dxmax;dx_out=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...
+     dxb=dx0/varresratio;dx_in=1.0d0*dxmax;dx_out=dx0*2.0d0  !! dx for solids and in/outs..
      call make_boundary_particles
      call make_boundary_blobs               
      ipart = nb   
@@ -586,20 +586,21 @@ case(5) !! Inflow/outflow tube for simple flames
         
         !! And what is the spacing, based on dist2bound?
 !! Over-ride object tests
-if(abs(x).le.0.05) then
+if(abs(x+0.5).le.0.1) then
    dist2bound=0.0d0
 else
-   dist2bound=min(abs(x-0.05),abs(x+0.05))
+!   dist2bound=min(abs(x-0.05),abs(x+0.1))
+   dist2bound=abs(x+0.4)
 endif   
    
         if(dist2bound.le.b0*dx0) then  !! Close - set to dxmin
            dx = dxmin                     
         else if(dist2bound.le.b1*dx0)then  !! A bit further out, smoothly vary from dxmin to dx0
            dx = 0.5d0*(dx0+dxmin) - 0.5d0*(dx0-dxmin)*cos((dist2bound-b0*dx0)*pi/((b1-b0)*dx0))  
-        else if(dist2bound.le.b1*dx0+b2*dx_in)then  !! Further still: linearly vary from dx0 to dx_in
-           dx = dx0 + (dx_in-dx0)*((dist2bound-b1*dx0)/(b2*dx_in))
-        else     !! Far out: set to dx_in
-           dx = dx_in
+        else if(dist2bound.le.b1*dx0+b2*dx_out)then  !! Further still: linearly vary from dx0 to dx_out
+           dx = dx0 + (dx_out-dx0)*((dist2bound-b1*dx0)/(b2*dx_out))
+        else     !! Far out: set to dx_out
+           dx = dx_out
         end if               
       
                

@@ -127,7 +127,7 @@ subroutine deallocate_everything
   deallocate(lambda_th)
 #endif
 #ifdef ms
-  deallocate(Mdiff)
+  deallocate(roMdiff)
 #endif    
 
   !! Neighbours lists and link lists

@@ -189,7 +189,7 @@ contains
      !! Register 3 is rhs_lnro,rhs_u,rhs_v (only used for RHS)
      !! Register 4 is e_acc_lnro,e_acc_u,e_acc_v - error accumulator
      integer(ikind) :: i,k,ispec
-     real(rkind) :: time0,emax_Y
+     real(rkind) :: time0,emax_Y,tmpro
      real(rkind),dimension(:),allocatable :: u_reg1,v_reg1,w_reg1,lnro_reg1,roE_reg1
      real(rkind),dimension(:),allocatable :: e_acc_lnro,e_acc_u,e_acc_v,e_acc_E,e_acc_w
      real(rkind),dimension(:,:),allocatable :: Yspec_reg1,e_acc_Yspec
@@ -209,13 +209,13 @@ contains
      allocate(e_acc_lnro(npfb),e_acc_u(npfb),e_acc_v(npfb),e_acc_E(npfb),e_acc_w(npfb))
      allocate(Yspec_reg1(npfb,nspec),rhs_Yspec(npfb,nspec),e_acc_Yspec(npfb,nspec))
      e_acc_lnro=zero;e_acc_u=zero;e_acc_v=zero;e_acc_E=zero;e_acc_Yspec=zero;e_acc_w=zero
-
+     
      !! Store prim vars in register 1 (w-register)
      !$omp parallel do private(ispec)
      do i=1,npfb
         lnro_reg1(i)=lnro(i);u_reg1(i)=u(i);v_reg1(i)=v(i);w_reg1(i)=w(i);roE_reg1(i)=roE(i)
         do ispec=1,nspec
-           Yspec_reg1(i,ispec)=Yspec(i,ispec)
+           Yspec_reg1(i,ispec)=Yspec(i,ispec) 
         end do
      end do
      !$omp end parallel do             
@@ -235,6 +235,7 @@ contains
         !! Set w_i and new u,v
         !$omp parallel do private(ispec)
         do i=1,npfb
+        
            !! Store next U in register 2
            lnro(i) = lnro_reg1(i) + RKa(k)*rhs_lnro(i)
            u(i) = u_reg1(i) + RKa(k)*rhs_u(i)
@@ -272,7 +273,7 @@ contains
            e_acc_E(i) = e_acc_E(i) + RKbmbh(k)*rhs_roE(i)                    
 #endif
 #ifdef ms           
-           do ispec=1,nspec
+           do ispec=1,nspec         
               e_acc_Yspec(i,ispec) = e_acc_Yspec(i,ispec) + RKbmbh(k)*rhs_Yspec(i,ispec)
            end do
 #endif
@@ -299,6 +300,7 @@ contains
      enrm_ro=zero;enrm_u=zero;enrm_v=zero;enrm_E=zero;enrm_Yspec=zero;enrm_w=zero
      !$omp parallel do private(ispec) reduction(max:enrm_ro,enrm_u,enrm_v,enrm_E,enrm_Yspec,enrm_w)
      do i=1,npfb
+     
         !! Final values of prim vars
         lnro(i) = lnro_reg1(i) + RKb(4)*rhs_lnro(i)
         u(i) = u_reg1(i) + RKb(4)*rhs_u(i)
@@ -445,8 +447,8 @@ contains
 #endif      
 
 #ifdef ms        
-        !! Molecular diffusivity::  s*s*ro/Mdiff
-        dt_spec = min(dt_spec,s(i)*s(i)*exp(lnro(i))/maxval(Mdiff(i,1:nspec)))
+        !! Molecular diffusivity::  s*s*ro/roMdiff
+        dt_spec = min(dt_spec,s(i)*s(i)*exp(lnro(i))/maxval(roMdiff(i,1:nspec)))
 #endif   
          
      end do

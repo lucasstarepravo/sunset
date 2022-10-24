@@ -188,12 +188,15 @@ contains
         !! Net production rate ================================================
         !$omp parallel do private(jspec,ispec,molar_production_rate,net_rate)
         do i=1,npfb
+
+           !! Net rate
+           net_rate = forward_rate(i) - backward_rate(i)
+
+           net_rate = net_rate*third_body_conc(i)
+
            do jspec = 1,num_reactants(istep) + num_products(istep)
               ispec = stepspecies_list(istep,jspec)
-              
-              !! Net rate
-              net_rate = forward_rate(i) - backward_rate(i)
-              net_rate = net_rate*third_body_conc(i)
+                          
            
               !! Net molar production rate of ispec by step istep
               molar_production_rate = delta_nu(istep,ispec)*net_rate
@@ -224,13 +227,15 @@ contains
            !! Augment the heat release (production rate x enthalpy of formation)
            heat_release = heat_release - molar_mass(ispec)*rateYspec(i,ispec) &
                                          *coef_h(ispec,polyorder_cp+2)
-                              
+
+
         end do
 alpha_out(i) = heat_release
 
+
      end do
      !$omp end parallel do     
-     
+
      !! Build contribution to source terms for boundary conditions ============
      if(nb.ne.0) then
         allocate(sumoverspecies_homega(nb))

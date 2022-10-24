@@ -168,11 +168,11 @@ Gradients of mixture specific heat capacity and enthalpy are also evaluated thro
 Similarly, the gradients of the transport properties, which have analytic relations with the thermodynamic quantities, are evaluated as
 \begin{equation}\nabla\mu=\frac{r_{T}\mu}{T}\nabla{T}\end{equation}
 \begin{equation}\nabla\lambda=\frac{r_{T}\lambda}{T}\nabla{T}+\frac{\lambda}{c_{p}}\nabla{c_{p}}\end{equation}
-\begin{equation}\nabla{D}_{\alpha}=\frac{r_{T}D_{\alpha}}{T}\nabla{T}-D_{\alpha}\nabla\ln\rho\end{equation}
+\begin{equation}\nabla\rho{D}_{\alpha}=\frac{r_{T}D_{\alpha}}{T}\nabla{T}\end{equation}
 The gradient of the enthalpy of species $\alpha$ is given by
-\begin{equation}\nabla{h}_{\alpha}=\frac{dh_{\alpha}}{dT}\nabla{T}=c_{p}\nabla{T},\end{equation}
+\begin{equation}\nabla{h}_{\alpha}=\frac{dh_{\alpha}}{dT}\nabla{T}=c_{p,\alpha}\nabla{T},\end{equation}
 and the gradient of the mixture specific heat capacity is
-\begin{equation}\nabla{c}_{p}=\displaystyle\sum_{\alpha}\left[Y_{\alpha}\frac{dc_{p}}{dT}\nabla{T}+c_{p}\nabla{Y}_{\alpha}\right].\end{equation}
+\begin{equation}\nabla{c}_{p}=\displaystyle\sum_{\alpha}\left[Y_{\alpha}\frac{dc_{p,\alpha}}{dT}\nabla{T}+c_{p,\alpha}\nabla{Y}_{\alpha}\right].\end{equation}
 
 \subsection{Boundaries}
 
@@ -272,17 +272,17 @@ The following cases are currently included in \verb|datclass.F90|:
 \frac{\partial\rho{E}}{\partial{t}}+u_{i}\frac{\partial\rho{E}}{\partial{x}_{i}}=&-&\rho{E}\frac{\partial{u}_{i}}{\partial{x}_{i}}-u_{i}\frac{\partial{p}}{\partial{x}_{i}}-p\frac{\partial{u}_{i}}{\partial{x}_{i}}\\
 &+&u_{i}\left\{\frac{\mu}{\rho}\left[\frac{\partial^{2}u_{i}}{\partial{x}_{j}\partial{x}_{j}}-\frac{1}{3}\frac{\partial}{\partial{x}_{i}}\left(\frac{\partial{u}_{j}}{\partial{x}_{j}}\right)\right]+\frac{1}{\rho}\left[\frac{\partial{u}_{i}}{\partial{x}_{j}}+\frac{\partial{u}_{j}}{\partial{x}_{i}}-\frac{2}{3}\delta_{ij}\frac{\partial{u}_{k}}{\partial{x}_{k}}\right]\frac{\partial\mu}{\partial{x}_{j}}\right\}\\
 &+&\mu\left(\frac{\partial{u}_{i}}{\partial{x}_{j}}+\frac{\partial{u}_{j}}{\partial{x}_{i}}-\frac{2}{3}\delta_{ij}\frac{\partial{u}_{k}}{\partial{x}_{k}}\right)\frac{\partial{u}_{i}}{\partial{x}_{j}}\\
-&+&\displaystyle\sum_{\alpha}\left\{\rho{D}_{\alpha}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}\frac{\partial{h}_{\alpha}}{\partial{x}_{i}}+\rho{h}_{\alpha}\left[D_{\alpha}\frac{\partial^{2}Y_{\alpha}}{\partial{x}_{i}\partial{x}_{i}}
-+\frac{\partial{D}_{\alpha}}{\partial{x}_{i}}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}+D_{\alpha}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}\frac{\partial\ln\rho}{\partial{x}_{i}}\right]\right\}\\
-&-&\displaystyle\sum_{\alpha}\rho{Y}_{\alpha}h_{\alpha}\displaystyle\sum_{\beta}\left[D_{\beta}\frac{\partial^{2}{Y}_{\beta}}{\partial{x}_{i}\partial{x}_{i}}+\frac{\partial{D}_{\beta}}{\partial{x}_{i}}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}+D_{\beta}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}\frac{\partial\ln\rho}{\partial{x}_{i}}\right]\\
-&-&\rho\displaystyle\sum_{\alpha}\left[h_{\alpha}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}+Y_{\alpha}\frac{\partial{h}_{\alpha}}{\partial{x}_{i}}\right]\displaystyle\sum_{\beta}D_{\beta}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}\\
+&+&\displaystyle\sum_{\alpha}\left\{\rho{D}_{\alpha}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}\frac{\partial{h}_{\alpha}}{\partial{x}_{i}}+{h}_{\alpha}\left[\rho{D}_{\alpha}\frac{\partial^{2}Y_{\alpha}}{\partial{x}_{i}\partial{x}_{i}}
++\frac{\partial\rho{D}_{\alpha}}{\partial{x}_{i}}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}\right]\right\}\\
+&-&\displaystyle\sum_{\alpha}{Y}_{\alpha}h_{\alpha}\displaystyle\sum_{\beta}\left[\rho{D}_{\beta}\frac{\partial^{2}{Y}_{\beta}}{\partial{x}_{i}\partial{x}_{i}}+\frac{\partial\rho{D}_{\beta}}{\partial{x}_{i}}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}\right]\\
+&-&\displaystyle\sum_{\alpha}\left[h_{\alpha}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}+Y_{\alpha}\frac{\partial{h}_{\alpha}}{\partial{x}_{i}}\right]\displaystyle\sum_{\beta}\rho{D}_{\beta}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}\\
 &+&{u}_{i}{f}_{i}
 \end{eqnarray}
 and
 \begin{eqnarray}
 \frac{\partial{Y}_{\alpha}}{\partial{t}}+u_{i}\frac{{Y}_{\alpha}}{\partial{x}_{i}}=&&\frac{\dot\omega_{\alpha}}{\rho}
-+D_{\alpha}\frac{\partial^{2}Y_{\alpha}}{\partial{x}_{i}\partial{x}_{i}}+\frac{\partial{D}_{\alpha}}{\partial{x}_{i}}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}+D_{\alpha}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}\frac{\partial\ln\rho}{\partial{x}_{i}}\\
-&-&Y_{\alpha}\displaystyle\sum_{\beta}\left[D_{\beta}\frac{\partial^{2}Y_{\beta}}{\partial{x}_{i}\partial{x}_{i}}+\frac{\partial{D}_{\beta}}{\partial{x}_{i}}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}+D_{\beta}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}\frac{\partial\ln\rho}{\partial{x}_{i}}\right]-\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}\displaystyle\sum_{\beta}D_{\beta}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}
++\frac{1}{\rho}\left[\rho{D}_{\alpha}\frac{\partial^{2}Y_{\alpha}}{\partial{x}_{i}\partial{x}_{i}}+\frac{\partial{\rho{D}}_{\alpha}}{\partial{x}_{i}}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}\right]\\
+&-&\frac{Y_{\alpha}}{\rho}\displaystyle\sum_{\beta}\left[\rho{D}_{\beta}\frac{\partial^{2}Y_{\beta}}{\partial{x}_{i}\partial{x}_{i}}+\frac{\partial\rho{D}_{\beta}}{\partial{x}_{i}}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}\right]-\frac{1}{\rho}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}\displaystyle\sum_{\beta}\rho{D}_{\beta}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}
 \end{eqnarray}
 
 \bibliographystyle{elsarticle-num-names}

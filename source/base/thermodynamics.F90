@@ -212,7 +212,7 @@ contains
         dcpdT = dcpdT*Temp + coef_dcpdT(ispec,iorder)
         
      end do
-                 
+                      
      return
   end subroutine evaluate_enthalpy_at_node
 !! ------------------------------------------------------------------------------------------------
@@ -276,10 +276,10 @@ contains
         lambda_th(i) = cp(i)*visc(i)/Pr
 
 #ifdef ms       
-        !! Molecular diffusivity
-        tmp = visc(i)/(exp(lnro(i))*Pr)
+        !! Molecular diffusivity - actually returning ro*Mdiff
+        tmp = visc(i)/Pr
         do ispec=1,nspec
-           Mdiff(i,ispec) = tmp*one_over_Lewis_number(ispec)
+           roMdiff(i,ispec) = tmp*one_over_Lewis_number(ispec)
         end do        
 #endif        
    
@@ -288,7 +288,7 @@ contains
 #else
      visc(:) = visc_ref
 #ifdef ms
-     Mdiff(:,:) = Mdiff_ref
+     roMdiff(:,:) = exp(lnro(i))*Mdiff_ref
 #endif     
 #endif     
   

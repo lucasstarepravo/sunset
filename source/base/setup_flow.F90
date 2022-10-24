@@ -42,7 +42,7 @@ contains
      allocate(lambda_th(npfb))
 #endif
 #ifdef ms     
-     allocate(Mdiff(npfb,nspec))
+     allocate(roMdiff(npfb,nspec))
 #endif     
      allocate(cp(np),Rgas_mix(np))
      
@@ -55,7 +55,7 @@ contains
      !! Choose initial conditions
 #ifndef restart     
 #ifdef react
-     if(.true.)then
+     if(.false.)then
         if(nsteps.eq.1) then
            call make_1d_1step_flame
         else if(nsteps.eq.21) then

@@ -40,7 +40,7 @@ module common_vars
   
   !! Transport properties
   real(rkind), dimension(:), allocatable :: Rgas_mix,cp,visc,lambda_th
-  real(rkind), dimension(:,:), allocatable :: Mdiff
+  real(rkind), dimension(:,:), allocatable :: roMdiff
   
   !! Transport properties - arrays covering the species
   real(rkind), dimension(:), allocatable :: molar_mass,one_over_Lewis_number,one_over_molar_mass
