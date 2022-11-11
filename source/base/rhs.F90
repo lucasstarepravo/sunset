@@ -384,6 +384,7 @@ contains
      real(rkind) :: tmp_scal_u,tmp_scal_v,tmp_scal_w,f_visc_u,f_visc_v,f_visc_w
      real(rkind) :: tmpro,body_force_u,body_force_v,body_force_w,one_over_ro
      real(rkind) :: c
+     real(rkind),dimension(:,:),allocatable :: grad2uvec,grad2ucross
 
      
      !! Gradient of velocity divergence
@@ -405,7 +406,7 @@ contains
      !! Pressure gradient (method depends on whether isoT or not)
 #ifndef isoT
      !! Evaluate pressure gradient directly (LABFM...)
-     call calc_gradient(p,gradp) 
+     call calc_gradient(p-p_outflow,gradp) 
 #else
      !! Evaluate the pressure gradient (from density gradient
      !$omp parallel do
@@ -472,8 +473,15 @@ contains
      !! Make L1,L2,L3,L4,L5 and populate viscous + body force part of rhs' and save transverse
      !! parts of convective terms for later...
      if(nb.ne.0)then
+     
+        !! Evaluate d2u/dx2,d2v/dx2,d2w/dx2, and d2udxy, d2udxz
+        allocate(grad2uvec(nb,3),grad2ucross(nb,2))
+        call calc_grad2vecbound(u,v,w,grad2uvec)  
+        call calc_grad2crossbound(gradu,grad2ucross)        
+   
+     
         !$omp parallel do private(i,tmpro,c,xn,yn,un,ut,f_visc_u,f_visc_v,body_force_u,body_force_v &
-        !$omp ,dpdn,dundn,dutdn,gradvisc,one_over_ro)
+        !$omp ,dpdn,dundn,dutdn,gradvisc,one_over_ro,f_visc_w)
         do j=1,nb
            i=boundary_list(j)
            tmpro = exp(lnro(i));one_over_ro = one/tmpro
@@ -512,25 +520,44 @@ contains
               L(j,3) = u(i)*gradv(i,1)
               L(j,4) = u(i)*gradw(i,1)
               L(j,5) = half*(u(i)+c)*(dpdn + tmpro*c*gradu(i,1))
-              
-              !! Viscous forces
-              f_visc_u = visc(i)*(lapu(i) + onethird*graddivvel(i,1))
-              f_visc_v = visc(i)*(lapv(i) + onethird*graddivvel(i,2))
+
+              !! Build initial stress divergence 
+              f_visc_u = visc(i)*(lapu(i) + onethird*graddivvel(i,1)) 
+              f_visc_v = visc(i)*(lapv(i) + onethird*graddivvel(i,2)) 
               f_visc_w = visc(i)*(lapw(i) + onethird*graddivvel(i,3))
-              !! viscous forces due to non-uniform viscosity
 #ifdef tdtp
+               !! non-uniform viscosity terms. N.B. dtau_nn/dn=zero for both inflow and outflow, so applied here.
               gradvisc(:) = r_temp_dependence*visc(i)*gradT(i,:)/T(i)
-              f_visc_u = f_visc_u + gradvisc(1)*(fourthirds*gradu(i,1) - twothirds*(gradv(i,2)+gradw(i,3))) &
-                                  + gradvisc(2)*(gradu(i,2)+gradv(i,1)) &
-                                  + gradvisc(3)*(gradu(i,3)+gradw(i,1))
+              f_visc_u = f_visc_u + zero                           !! dtau_nn/dn=0
               f_visc_v = f_visc_v + gradvisc(1)*(gradu(i,2)+gradv(i,1)) &
                                   + gradvisc(2)*(fourthirds*gradv(i,2) - twothirds*(gradu(i,1)+gradw(i,3))) &
                                   + gradvisc(3)*(gradv(i,3)+gradw(i,2))
               f_visc_w = f_visc_w + gradvisc(1)*(gradu(i,3)+gradw(i,1)) &
                                   + gradvisc(2)*(gradv(i,3)+gradw(i,2)) &
-                                  + gradvisc(3)*(fourthirds*gradw(i,3) - twothirds*(gradu(i,1)+gradv(i,2)))    
+                                  + gradvisc(3)*(fourthirds*gradw(i,3) - twothirds*(gradu(i,1)+gradv(i,2)))     
 #endif 
+              
+              !! Zero various terms depending on inflow or outflow. This is done by subtracting terms as
+              !! appropriate.
+              if(node_type(i).eq.1) then !! inflow
+                 !! dtau_nn/dn = 0
+                 f_visc_u = f_visc_u + visc(i)*(twothirds*graddivvel(i,1) - two*grad2uvec(j,1))
+              else        !! Outflow
+                 !! dtau_nn/dn = 0
+                 f_visc_u = f_visc_u + visc(i)*(twothirds*graddivvel(i,1) - two*grad2uvec(j,1))
+                             
+                 !! dtau_jn/dn = 0 for j=2,3 
+                 f_visc_v = f_visc_v -grad2uvec(j,2) - grad2ucross(j,1)
+                 f_visc_w = f_visc_w -grad2uvec(j,3) - grad2ucross(j,2)
+
+                 !! zero non-uniform viscosity contribution to dtau_jn/dn for j=2,3 
+#ifdef tdtp
+                 f_visc_v = f_visc_v - gradvisc(1)*(gradu(i,2)+gradv(i,1)) 
+                 f_visc_w = f_visc_w - gradvisc(1)*(gradu(i,3)+gradw(i,1)) 
+#endif 
+              
              
+              end if
      
               !! Body force
               body_force_u = grav(1) + driving_force(1)*one_over_ro
@@ -548,7 +575,8 @@ contains
               rhs_w(i) = -v(i)*gradw(i,2) - w(i)*gradw(i,3) - gradp(i,3)*one_over_ro + f_visc_w*one_over_ro + body_force_w 
            end if
         end do
-        !$omp end parallel do          
+        !$omp end parallel do 
+        deallocate(grad2uvec,grad2ucross)         
      end if
          
      !! Deallocate any stores no longer required
@@ -695,7 +723,6 @@ contains
        !! OUTFLOW BOUNDARY 
        else if(node_type(i).eq.2) then   
           call specify_characteristics_outflow(j,L(j,:),gradp(i,:),gradu(i,:),gradv(i,:),gradw(i,:))       
-
        end if          
     end do
     !$omp end parallel do

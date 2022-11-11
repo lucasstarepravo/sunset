@@ -24,6 +24,7 @@ module labf
   private
   public calc_labf_weights,adapt_stencils,calc_boundary_weights,calc_labf_sums, &
          filter_coefficients
+  integer(ikind) :: nsize_large         
 
 !! Choice of ABF type:: 1=original, 2=Hermite polynomials, 3=Legendre polynomials
 !! ABFs 2 and 3 are multiplied by an RBF (Wab(qq) set in sphtools).
@@ -64,6 +65,7 @@ contains
      k=10
 #endif
      nsizeG=(k*k+3*k)/2   !!  5,9,14,20,27,35,44... for k=2,3,4,5,6,7,8...
+     nsize_large = nsizeG
      
      !! Reduce nplink now, to avoid allocating more memory than necessary
      nplink = maxval(ij_count(1:npfb))
@@ -318,8 +320,13 @@ contains
 !! ------------------------------------------------------------------------------------------------
   subroutine calc_boundary_weights
      !! Calculates weights for derivatives near boundaries.
-     !! For i<=3*nb, normal derivatives are calculated using 4th order FD stencils, and transverse
-     !! derivatives are calculated using one-dimension 4th order LABFM.
+     !! Stencil contains boundary node i0, and 4 rows i1,i2,i3,i4
+     !! For i3,i4 - everything LABFM, order<=6
+     !! For i2 - everything LABFM, order=4
+     !! For i1 - 2nd derivs and hyp are LABFM, order=4, gradients are FD+1D-LABFM
+     !! For i0 - everything is FD+1D-LABFM
+     !! All FD are in boundary normal direction, using 5 point stencils.
+     !! All 1D-LABFM are used in boundary tangent direction, and are 6th order
      integer(ikind) :: i,j,k,nsize,nsizeG,i1,i2,is,ie,irow,ii,jj,kk
      integer(ikind) :: im1,im2,ip1,ip2
      real(rkind) :: rad,qq,xt,yt,ff1,xn,yn,tmp_n,tmp_t,dx2,dx4,tmp1,x,y,tmp2,dx
@@ -334,7 +341,7 @@ contains
      real(rkind),dimension(2) :: grad_tn
      real(rkind),dimension(2,2) :: Jinv
      
-     logical :: fd_2rows,bound_row
+   
      
      !! Space for boundary weights for grad2. N.B. they are indexed only over [1..nb]
      allocate(ij_wb_grad2(dims,nplink,nb));ij_wb_grad2=zero
@@ -424,6 +431,7 @@ contains
               if(node_type(j).eq.-4.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) =  one/12.0d0/dx                 
            end do
         end if
+if(.false.)then
         if(node_type(i).eq.-2) then
            dx = s(i)        
            ij_w_grad(:,:,i) = zero
@@ -438,6 +446,7 @@ contains
               if(node_type(j).eq.-4.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) = -one/12.0d0/dx              
            end do
         end if
+endif        
      end do       
 
 
@@ -452,7 +461,9 @@ contains
      
      !! Boundary and first 2 rows: set gradients
      do i=1,npfb
-        if(node_type(i).ge.-2.and.node_type(i).le.2) then
+!        if(node_type(i).ge.-2.and.node_type(i).le.2) then
+if(node_type(i).ge.-1.and.node_type(i).le.2) then
+        
            amatt=zero;bvect=zero;xvec = zero;gvec = zero
            xt=-rnorm(i,2);yt=rnorm(i,1)  !! unit tangent vector
            xn=rnorm(i,1);yn=rnorm(i,2)  !! unit normal vector
@@ -624,7 +635,8 @@ contains
 
      do jj=1,npfb-nb
         i = internal_list(jj)
-        if(node_type(i).eq.-1.or.node_type(i).eq.-2) then  !! For first and second row fluid nodes
+!        if(node_type(i).eq.-1.or.node_type(i).eq.-2) then  !! For first and second row fluid nodes
+if(node_type(i).eq.-1) then  !! For first and second row fluid nodes        
            xn = rnorm(i,1);yn=rnorm(i,2)
            Jinv(1,1)=xn;Jinv(1,2)=-yn;Jinv(2,1)=yn;Jinv(2,2)=xn   !! Jacobian for normal-tangent to x-y
            do k=1,ij_count(i)             

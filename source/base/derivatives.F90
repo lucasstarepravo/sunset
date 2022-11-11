@@ -28,7 +28,7 @@ contains
     integer :: i,j,k
     real(rkind),dimension(dims) :: gradtmp
     real(rkind) :: gradztmp
-
+    
     segment_tstart = omp_get_wtime()     
     
     !$OMP PARALLEL DO PRIVATE(j,k,gradtmp)
@@ -41,7 +41,7 @@ contains
        gradphi(i,1:2) = gradtmp(1:2) - phi(i)*ij_w_grad_sum(:,i)                           
     end do
     !$OMP END PARALLEL DO
-    
+     
     
 #ifdef dim3       
     !! Finite differences along z
@@ -197,6 +197,72 @@ contains
     return
   end subroutine calc_grad2bound
 !! ------------------------------------------------------------------------------------------------  
+  subroutine calc_grad2vecbound(phi1,phi2,phi3,g2phi)
+    !! Calculate the second boundary normal derivatives of the components of a vector
+    real(rkind),dimension(:),intent(in) :: phi1,phi2,phi3
+    real(rkind),dimension(:,:),intent(inout) :: g2phi
+    integer i,j,k,ii
+    real(rkind),dimension(dims) :: g2_tmp
+
+    segment_tstart = omp_get_wtime()         
+
+    !$OMP PARALLEL DO PRIVATE(i,j,k,g2_tmp)
+    do ii=1,nb
+       i=boundary_list(ii)
+       g2_tmp = zero
+       do k=1,ij_count(i)
+          j = ij_link(k,i) 
+          g2_tmp(1) = g2_tmp(1) + phi1(j)*ij_wb_grad2(1,k,ii)
+          g2_tmp(2) = g2_tmp(2) + phi2(j)*ij_wb_grad2(1,k,ii)
+          g2_tmp(3) = g2_tmp(3) + phi3(j)*ij_wb_grad2(1,k,ii)          
+       end do
+       g2phi(ii,1) = g2_tmp(1) - phi1(i)*ij_wb_grad2_sum(1,ii)
+       g2phi(ii,2) = g2_tmp(2) - phi2(i)*ij_wb_grad2_sum(1,ii)
+       g2phi(ii,3) = g2_tmp(3) - phi3(i)*ij_wb_grad2_sum(1,ii)                     
+    end do
+    !$OMP END PARALLEL DO
+
+    !! Profiling
+    segment_tend = omp_get_wtime()
+    segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
+
+    return
+  end subroutine calc_grad2vecbound  
+!! ------------------------------------------------------------------------------------------------  
+  subroutine calc_grad2crossbound(gradphi,g2phi)
+    !! Calculate the second cross derivatives of a scalar on boundary nodes.
+    !! Takes in the first derivatives of scale, and calculates boundary normal derivatives of those
+    real(rkind),dimension(:,:),intent(in) :: gradphi
+    real(rkind),dimension(:,:),intent(inout) :: g2phi
+    integer i,j,k,ii
+    real(rkind),dimension(dims) :: g2_tmp
+
+    segment_tstart = omp_get_wtime()         
+
+    !$OMP PARALLEL DO PRIVATE(i,j,k,g2_tmp)
+    do ii=1,nb
+       i=boundary_list(ii)
+       g2_tmp = zero
+       do k=1,ij_count(i)
+          j = ij_link(k,i) 
+          !! Only using nodes in the boundary normal direction
+          if(j.le.npfb) then  !! Not happy with this if, but okay for now.
+             g2_tmp(1) = g2_tmp(1) + gradphi(j,2)*ij_w_grad(1,k,i)
+             g2_tmp(2) = g2_tmp(2) + gradphi(j,3)*ij_w_grad(1,k,i)
+          endif
+       end do
+       g2phi(ii,1) = g2_tmp(1) - gradphi(i,2)*ij_w_grad_sum(1,i)
+       g2phi(ii,2) = g2_tmp(2) - gradphi(i,3)*ij_w_grad_sum(1,i)
+    end do
+    !$OMP END PARALLEL DO
+
+    !! Profiling
+    segment_tend = omp_get_wtime()
+    segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
+
+    return
+  end subroutine calc_grad2crossbound 
+!! ------------------------------------------------------------------------------------------------ 
   subroutine calc_filtered_var(phi)
     !! Calculate the hyperviscosity filtered phi
     real(rkind),dimension(:),intent(inout) :: phi

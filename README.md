@@ -1,6 +1,6 @@
 # SUNSET code
 
-The **S**calable, **U**nstructured **N**ode-**SET** code, for mesh-free DNS.
+The **S**calable, **U**nstructured **N**ode-**SET** code, for DNS of compressible reacting flows.
 
 Developed by Dr Jack King, University of Manchester.
 
@@ -17,7 +17,12 @@ Developed by Dr Jack King, University of Manchester.
    + Symmetry
    + Periodic
 - Parallelised with OpenMP + MPI.
-- Two-dimensional domain discretisation, tested up to 1024 cores.
+- Three-dimensional domain discretisation, tested up to 1024 cores.
 
+## References
+
+- LABFM fundamentals: King, Lind & Nasar (2020) JCP 415:109549 https://doi.org/10.1016/j.jcp.2020.109549
+- LABFM fundamentals + BCs: King & Lind (2022) JCP 449:110760 https://doi.org/10.1016/j.jcp.2021.110760
+- More to follow.
 
 

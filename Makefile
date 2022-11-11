@@ -21,7 +21,7 @@
 # make thermo=0 dim3=X mpi=X pgrad=X
 #
 # For standard combustion problems, react=1 will overwrite any thermo, tdtp and multispec flags:
-# make react=1 dim3=X mpi=X yout=X wisot=X       <---------- standard combustion make
+# make react=1 dim3=X mpi=X yout=X wisot=X hardinf=X     <---------- standard combustion make
 #
 # For thermal flows with real gas properties:
 # make thermo=1 dim3=X mpi=X pgrad=X tdtp=1

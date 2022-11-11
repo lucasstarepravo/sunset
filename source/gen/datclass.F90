@@ -540,7 +540,7 @@ case(5) !! Inflow/outflow tube for simple flames
      varresratio = 1.0d0  !! Ratio for scaling near the solid objects
      dxmax = dx0  
      dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dx_in=1.0d0*dxmax;dx_out=dx0*2.0d0  !! dx for solids and in/outs..
+     dxb=dx0/varresratio;dx_in=2.0d0*dxmax;dx_out=dx0*2.0d0  !! dx for solids and in/outs..
      call make_boundary_particles
      call make_boundary_blobs               
      ipart = nb   
@@ -586,11 +586,11 @@ case(5) !! Inflow/outflow tube for simple flames
         
         !! And what is the spacing, based on dist2bound?
 !! Over-ride object tests
-if(abs(x+0.5).le.0.1) then
+if(abs(x).le.0.075) then
    dist2bound=0.0d0
 else
-!   dist2bound=min(abs(x-0.05),abs(x+0.1))
-   dist2bound=abs(x+0.4)
+   dist2bound=min(abs(x-0.075),abs(x+0.075))
+!   dist2bound=abs(x+0.4)
 endif   
    
         if(dist2bound.le.b0*dx0) then  !! Close - set to dxmin
@@ -741,7 +741,7 @@ case(6) !! Channel flows, propagating front
      xl=1.0d0 ! channel length
      h0=xl/24.0d0   !cylinder radius
      yl=4.0d0*h0  ! channel width
-     dx0=xl/1200.0       !15
+     dx0=xl/600.0       !15
      xbcond=0;ybcond=1     
      
      nb_patches = 4
@@ -814,7 +814,7 @@ case(6) !! Channel flows, propagating front
 !! Stretch high-res region downstream of flameholder        
 if(x.gt.0.0d0) then
  temp = max(exp(-x/h0),0.25d0)
- dist2bound = dist2bound*temp
+! dist2bound = dist2bound*temp
  dxio = dx_out
 else
  dxio = dx_in 

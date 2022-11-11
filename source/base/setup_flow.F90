@@ -55,7 +55,7 @@ contains
      !! Choose initial conditions
 #ifndef restart     
 #ifdef react
-     if(.false.)then
+     if(.true.)then
         if(nsteps.eq.1) then
            call make_1d_1step_flame
         else if(nsteps.eq.21) then
