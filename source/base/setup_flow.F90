@@ -441,7 +441,7 @@ contains
 
      !! Position and scale     
      flame_location = zero
-     flame_thickness = 5.0d-4/L_char !! Scale thickness because position vectors are scaled...
+     flame_thickness = 1.0d-3/L_char !! Scale thickness because position vectors are scaled...
 
      !! Temperatures
      T_reactants = 3.0d2
@@ -491,7 +491,7 @@ contains
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! wall initial conditions
               u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
-!              T(i) = T_reactants + half*half*(T_products-T_reactants)
+              T(i) = T_reactants !+ half*half*(T_products-T_reactants)
            end if                 
            if(node_type(i).eq.1) then !! inflow initial conditions
               u(i)=u_char                

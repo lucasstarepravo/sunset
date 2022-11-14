@@ -14,6 +14,7 @@ module chemistry
   use common_parameter
   use common_vars
   use thermodynamics
+  use omp_lib
   implicit none
 
 
@@ -23,14 +24,15 @@ contains
   subroutine calculate_chemical_production_rate
      integer(ikind) :: j,i,ispec,istep,jspec,jstep,ithirdbody,kspec
      real(rkind) :: arrhenius_rate_back,gibbs_tmp,tmpro
-     real(rkind) :: molar_production_rate,arrhenius_rate0,arrhenius_rate
+     real(rkind) :: mass_production_rate,arrhenius_rate0,arrhenius_rate
      real(rkind) :: p_reduced,net_rate,logYovW,enthalpy,heat_release
      real(rkind),dimension(:,:),allocatable :: rateYspec,gibbs
-     real(rkind),dimension(:),allocatable :: forward_rate,third_body_conc,backward_rate
+     real(rkind),dimension(:),allocatable :: rate,third_body_conc,backward_rate
          
+     segment_tstart = omp_get_wtime()                  
      
      allocate(rateYspec(npfb,nspec));rateYspec = zero
-     allocate(forward_rate(npfb));forward_rate=zero
+     allocate(rate(npfb));rate=zero
      allocate(third_body_conc(npfb));third_body_conc=one
      allocate(backward_rate(npfb));backward_rate = zero
      
@@ -73,10 +75,10 @@ contains
                           - arrhenius_coefs(istep,3)/T(i)
  
            !! Loop over all reactants and build log of forward rate
-           forward_rate(i) = arrhenius_rate
+           rate(i) = arrhenius_rate
         end do
         !$omp end parallel do
-        !! forward_rate contains ln(k_{f,m})
+        !! rate contains ln(k_{f,m})
                     
         !! Third bodies =======================================================
         if(third_body_flag(istep).ne.0) then
@@ -113,12 +115,11 @@ contains
                                 lindemann_coefs(jstep,3)/T(i)
 
               !! Reduced pressure
-              p_reduced = exp(arrhenius_rate0 - forward_rate(i))*third_body_conc(i)
+              p_reduced = exp(arrhenius_rate0 - rate(i))*third_body_conc(i)
               
               !! rate constant for this step
-              forward_rate(i) = forward_rate(i) + &
-                                log(p_reduced/(one+p_reduced)) + &
-                                lindemann_coefs(jstep,4)       
+              rate(i) = rate(i) + log(p_reduced/(one+p_reduced)) &
+                                + lindemann_coefs(jstep,4)       
               
               !! Reset third body here
               third_body_conc(i) = one               
@@ -127,7 +128,7 @@ contains
         end if                     
            
         !! Store log(k_forward) for use in any backward steps
-        backward_rate(:) = forward_rate(:)
+        backward_rate(:) = rate(:)
 
         !! At this stage, forward rate contains ln(k) for both regular and Lindemann steps
                    
@@ -140,11 +141,10 @@ contains
               
               logYovW = log(max(Yspec(i,ispec),verysmall)*one_over_molar_mass(ispec))
               
-              forward_rate(i) = forward_rate(i) + nu_dash(istep,ispec)* &
-                                (lnro(i)+logYovW)
+              rate(i) = rate(i) + nu_dash(istep,ispec)*(lnro(i)+logYovW)
            end do
-           !! exponential
-           forward_rate(i) = exp(forward_rate(i))     
+           !! exponential 
+           rate(i) = exp(rate(i))  
         end do
         !$omp end parallel do
 
@@ -175,7 +175,7 @@ contains
                  backward_rate(i) = backward_rate(i) + nu_ddash(istep,ispec)* &
                                     (lnro(i) + logYovW)           
               end do
-              !! exponential
+              !! exponential 
               backward_rate(i) = exp(backward_rate(i))
            end do
            !$omp end parallel do
@@ -184,33 +184,35 @@ contains
            backward_rate(:) = zero                               
         end if
                  
-                     
         !! Net production rate ================================================
-        !$omp parallel do private(jspec,ispec,molar_production_rate,net_rate)
+        !$omp parallel do private(net_rate)
         do i=1,npfb
-
-           !! Net rate
-           net_rate = forward_rate(i) - backward_rate(i)
-
-           net_rate = net_rate*third_body_conc(i)
-
-           do jspec = 1,num_reactants(istep) + num_products(istep)
-              ispec = stepspecies_list(istep,jspec)
-                          
            
-              !! Net molar production rate of ispec by step istep
-              molar_production_rate = delta_nu(istep,ispec)*net_rate
-                        
-              !! Add to rate for this species
-              rateYspec(i,ispec) = rateYspec(i,ispec) + molar_production_rate
-           end do
+           !! net
+           net_rate = rate(i) - backward_rate(i)
+           
+           !! Add third body concs
+           rate(i) = net_rate*third_body_conc(i)
         end do
         !$omp end parallel do
+        
+        
+        !! Loop over all species in this step, and add to the total rate for that species
+        do jspec = 1,num_reactants(istep) + num_products(istep)
+           ispec = stepspecies_list(istep,jspec)        
+ 
+           !$omp parallel do 
+           do i=1,npfb                                                        
+              !! Add net molar production rate for this species
+              rateYspec(i,ispec) = rateYspec(i,ispec) + delta_nu(istep,ispec)*rate(i)
+           end do
+           !$omp end parallel do
+        end do
            
      end do !! End of steps loop ==============================================
-     
+         
      !! Add rate onto RHS =====================================================
-     !$omp parallel do private(ispec,tmpro,heat_release)
+     !$omp parallel do private(ispec,tmpro,heat_release,mass_production_rate)
      do i=1,npfb       
         tmpro = exp(-lnro(i))    !! N.B. tmpro holds 1/ro here.
      
@@ -220,14 +222,14 @@ contains
         !! Loop over all species and add rate to rhs        
         do ispec = 1,nspec
         
+           !! Convert from molar to mass production rate
+           mass_production_rate = rateYspec(i,ispec)*molar_mass(ispec)
+        
            !! Augment the RHS of Yspec for species ispec
-           rhs_yspec(i,ispec) = rhs_Yspec(i,ispec) &
-                              + molar_mass(ispec)*rateYspec(i,ispec)*tmpro           
+           rhs_yspec(i,ispec) = rhs_Yspec(i,ispec) + mass_production_rate*tmpro           
                               
            !! Augment the heat release (production rate x enthalpy of formation)
-           heat_release = heat_release - molar_mass(ispec)*rateYspec(i,ispec) &
-                                         *coef_h(ispec,polyorder_cp+2)
-
+           heat_release = heat_release - mass_production_rate*coef_h(ispec,polyorder_cp+2)
 
         end do
 alpha_out(i) = heat_release
@@ -248,7 +250,7 @@ alpha_out(i) = heat_release
            !! Loop over species
            do ispec=1,nspec                                    
               !! Store the reaction rate on the boundary
-              reaction_rate_bound(j,ispec) = rateYspec(i,ispec)*molar_mass(ispec)                                      
+              reaction_rate_bound(j,ispec) = rateYspec(i,ispec)*molar_mass(ispec)                                     
               
               !! Evaluate enthalpy of species ispec
               call evaluate_enthalpy_only_at_node(T(i),ispec,enthalpy)           
@@ -267,7 +269,11 @@ alpha_out(i) = heat_release
      
      !! De-allocation of arrays
      if(num_gibbs_species.ne.0) deallocate(gibbs)
-     deallocate(rateYspec,forward_rate,backward_rate,third_body_conc)
+     deallocate(rateYspec,rate,backward_rate,third_body_conc)
+  
+     !! Profiling
+     segment_tend = omp_get_wtime()
+     segment_time_local(6) = segment_time_local(6) + segment_tend - segment_tstart  
   
      return
   end subroutine calculate_chemical_production_rate  

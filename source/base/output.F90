@@ -91,7 +91,7 @@ contains
            write(6,*) "Filtering                 :",segment_time_global(3)/sum(segment_time_global(1:8))
            write(6,*) "Gradients                 :",segment_time_global(4)/sum(segment_time_global(1:8))
            write(6,*) "Laplacians                :",segment_time_global(5)/sum(segment_time_global(1:8))
-           write(6,*) "Divergence                :",segment_time_global(6)/sum(segment_time_global(1:8))
+           write(6,*) "Chemistry                 :",segment_time_global(6)/sum(segment_time_global(1:8))
            write(6,*) "Boundary 2nd derivatives  :",segment_time_global(7)/sum(segment_time_global(1:8))
            write(6,*) "RHS building              :",segment_time_global(8)/sum(segment_time_global(1:8))           
            write(6,'(/,/,A)') "  "
@@ -120,7 +120,7 @@ contains
         write(6,*) "Filtering                 :",segment_time_local(3)/sum(segment_time_local(1:8))
         write(6,*) "Gradients                 :",segment_time_local(4)/sum(segment_time_local(1:8))
         write(6,*) "Laplacians                :",segment_time_local(5)/sum(segment_time_local(1:8))
-        write(6,*) "Divergence                :",segment_time_local(6)/sum(segment_time_local(1:8))
+        write(6,*) "Chemistry                 :",segment_time_local(6)/sum(segment_time_local(1:8))
         write(6,*) "Boundary 2nd derivatives  :",segment_time_local(7)/sum(segment_time_local(1:8))
         write(6,*) "RHS building              :",segment_time_local(8)/sum(segment_time_local(1:8))        
         write(6,'(/,/,/,A)') "  "                  

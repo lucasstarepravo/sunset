@@ -59,7 +59,8 @@ contains
          
      !! Profiling
      segment_tstart_rhs = omp_get_wtime()     
-     segment_tstart_subtract = segment_time_local(4) + segment_time_local(5) + segment_time_local(7)
+     segment_tstart_subtract = segment_time_local(4) + segment_time_local(5) &
+                             + segment_time_local(7) + segment_time_local(6)
   
      !! Some initial allocation of space for boundaries
 #ifndef ms
@@ -128,7 +129,8 @@ contains
   
      !! Profiling - time spent doign RHS minus time spent doing gradients for RHS
      segment_tend_rhs = omp_get_wtime()
-     segment_tend_subtract = segment_time_local(4) + segment_time_local(5) + segment_time_local(7)     
+     segment_tend_subtract = segment_time_local(4) + segment_time_local(5) &
+                           + segment_time_local(7) + segment_time_local(6)    
      segment_time_local(8) = segment_time_local(8) + segment_tend_rhs - segment_tstart_rhs
      segment_time_local(8) = segment_time_local(8) + segment_tstart_subtract - segment_tend_subtract
 
@@ -182,7 +184,7 @@ contains
      real(rkind),dimension(:,:,:),allocatable :: gradYspec
      real(rkind),dimension(:,:),allocatable :: grad2Yspec
      integer(ikind) :: i,j,ispec
-     real(rkind),dimension(dims) :: tmp_vec,gradroMdiff,grad_enthalpy
+     real(rkind),dimension(dims) :: tmp_vec,gradroMdiff,grad_enthalpy,roDgradY
      real(rkind) :: tmp_scal,lapYspec_tmp,tmpY,divroDgradY,enthalpy,dcpdT,cpispec,tmpro
      real(rkind),dimension(:,:),allocatable :: speciessum_roDgradY,speciessum_hgradY
      real(rkind),dimension(:),allocatable :: speciessum_divroDgradY,speciessum_hY
@@ -266,7 +268,7 @@ contains
         if(nb.ne.0)then
            allocate(grad2Yspec(nb,dims))
            call calc_grad2bound(Yspec(:,ispec),grad2Yspec)
-           !$omp parallel do private(i,xn,yn,un,ut,dutdt,lapYspec_tmp,tmpY &
+           !$omp parallel do private(i,xn,yn,un,ut,dutdt,lapYspec_tmp,tmpY,roDgradY &
            !$omp ,gradroMdiff,divroDgradY,enthalpy,grad_enthalpy,tmpro,cpispec,dcpdT)
            do j=1,nb
               i=boundary_list(j)
@@ -279,26 +281,33 @@ contains
               gradroMdiff(:) = zero
 #endif                              
                            
-              !! Slight difference here depending on type of boundary           
+              !! roDgradY  
+              roDgradY(:) = roMdiff(i,ispec)*gradYspec(i,:,ispec)                
+                           
+              !! divroDgradY = ro*D*lapY + grad(ro*D)*gradY
+              !! also zero normal component of speciessum_roDgradY as required
               if(node_type(i).eq.0)then  !! WALLS: no diffusive mass flux through walls
 
-                 lapYspec_tmp = grad2Yspec(j,2) + grad2Yspec(j,3) !! Transverse terms only 
-                 !!divroDgradY = ro*D*lapY + grad(ro*D)*gradY                 
+                 lapYspec_tmp = grad2Yspec(j,2) + grad2Yspec(j,3) !! Transverse terms only
                  divroDgradY = roMdiff(i,ispec)*lapYspec_tmp &
                             + dot_product(gradYspec(i,2:3,ispec),gradroMdiff(2:3))
-           
-              else            !! Inflow or outflow
+                 roDgradY(1) = zero !! zero normal contribution on walls                            
+              else if(node_type(i).eq.1) then      !! Inflow
                  lapYspec_tmp = grad2Yspec(j,1) + grad2Yspec(j,2) + grad2Yspec(j,3)
-      
-                 !!divroDgradY = ro*D*lapY + grad(ro*D)*gradY
                  divroDgradY = roMdiff(i,ispec)*lapYspec_tmp &                            
                             + dot_product(gradYspec(i,:,ispec),gradroMdiff(:))   
+              else !! Outflow
+                 lapYspec_tmp = grad2Yspec(j,2) + grad2Yspec(j,3) !! Transverse terms only
+                 divroDgradY = roMdiff(i,ispec)*lapYspec_tmp &
+                            + dot_product(gradYspec(i,2:3,ispec),gradroMdiff(2:3))             
+                 roDgradY(1) = zero !! zero normal contribution through outflow
               end if              
 
               !! Sum roDgradY and div(roDgradY) over species
               speciessum_divroDgradY(i) = speciessum_divroDgradY(i) + divroDgradY
-              speciessum_roDgradY(i,:) = speciessum_roDgradY(i,:) + roMdiff(i,ispec)*gradYspec(i,:,ispec)
-              if(node_type(i).eq.0) speciessum_roDgradY(i,1) = zero !! zero normal contribution on walls
+
+              !! sum of species of roDgradY  
+              speciessum_roDgradY(i,:) = speciessum_roDgradY(i,:) + roDgradY(:)      
 
 #ifndef isoT
               !! Evaluate enthalpy, cp and dcp/dT for species ispec
@@ -309,8 +318,7 @@ contains
           
               !! Add gradh(ispec).ro*D*gradY for species ispec 
               grad_enthalpy = cpispec*gradT(i,:)
-              store_diff_E(i) = store_diff_E(i) + roMdiff(i,ispec)* &
-                                                  dot_product(gradYspec(i,:,ispec),grad_enthalpy)
+              store_diff_E(i) = store_diff_E(i) + dot_product(roDgradY,grad_enthalpy)
 
               !! Add this species contribution to the mixture enthalpy
               speciessum_hY(i) = speciessum_hY(i) + enthalpy*Yspec(i,ispec)
@@ -547,13 +555,13 @@ contains
                  f_visc_u = f_visc_u + visc(i)*(twothirds*graddivvel(i,1) - two*grad2uvec(j,1))
                              
                  !! dtau_jn/dn = 0 for j=2,3 
-                 f_visc_v = f_visc_v -grad2uvec(j,2) - grad2ucross(j,1)
-                 f_visc_w = f_visc_w -grad2uvec(j,3) - grad2ucross(j,2)
+!                 f_visc_v = f_visc_v -grad2uvec(j,2) - grad2ucross(j,1)
+!                 f_visc_w = f_visc_w -grad2uvec(j,3) - grad2ucross(j,2)
 
                  !! zero non-uniform viscosity contribution to dtau_jn/dn for j=2,3 
 #ifdef tdtp
-                 f_visc_v = f_visc_v - gradvisc(1)*(gradu(i,2)+gradv(i,1)) 
-                 f_visc_w = f_visc_w - gradvisc(1)*(gradu(i,3)+gradw(i,1)) 
+!                 f_visc_v = f_visc_v - gradvisc(1)*(gradu(i,2)+gradv(i,1)) 
+!                 f_visc_w = f_visc_w - gradvisc(1)*(gradu(i,3)+gradw(i,1)) 
 #endif 
               
              
@@ -675,9 +683,14 @@ contains
               store_diff_E(i) = store_diff_E(i) + visc(i)*tmp_visc
               
               !! Add thermal diffusion term: div.(lambda*gradT)
-              store_diff_E(i) = store_diff_E(i) + lambda_th(i)*lapT(i)  
-              gradlambda(:) = lambda_th(i)*r_temp_dependence*gradT(i,:)/T(i)  + lambda_th(i)*gradcp(i,:)/cp(i)
-              store_diff_E(i) = store_diff_E(i) + dot_product(gradlambda(:),gradT(i,:))
+              gradlambda(:) = lambda_th(i)*r_temp_dependence*gradT(i,:)/T(i)  + lambda_th(i)*gradcp(i,:)/cp(i)   
+              if(node_type(i).eq.1) then    !! Inflows
+                 lapT_tmp = lapT(i)
+              else if(node_type(i).eq.2) then  !! outflows  - zero normal heat flux
+                 gradlambda(1) = zero                
+                 lapT_tmp = grad2T(j,2) + grad2T(j,3)                        
+              end if              
+              store_diff_E(i) = store_diff_E(i) + lambda_th(i)*lapT_tmp + dot_product(gradlambda(:),gradT(i,:))               
                         
               !! RHS (visc + cond + transverse + source)
               rhs_roE(i) = - v(i)*gradroE(i,2) - roE(i)*gradv(i,2) - w(i)*gradroE(i,3) - roE(i)*gradw(i,3) &

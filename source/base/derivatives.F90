@@ -146,7 +146,7 @@ contains
     
     !! Profiling
     segment_tend = omp_get_wtime()
-    segment_time_local(6) = segment_time_local(6) + segment_tend - segment_tstart   
+    segment_time_local(4) = segment_time_local(4) + segment_tend - segment_tstart
     return
   end subroutine calc_divergence
 !! ------------------------------------------------------------------------------------------------  
