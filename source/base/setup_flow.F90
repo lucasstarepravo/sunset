@@ -69,6 +69,7 @@ contains
 #else
      call hardcode_initial_conditions     
 #endif
+
 #else    
      !! RESTART OPTION. Ask for input number (just hard-coded for now...)
      call load_restart_file(2)
@@ -127,9 +128,12 @@ contains
      
      !! Set inflow velocity, Z-length-scale and characteristic time-scale
      u_inflow = u_char
-     Lz = L_char
+     Lz = 2.0d0*pi*L_char   !! Hard-coded 2pi
      Time_char = L_char/u_char
      
+     
+     !! Default set nspec in case of non-multispecies
+     nspec =1
      close(12)
           
      return
@@ -314,11 +318,12 @@ contains
      read(12,*) nsteps
      read(12,*)
      
-     !! Number of different third body efficiencies
-     read(12,*)
-     read(12,*) nthirdbodies
-     read(12,*)
-     
+     if(nsteps.ne.0)then
+        !! Number of different third body efficiencies     
+        read(12,*)
+        read(12,*) nthirdbodies
+        read(12,*)
+     end if     
      
      !! Space for rate constants and coefficients etc
      allocate(Arrhenius_coefs(nsteps,3))
@@ -340,92 +345,94 @@ contains
     
      
      read(12,*) !! Comment line
-     do istep = 1,nsteps
-        read(12,*) dummy_int  !! Reaction number
-        if(dummy_int.ne.istep) write(6,*) "Warning, error reading reaction mech. Expect seg fault."
+     if(nsteps.ne.0)then
+        do istep = 1,nsteps
+           read(12,*) dummy_int  !! Reaction number
+           if(dummy_int.ne.istep) write(6,*) "Warning, error reading reaction mech. Expect seg fault."
 
-        read(12,*) num_reactants(istep)            !! Number of reactants
-        do ispec = 1,num_reactants(istep)  !! Loop over all reactants
-           read(12,*) dummy_int,dummy_real
-           reactant_list(istep,ispec) = dummy_int !! Identity of reactant
-           stepspecies_list(istep,ispec) = dummy_int
-           nu_dash(istep,dummy_int) = dummy_real  !! Stoichiometric coefficient
+           read(12,*) num_reactants(istep)            !! Number of reactants
+           do ispec = 1,num_reactants(istep)  !! Loop over all reactants
+              read(12,*) dummy_int,dummy_real
+              reactant_list(istep,ispec) = dummy_int !! Identity of reactant
+              stepspecies_list(istep,ispec) = dummy_int
+              nu_dash(istep,dummy_int) = dummy_real  !! Stoichiometric coefficient
+           end do
+
+           read(12,*) num_products(istep)            !! Number of products
+           do ispec = 1,num_products(istep)  !! Loop over all products
+              read(12,*) dummy_int,dummy_real
+              product_list(istep,ispec) = dummy_int !! Identity of product
+              stepspecies_list(istep,num_reactants(istep) + ispec) = dummy_int
+              nu_ddash(istep,dummy_int) = dummy_real  !! Stoichiometric coefficient
+           end do
+        
+           !! Calculate deltas
+           delta_nu(istep,:) = nu_ddash(istep,:) - nu_dash(istep,:)
+        
+           !! Coefficients for arrhenius rate constant
+           read(12,*) Arrhenius_coefs(istep,1:3)
+   
+           !! Take logarithm of pre-exponential factor
+           Arrhenius_coefs(istep,1) = log(Arrhenius_coefs(istep,1))
+           Arrhenius_coefs(istep,3) = Arrhenius_coefs(istep,3)/(Rgas_universal)                     
+        
+           !! Gibbs based backwards rate?
+           read(12,*) gibbs_rate_flag(istep)
+           
+           !! Lindemann form?
+           read(12,*) lindemann_form_flag(istep)
+           
+           !! Third bodies?
+           read(12,*) third_body_flag(istep)        
+                 
+           read(12,*) !! Blank line      
         end do
 
-        read(12,*) num_products(istep)            !! Number of products
-        do ispec = 1,num_products(istep)  !! Loop over all products
-           read(12,*) dummy_int,dummy_real
-           product_list(istep,ispec) = dummy_int !! Identity of product
-           stepspecies_list(istep,num_reactants(istep) + ispec) = dummy_int
-           nu_ddash(istep,dummy_int) = dummy_real  !! Stoichiometric coefficient
-        end do
+        !! Lists of third body efficiencies
+        if(nthirdbodies.ne.0) then
         
-        !! Calculate deltas
-        delta_nu(istep,:) = nu_ddash(istep,:) - nu_dash(istep,:)
-        
-        !! Coefficients for arrhenius rate constant
-        read(12,*) Arrhenius_coefs(istep,1:3)
-
-        !! Take logarithm of pre-exponential factor
-        Arrhenius_coefs(istep,1) = log(Arrhenius_coefs(istep,1))
-        Arrhenius_coefs(istep,3) = Arrhenius_coefs(istep,3)/(Rgas_universal)                     
-        
-        !! Gibbs based backwards rate?
-        read(12,*) gibbs_rate_flag(istep)
-        
-        !! Lindemann form?
-        read(12,*) lindemann_form_flag(istep)
-        
-        !! Third bodies?
-        read(12,*) third_body_flag(istep)        
-              
-        read(12,*) !! Blank line      
-     end do
-
-     !! Lists of third body efficiencies
-     if(nthirdbodies.ne.0) then
-        
-        do istep = 1,nthirdbodies
+           do istep = 1,nthirdbodies
+              read(12,*) !! Comment line
+              do ispec = 1,nspec
+                 read(12,*) dummy_int,third_body_efficiencies(istep,ispec)     !! List of efficiencies
+              end do
+           end do
+        end if
+        read(12,*) !! Blank line
+     
+        !! Lists of Lindemann coefficients
+        nlindemann = maxval(lindemann_form_flag(1:nsteps))
+        if(nlindemann.ne.0) then
            read(12,*) !! Comment line
-           do ispec = 1,nspec
-              read(12,*) dummy_int,third_body_efficiencies(istep,ispec)     !! List of efficiencies
-           end do
+           do istep = 1,nlindemann
+              read(12,*) dummy_int,lindemann_coefs(istep,1:4)
+              !! Take logarithm of pre-exponential factor etc
+              lindemann_coefs(istep,1) = log(lindemann_coefs(istep,1))
+              lindemann_coefs(istep,3) = lindemann_coefs(istep,3)/(Rgas_universal)
+              lindemann_coefs(istep,4) = log(lindemann_coefs(istep,4))
+           end do         
+        end if
+     
+        !! Build list of species which require gibbs evaluation
+        allocate(gibbs_flag_species(nspec));gibbs_flag_species=0     
+        do istep = 1,nsteps
+           if(gibbs_rate_flag(istep).ne.0) then          !! For gibbs steps
+              do jspec = 1, num_reactants(istep) + num_products(istep)  !! Loop over products and reactants
+                 ispec = stepspecies_list(istep,jspec)              
+                 gibbs_flag_species(ispec) = 1              !! Flag this species as requiring gibbs evaluation
+              end do
+           end if
         end do
-     end if
-     read(12,*) !! Blank line
-     
-     !! Lists of Lindemann coefficients
-     nlindemann = maxval(lindemann_form_flag(1:nsteps))
-     if(nlindemann.ne.0) then
-        read(12,*) !! Comment line
-        do istep = 1,nlindemann
-           read(12,*) dummy_int,lindemann_coefs(istep,1:4)
-           !! Take logarithm of pre-exponential factor etc
-           lindemann_coefs(istep,1) = log(lindemann_coefs(istep,1))
-           lindemann_coefs(istep,3) = lindemann_coefs(istep,3)/(Rgas_universal)
-           lindemann_coefs(istep,4) = log(lindemann_coefs(istep,4))
-        end do         
-     end if
-     
-     !! Build list of species which require gibbs evaluation
-     allocate(gibbs_flag_species(nspec));gibbs_flag_species=0     
-     do istep = 1,nsteps
-        if(gibbs_rate_flag(istep).ne.0) then          !! For gibbs steps
-           do jspec = 1, num_reactants(istep) + num_products(istep)  !! Loop over products and reactants
-              ispec = stepspecies_list(istep,jspec)              
-              gibbs_flag_species(ispec) = 1              !! Flag this species as requiring gibbs evaluation
-           end do
-        end if
-     end do
-     !! Count the number of species which require gibbs evaluation
-     num_gibbs_species=0
-     do ispec=1,nspec
-        if(gibbs_flag_species(ispec).ne.0)then
-           num_gibbs_species = num_gibbs_species  + 1           
-           gibbs_flag_species(ispec) = num_gibbs_species  !! Modify flag to become a counter
-        end if
-     end do
-     
+        !! Count the number of species which require gibbs evaluation
+        num_gibbs_species=0
+        do ispec=1,nspec
+           if(gibbs_flag_species(ispec).ne.0)then
+              num_gibbs_species = num_gibbs_species  + 1           
+              gibbs_flag_species(ispec) = num_gibbs_species  !! Modify flag to become a counter
+           end if
+        end do
+
+     end if  !! End of "only read if not zero step mechanism" if-statement     
      close(12)               
 
      
@@ -441,7 +448,7 @@ contains
 
      !! Position and scale     
      flame_location = zero
-     flame_thickness = 1.0d-3/L_char !! Scale thickness because position vectors are scaled...
+     flame_thickness = 5.0d-4/L_char !! Scale thickness because position vectors are scaled...
 
      !! Temperatures
      T_reactants = 3.0d2
@@ -803,25 +810,28 @@ contains
      !$OMP PARALLEL DO PRIVATE(x,y,z,tmp,ispec)
      do i=1,npfb
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
-        u(i) = u_char!-cos(two*pi*x)*sin(two*pi*y)!*cos(two*pi*z/Lz)!*oosqrt2
-        v(i) = zero!sin(two*pi*x)*cos(two*pi*y)!*cos(two*pi*z/Lz)    !!c c
-        w(i) = zero!u(i);u(i)=zero
-!        tmp = -half*half*(cos(4.0d0*pi*x) + cos(4.0d0*pi*y))/csq  !! Modify for not(isoT)
-        lnro(i) = log(rho_char)!log(rho_char + tmp)
-!if(x.le.zero) lnro(i) = log(1.2*rho_char)             
+!        u(i) = -cos(two*pi*x)*sin(two*pi*y)*cos(two*pi*z/Lz)!*oosqrt2
+!        v(i) = sin(two*pi*x)*cos(two*pi*y)*cos(two*pi*z/Lz)    !!c c
+        !! old
+!        tmp = -half*half*(cos(two*x) + cos(two*y))/csq  !! Modify for not(isoT)
 
-        tmp = half*(one+erf(5.0d0*x))
-        T(i) = T_ref    
-        tmp = rho_char*T_ref/T(i)
-        lnro(i) = log(tmp)                                            
+        !! TG 3D Re1600 as in Cant 2022, Sandam 2017 etc (ish)
+        u(i) = -cos(x)*sin(y)*cos(z)!*oosqrt2
+        v(i) = sin(x)*cos(y)*cos(z)    !!c c
+        w(i) = zero!u(i);u(i)=zero
+        tmp = Rgas_universal*one_over_molar_mass(1)*T_ref  !! RT0
+        tmp = rho_char*U_char*U_char/tmp   !! roUU/RT0
+        tmp = -tmp*(one/16.0d0)*(cos(two*x)+cos(two*y))*(two+cos(two*z))        
+        T(i) = T_ref
+
+        lnro(i) = log(rho_char + tmp)
+
               
 #ifdef ms    
-!        do ispec=1,nspec      
-           tmp = one - half*(one + erf(5.0d0*x))
-           Yspec(i,1) = tmp
-!           Yspec(i,2) = one - tmp
-
-!        end do
+        tmp = one - half*(one + erf(5.0d0*x))
+        Yspec(i,1) = tmp
+#else
+        Yspec(i,1) = one
 #endif         
                     
      end do

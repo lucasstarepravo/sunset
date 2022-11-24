@@ -19,7 +19,6 @@ module output
   use mpi_transfers
 #endif    
   implicit none
-  real(rkind),dimension(:,:),allocatable :: gradu,gradv,gradw !! For vorticity and drag coefficient calculations
 
 contains
 !! ------------------------------------------------------------------------------------------------
@@ -138,7 +137,7 @@ contains
      !! Can be converted to vtk and read into paraview.
      use derivatives
      integer(ikind),intent(in) :: n_out
-     integer(ikind) :: i,j,k,np_out_local,dimsout,nspec_out
+     integer(ikind) :: i,j,k,np_out_local,dimsout,nspec_out,nprocsout
      character(70) :: fname
      real(rkind),dimension(:),allocatable :: vort,testout
      real(rkind),dimension(:,:),allocatable :: testoutv
@@ -146,7 +145,9 @@ contains
 
      !! Only output from the first sheet
      if(iprocZ.eq.0)then     
+        nprocsout = nprocsX*nprocsY
 !if(.true.)then     
+!nprocsout = nprocsX*nprocsY*nprocsZ
 
         !! Calculate the vorticity 
         allocate(gradu(npfb,dims),gradv(npfb,dims),gradw(npfb,dims));gradw=zero
@@ -231,7 +232,7 @@ contains
 
 #ifdef dim3
            write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),h(i),node_type(i),tmpro, &
-                       u(i),v(i),w(i),tmpVort(i),tmpT,Yspec(i,1:nspec_out)        
+                       u(i),v(i),w(i),tmpVort,tmpT,Yspec(i,1:nspec_out)        
 #else
            write(20,*) rp(i,1),rp(i,2),s(i),h(i),node_type(i),tmpro,u(i),v(i),tmpVort, &
                        tmpT,Yspec(i,1:nspec_out)
@@ -252,7 +253,7 @@ contains
 #ifdef mp  
 !     call MPI_ALLREDUCE(np_out_local,np_global,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD,ierror)     
      if(iproc.eq.0) then 
-        write(21,*) time,dimsout,npfb_global,n_out,nprocsX*nprocsY*nprocsZ,nspec_out
+        write(21,*) time,dimsout,npfb_global,n_out,nprocsout,nspec_out
         flush(21)
      end if
 #else

@@ -221,10 +221,6 @@ case(1) !! Box for Rayleigh Taylor
      npfb = ipart
      dx0 = maxval(dxp(1:npfb))
      
-     do i=1,npfb
-        write(30,*) xp(i),yp(i)
-     end do
-
 
      write(*,*) 'nb,npfb= ', nb,npfb,nbio
        
@@ -232,9 +228,9 @@ case(1) !! Box for Rayleigh Taylor
 !! ------------------------------------------------------------------------------------------------
   case(3) !! Kolmogorov flow
 
-     yl=1.0d0;h0=yl
+     yl=2.0d0*pi;h0=yl
      xl=1.0d0*yl
-     dx0=yl/100.0!0.025d0
+     dx0=yl/64.0!0.025d0
      xbcond=1;ybcond=1     
 
      !   JRCK boundary conditions
@@ -501,9 +497,6 @@ case(4) !! A sort of porous media... for porous Rayleigh-Taylor stuff
      npfb = ipart
      dx0 = maxval(dxp(1:npfb))
      
-     do i=1,npfb
-        write(30,*) xp(i),yp(i)
-     end do
 
      write(*,*) 'nb,npfb= ', nb,npfb,nbio
 
@@ -512,9 +505,9 @@ case(4) !! A sort of porous media... for porous Rayleigh-Taylor stuff
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.0125!0.0125d0  ! channel width
+     yl=0.025!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/2000.0       !15
+     dx0=xl/1000.0       !15
      xbcond=0;ybcond=1     
      
      nb_patches = 4
@@ -728,10 +721,6 @@ endif
                         
      npfb = ipart
      dx0 = maxval(dxp(1:npfb))
-     
-     do i=1,npfb
-        write(30,*) xp(i),yp(i)
-     end do
 
      write(*,*) 'nb,npfb= ', nb,npfb,nbio
      
@@ -755,7 +744,7 @@ case(6) !! Channel flows, propagating front
      nb_blobs = 1
      allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,6),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
      b0=2.5d0*h0;b1=b0*sqrt(3.0d0)/2.0d0;b2=b0/2.0d0
-     blob_centre(1,:)=(/-2.00d0*h0,0.d0/); !! Central
+     blob_centre(1,:)=(/-1.5d0*h0,0.d0/); !! Central
      do i=1,nb_blobs
         blob_coeffs(i,:)=h0*(/1.0d0,1.0d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0;blob_ellipse(i)=1
      end do
@@ -812,9 +801,9 @@ case(6) !! Channel flows, propagating front
         end do     
      
 !! Stretch high-res region downstream of flameholder        
-if(x.gt.0.0d0) then
- temp = max(exp(-x/h0),0.25d0)
-! dist2bound = dist2bound*temp
+if((x-blob_centre(1,1)).gt.0.0d0) then
+ temp = max(exp(-(x-blob_centre(1,1))/h0),0.4d0)
+ dist2bound = dist2bound*temp
  dxio = dx_out
 else
  dxio = dx_in 
@@ -957,10 +946,6 @@ endif
      npfb = ipart
      dx0 = maxval(dxp(1:npfb))
      
-     do i=1,npfb
-        write(30,*) xp(i),yp(i)
-     end do
-
      write(*,*) 'nb,npfb= ', nb,npfb,nbio
 
 !! ------------------------------------------------------------------------------------------------
@@ -1184,12 +1169,9 @@ case(7) !! Something periodic
      npfb = ipart
      dx0 = maxval(dxp(1:npfb))
      
-     do i=1,npfb
-        write(30,*) xp(i),yp(i)
-     end do
 
      write(*,*) 'nb,npfb= ', nb,npfb,nbio
-
+!! ------------------------------------------------------------------------------------------------
   case(8)
   !! Loads of cylinders!!...
 
@@ -1442,10 +1424,6 @@ case(7) !! Something periodic
      npfb = ipart
      dx0 = maxval(dxp(1:npfb))
      
-     do i=1,npfb
-        write(30,*) xp(i),yp(i)
-     end do
-
      write(*,*) 'nb,npfb= ', nb,npfb,nbio
 
   

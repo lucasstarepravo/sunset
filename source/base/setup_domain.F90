@@ -263,7 +263,38 @@ contains
            boundary_list(jj) = i
         end if
      end do    
-             
+     
+     !! Setup the flags for flux-zeroing
+     if(nb.ne.0)then
+        allocate(znf_mdiff(nb),znf_tdiff(nb),znf_vdiff(nb),znf_vtdiff(nb))
+        do j=1,nb
+           i=boundary_list(j)
+           if(node_type(i).eq.0) then !! Walls
+              znf_mdiff(j) = .true.      !! No mass diffusion through walls
+#ifdef wall_isoT
+              znf_tdiff(j) = .false.     !! isothermal wall can have heat flux
+#else
+              znf_tdiff(j) = .true.      !! no heat flux through adiabatic wall
+#endif              
+              znf_vdiff(j) = .false.
+              znf_vtdiff(j) = .false.              
+           else if(node_type(i).eq.1) then !! Inflow
+              znf_mdiff(j) = .false.        
+              znf_tdiff(j) = .false.
+#ifdef hardinf           
+              znf_vdiff(j) = .false. 
+#else
+              znf_vdiff(j) = .true.     !! No normal viscous diffusion through soft-inflow                
+#endif              
+              znf_vtdiff(j) = .false.              
+           else if(node_type(i).eq.2) then !! Outflow
+              znf_mdiff(j) = .true.      !! No mass diffusion through outflow (N.B. not imposed...)
+              znf_tdiff(j) = .true.      !! No thermal diffusion through outflow
+              znf_vdiff(j) = .false.      
+              znf_vtdiff(j) = .true.      !! No tangential viscous diffusion through outflow                            
+           end if     
+        end do
+     end if          
 
      !! Set the global number of boundary nodes
 #ifdef mp

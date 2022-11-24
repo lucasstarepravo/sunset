@@ -81,8 +81,8 @@ contains
         ij_fd_grad(1) =  one/12.0d0/dz
         ij_fd_grad(2) = -8.0d0/12.0d0/dz
         ij_fd_grad(3) =  zero
-        ij_fd_grad(4) = -8.0d0/12.0d0/dz
-        ij_fd_grad(5) =  one/12.0d0/dz
+        ij_fd_grad(4) =  8.0d0/12.0d0/dz
+        ij_fd_grad(5) = -one/12.0d0/dz
 
         !! Second derivative weights        
         ij_fd_grad2(1) = -one/12.0d0/dz/dz 

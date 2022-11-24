@@ -113,7 +113,7 @@ contains
 !     write(6,*) roE(i),NRiters,T_tmp,fT,dfT
 !end if        
               !! Calculate new T
-              deltaT = - fT/dfT
+              deltaT = - fT/(dfT)
               T_tmp = T_tmp + deltaT
 
               !! Check for convergence

@@ -19,7 +19,6 @@ module statistics
   use mpi_transfers
 #endif    
   implicit none
-  real(rkind),dimension(:,:),allocatable :: gradu,gradv,gradw !! For vorticity and drag coefficient calculations
 
 contains
 !! ------------------------------------------------------------------------------------------------
@@ -53,6 +52,9 @@ contains
      
      !! Time, error in species conservation, total mass of each species in domain
      open(unit=199,file='data_out/statistics/species.out')
+
+     !! Time, enstrophy
+     open(unit=198,file='data_out/statistics/enstrophy.out')
 
      return     
   end subroutine open_stats_files
@@ -458,5 +460,51 @@ contains
   
     return
   end subroutine error_TG   
+!! ------------------------------------------------------------------------------------------------    
+  subroutine check_enstrophy
+     !! Evaluate volume averaged enstrophy and also the volume averaged kinetic energy
+     integer(ikind) :: i
+     real(rkind) :: srtnorm,sum_enstrophy,vol_i,sum_vol,sum_ke
+     real(rkind) :: sum_enstrophy_local,sum_vol_local,sum_ke_local
+     
+     sum_enstrophy = zero
+     sum_vol = zero
+     sum_ke = zero
+     !$omp parallel do private(srtnorm,vol_i) reduction(+:sum_enstrophy,sum_vol,sum_ke)
+     do i=1,npfb
+     
+        vol_i = s(i)*s(i)
+#ifdef dim3
+        vol_i = vol_i*dz
+#endif        
+        srtnorm = dot_product(gradu(i,:),gradu(i,:)) + &
+                  dot_product(gradv(i,:),gradv(i,:)) + &
+                  dot_product(gradw(i,:),gradw(i,:))
+        sum_enstrophy = sum_enstrophy + visc(i)*srtnorm*vol_i
+        sum_vol = sum_vol + vol_i
+        
+        !!
+        sum_ke = sum_ke + exp(lnro(i))*(u(i)**two + v(i)**two + w(i)**two)*vol_i
+     end do
+     !$omp end parallel do
+     
+#ifdef mp
+     sum_enstrophy_local = sum_enstrophy
+     sum_vol_local = sum_vol
+     sum_ke_local = sum_ke
+     call MPI_ALLREDUCE(sum_enstrophy_local,sum_enstrophy,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(sum_vol_local,sum_vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(sum_ke_local,sum_ke,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)  
+     if(iproc.eq.0)then
+        write(198,*) time/Time_char,sum_enstrophy/sum_vol,sum_ke/sum_vol
+        flush(198)
+     end if        
+#else
+     write(198,*) time/Time_char,sum_enstrophy/sum_vol,sum_ke/sum_vol
+     flush(198)
+#endif     
+           
+     return
+  end subroutine check_enstrophy  
 !! ------------------------------------------------------------------------------------------------ 
 end module statistics

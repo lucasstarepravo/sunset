@@ -68,4 +68,19 @@ module common_parameter
   real(rkind), parameter :: pid_c=0.1d0/two  !! D-coefficient   ! 0.1
   real(rkind), parameter :: pid_k=0.9d0      !! kappa coefficient !0.9
   
+  !! Finite difference stencil sizes
+#define FDORDER 8              
+  !! Size of Stencil
+#if FDORDER==4
+  integer(ikind),parameter :: ij_count_fd = 5
+#elif FDORDER==6
+  integer(ikind),parameter :: ij_count_fd = 7
+#elif FDORDER==8
+  integer(ikind),parameter :: ij_count_fd = 9
+#elif FDORDER==10
+  integer(ikind),parameter :: ij_count_fd = 11
+#elif FDORDER==12
+  integer(ikind),parameter :: ij_count_fd = 13
+#endif      
+  
 end module common_parameter

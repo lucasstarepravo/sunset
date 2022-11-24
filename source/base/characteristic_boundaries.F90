@@ -12,9 +12,11 @@ module characteristic_boundaries
 
     
   !! Boundary framework follows a mixture of:: 
-  !! Sutherland & Kennedy (2003)
-  !! Yoo & Im (2007)
-  !! Coussement et al. (2012)    
+  !! Sutherland & Kennedy (2003)  <--------- probably most useful ref
+  !! Yoo & Im (2007)              <--------- probably the formulation most closely followed...
+  !! Coussement et al. (2012)   
+  
+  !! 
   use kind_parameters
   use common_parameter
   use common_vars
@@ -22,10 +24,10 @@ module characteristic_boundaries
   implicit none
 contains
 !! ------------------------------------------------------------------------------------------------
-  subroutine specify_characteristics_wall(j,Lchar,gradv,gradw)
+  subroutine specify_characteristics_wall(j,Lchar,gradb_v,gradb_w)
      integer(ikind),intent(in) :: j
      real(rkind),dimension(:),intent(inout) :: Lchar
-     real(rkind),dimension(:),intent(in) :: gradv,gradw
+     real(rkind),dimension(:),intent(in) :: gradb_v,gradb_w
      integer(ikind) :: i,ispec
      real(rkind) :: tmpro,c,gammagasm1,psource,Ysource
      
@@ -98,10 +100,10 @@ contains
 
   end subroutine specify_characteristics_wall
 !! ------------------------------------------------------------------------------------------------
-  subroutine specify_characteristics_inflow(j,Lchar,gradlnro,gradp,gradu,gradv,gradw)
+  subroutine specify_characteristics_inflow(j,Lchar,gradb_lnro,gradb_p,gradb_u,gradb_v,gradb_w)
      integer(ikind),intent(in) :: j
      real(rkind),dimension(:),intent(inout) :: Lchar
-     real(rkind),dimension(:),intent(in) :: gradlnro,gradp,gradu,gradv,gradw
+     real(rkind),dimension(:),intent(in) :: gradb_lnro,gradb_p,gradb_u,gradb_v,gradb_w
      integer(ikind) :: i,ispec
      real(rkind) :: tmpro,c,gammagasm1,gammagas
      
@@ -129,8 +131,8 @@ contains
      Lchar(4) = w(i)*0.278d0*c/L_domain_x &        !! track w=zero
               + rhs_w(i)                           !! rhs_w contains transverse and visc terms needed
      Lchar(5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &     !! Track u_inflow
-              - half*(v(i)*gradp(2)+p(i)*gradv(2)+tmpro*c*v(i)*gradu(2)) &    !! transverse 1 conv. terms
-              - half*(w(i)*gradp(3)+p(i)*gradw(3)+tmpro*c*w(i)*gradu(3))      !! transverse 2 conv. terms 
+              - half*(v(i)*gradb_p(2)+p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2)) &    !! transverse 1 conv. terms
+              - half*(w(i)*gradb_p(3)+p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))      !! transverse 2 conv. terms 
 #ifdef ms
      Lchar(5+1:5+nspec) = zero
 #endif     
@@ -154,8 +156,10 @@ contains
     gammagas = cp(i)/(cp(i)-Rgas_mix(i))
     gammagasm1 = gammagas - one
     Lchar(2) = (T_bound(j)-T(i))*c*0.278d0/L_domain_x/gammagas &  !! Track T_bound(j)
-             - (v(i)*gradlnro(2)*tmpro + tmpro*gradv(2) + v(i)*gradp(2)/c/c + gammagas*p(i)*gradv(2)/c/c) &
-             - (w(i)*gradlnro(3)*tmpro + tmpro*gradw(3) + w(i)*gradp(3)/c/c + gammagas*p(i)*gradw(3)/c/c)
+             - (v(i)*gradb_lnro(2)*tmpro + tmpro*gradb_v(2) + &
+                v(i)*gradb_p(2)/c/c + gammagas*p(i)*gradb_v(2)/c/c) &
+             - (w(i)*gradb_lnro(3)*tmpro + tmpro*gradb_w(3) + &
+                w(i)*gradb_p(3)/c/c + gammagas*p(i)*gradb_w(3)/c/c)
              !! + visc + source terms TBC
     Lchar(3) = v(i)*0.278d0*c/L_domain_x &        !! track v=zero
              + rhs_v(i)                           !! rhs_v contains transverse and visc terms needed
@@ -163,8 +167,8 @@ contains
              + rhs_w(i)                           !! rhs_w contains transverse and visc terms needed
 
     Lchar(5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &      !! Track u_inflow
-             - half*(v(i)*gradp(2)+gammagas*p(i)*gradv(2)+tmpro*c*v(i)*gradu(2))  & !! transverse 1 conv. terms
-             - half*(w(i)*gradp(3)+gammagas*p(i)*gradw(3)+tmpro*c*w(i)*gradu(3))    !! transverse 2 conv. terms  
+             - half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2))  & !! transverse 1 conv. terms
+             - half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))    !! transverse 2 conv. terms  
 
     !! Add source terms for chemical reactions
 #ifdef react
@@ -184,14 +188,14 @@ contains
     
     !! Fixed temperature option       
 !    Lchar(2) = gammagasm1*(Lchar(1)+Lchar(5))/c/c &
-!             - gammagasm1*tmpro*gradv(2) &   !! trans 1 term
-!             - gammagasm1*tmpro*gradw(3)     !! Trans 2 term 
+!             - gammagasm1*tmpro*gradb_v(2) &   !! trans 1 term
+!             - gammagasm1*tmpro*gradb_w(3)     !! Trans 2 term 
              !+dT/dy term?
              
     !! Fixed density (and hence mass flux) option             
     Lchar(2) = -Lchar(1)/c/c &
-               -tmpro*v(i)*gradlnro(2) - tmpro*gradv(2) &  !! trans 1 term
-               -tmpro*w(i)*gradlnro(3) - tmpro*gradw(3)    !! trans 2 term
+               -tmpro*v(i)*gradb_lnro(2) - tmpro*gradb_v(2) &  !! trans 1 term
+               -tmpro*w(i)*gradb_lnro(3) - tmpro*gradb_w(3)    !! trans 2 term
 
 #ifdef ms
     Lchar(5+1:5+nspec) = zero                                  
@@ -202,10 +206,10 @@ contains
 
   end subroutine specify_characteristics_inflow
 !! ------------------------------------------------------------------------------------------------
-  subroutine specify_characteristics_outflow(j,Lchar,gradp,gradu,gradv,gradw)
+  subroutine specify_characteristics_outflow(j,Lchar,gradb_p,gradb_u,gradb_v,gradb_w)
      integer(ikind),intent(in) :: j
      real(rkind),dimension(:),intent(inout) :: Lchar
-     real(rkind),dimension(:),intent(in) :: gradp,gradu,gradv,gradw
+     real(rkind),dimension(:),intent(in) :: gradb_p,gradb_u,gradb_v,gradb_w
      integer(ikind) :: i,ispec
      real(rkind) :: tmpro,c,gammagasm1,gammagas
      
@@ -226,8 +230,10 @@ contains
      !! ISOTHERMAL FLOWS, PARTIALLY NON-REFLECTING
      if(u(i).lt.c) then
         Lchar(1) = (p(i)-p_outflow)*0.278d0*c*(one)/two/L_domain_x &                      !! track p_outflow
-                 - (one-u(i)/c)*half*(v(i)*gradp(2)+p(i)*gradv(2)-tmpro*c*v(i)*gradu(2)) & !!transverse 1 conv. terms
-                 - (one-u(i)/c)*half*(w(i)*gradp(3)+p(i)*gradw(3)-tmpro*c*w(i)*gradu(3))   !! transverse 2 conv. terms
+                 - (one-u(i)/c)*half*(v(i)*gradb_p(2) + &
+                                      p(i)*gradb_v(2)-tmpro*c*v(i)*gradb_u(2)) & !!transverse 1 conv. terms
+                 - (one-u(i)/c)*half*(w(i)*gradb_p(3) + &
+                                      p(i)*gradb_w(3)-tmpro*c*w(i)*gradb_u(3))   !! transverse 2 conv. terms
      end if
      Lchar(2) = zero   !! No entropy in isothermal flows
      !Lchar(3) is outgoing
@@ -241,8 +247,10 @@ contains
      
         gammagas = cp(i)/(cp(i)-Rgas_mix(i))     
         Lchar(1) = (p(i)-p_outflow)*0.278d0*c*(one)/two/L_domain_x &                               !! track p_outflow
-                 - (one-u(i)/c)*half*(v(i)*gradp(2)+gammagas*p(i)*gradv(2)-tmpro*c*v(i)*gradu(2)) & !! trans1 conv.
-                 - (one-u(i)/c)*half*(w(i)*gradp(3)+gammagas*p(i)*gradw(3)-tmpro*c*w(i)*gradu(3))   !! trasn2 conv.
+                 - (one-u(i)/c)*half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2) - &
+                                      tmpro*c*v(i)*gradb_u(2)) & !! trans1 conv.
+                 - (one-u(i)/c)*half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3) - &
+                                      tmpro*c*w(i)*gradb_u(3))   !! trasn2 conv.
      
        !! Add source terms for reacting flows
 #ifdef react

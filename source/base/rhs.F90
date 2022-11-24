@@ -31,7 +31,7 @@ module rhs
   public calc_all_rhs,filter_variables
 
   !! Allocatable arrays for 1st and 2nd gradients
-  real(rkind),dimension(:,:),allocatable :: gradu,gradv,gradw,gradlnro,gradp
+  real(rkind),dimension(:,:),allocatable :: gradlnro,gradp  !! Velocity gradients defined in common, as used elsewhere too
   real(rkind),dimension(:,:),allocatable :: gradroE
   real(rkind),dimension(:,:),allocatable :: graddivvel
   real(rkind),dimension(:),allocatable :: lapu,lapv,lapw
@@ -52,6 +52,7 @@ module rhs
 contains
 !! ------------------------------------------------------------------------------------------------
   subroutine calc_all_rhs
+     use statistics
      !! Control routine for calculating right hand sides. Does thermodynamic evaluations, finds
      !! gradients, and then calls property-specific RHS routines
      integer(ikind) :: k,i
@@ -119,6 +120,11 @@ contains
         deallocate(sumoverspecies_homega,reaction_rate_bound)
 #endif                
      end if
+          
+     !! If we want to calculate total dissipation rate
+     if(.true..and.iRKstep.eq.1) then
+        call check_enstrophy
+     end if    
      
      !! Clear space no longer required
      deallocate(gradlnro,gradu,gradv,gradw,gradp)
@@ -286,23 +292,17 @@ contains
                            
               !! divroDgradY = ro*D*lapY + grad(ro*D)*gradY
               !! also zero normal component of speciessum_roDgradY as required
-              if(node_type(i).eq.0)then  !! WALLS: no diffusive mass flux through walls
-
+              if(znf_mdiff(j)) then
                  lapYspec_tmp = grad2Yspec(j,2) + grad2Yspec(j,3) !! Transverse terms only
                  divroDgradY = roMdiff(i,ispec)*lapYspec_tmp &
                             + dot_product(gradYspec(i,2:3,ispec),gradroMdiff(2:3))
-                 roDgradY(1) = zero !! zero normal contribution on walls                            
-              else if(node_type(i).eq.1) then      !! Inflow
+                 roDgradY(1) = zero !! zero normal contribution on walls                                         
+              else
                  lapYspec_tmp = grad2Yspec(j,1) + grad2Yspec(j,2) + grad2Yspec(j,3)
                  divroDgradY = roMdiff(i,ispec)*lapYspec_tmp &                            
-                            + dot_product(gradYspec(i,:,ispec),gradroMdiff(:))   
-              else !! Outflow
-                 lapYspec_tmp = grad2Yspec(j,2) + grad2Yspec(j,3) !! Transverse terms only
-                 divroDgradY = roMdiff(i,ispec)*lapYspec_tmp &
-                            + dot_product(gradYspec(i,2:3,ispec),gradroMdiff(2:3))             
-                 roDgradY(1) = zero !! zero normal contribution through outflow
-              end if              
-
+                            + dot_product(gradYspec(i,:,ispec),gradroMdiff(:))               
+              endif
+              
               !! Sum roDgradY and div(roDgradY) over species
               speciessum_divroDgradY(i) = speciessum_divroDgradY(i) + divroDgradY
 
@@ -534,9 +534,11 @@ contains
               f_visc_v = visc(i)*(lapv(i) + onethird*graddivvel(i,2)) 
               f_visc_w = visc(i)*(lapw(i) + onethird*graddivvel(i,3))
 #ifdef tdtp
-               !! non-uniform viscosity terms. N.B. dtau_nn/dn=zero for both inflow and outflow, so applied here.
+              !! non-uniform viscosity terms. 
               gradvisc(:) = r_temp_dependence*visc(i)*gradT(i,:)/T(i)
-              f_visc_u = f_visc_u + zero                           !! dtau_nn/dn=0
+              f_visc_u = f_visc_u + gradvisc(1)*(fourthirds*gradu(i,1) - twothirds*(gradv(i,2)+gradw(i,3))) &
+                                  + gradvisc(2)*(gradu(i,2)+gradv(i,1)) &
+                                  + gradvisc(3)*(gradu(i,3)+gradw(i,1))
               f_visc_v = f_visc_v + gradvisc(1)*(gradu(i,2)+gradv(i,1)) &
                                   + gradvisc(2)*(fourthirds*gradv(i,2) - twothirds*(gradu(i,1)+gradw(i,3))) &
                                   + gradvisc(3)*(gradv(i,3)+gradw(i,2))
@@ -545,26 +547,23 @@ contains
                                   + gradvisc(3)*(fourthirds*gradw(i,3) - twothirds*(gradu(i,1)+gradv(i,2)))     
 #endif 
               
-              !! Zero various terms depending on inflow or outflow. This is done by subtracting terms as
-              !! appropriate.
-              if(node_type(i).eq.1) then !! inflow
+              !! Zero normal flux normal stress divergence
+              if(znf_vdiff(j)) then
                  !! dtau_nn/dn = 0
-                 f_visc_u = f_visc_u + visc(i)*(twothirds*graddivvel(i,1) - two*grad2uvec(j,1))
-              else        !! Outflow
-                 !! dtau_nn/dn = 0
-                 f_visc_u = f_visc_u + visc(i)*(twothirds*graddivvel(i,1) - two*grad2uvec(j,1))
-                             
+                 f_visc_u = f_visc_u + visc(i)*(twothirds*graddivvel(i,1) - two*grad2uvec(j,1))       
+                 f_visc_u = f_visc_u - gradvisc(1)*(fourthirds*gradu(i,1) - twothirds*(gradv(i,2)+gradw(i,3)))
+              endif
+
+              if(znf_vtdiff(j))then
                  !! dtau_jn/dn = 0 for j=2,3 
 !                 f_visc_v = f_visc_v -grad2uvec(j,2) - grad2ucross(j,1)
 !                 f_visc_w = f_visc_w -grad2uvec(j,3) - grad2ucross(j,2)
 
                  !! zero non-uniform viscosity contribution to dtau_jn/dn for j=2,3 
 #ifdef tdtp
-!                 f_visc_v = f_visc_v - gradvisc(1)*(gradu(i,2)+gradv(i,1)) 
-!                 f_visc_w = f_visc_w - gradvisc(1)*(gradu(i,3)+gradw(i,1)) 
+                 f_visc_v = f_visc_v - gradvisc(1)*(gradu(i,2)+gradv(i,1)) 
+                 f_visc_w = f_visc_w - gradvisc(1)*(gradu(i,3)+gradw(i,1)) 
 #endif 
-              
-             
               end if
      
               !! Body force
@@ -648,55 +647,33 @@ contains
         !$omp parallel do private(i,tmp_visc,gradlambda,lapT_tmp)
         do j=1,nb
            i=boundary_list(j)
-           if(node_type(i).eq.0)then !! Wall
-              !! Viscous energy term: div.(tau u) (some bits omitted as u,v,w=0,0 and grad(u/v/w,2/3)=0 )
-              tmp_visc = fourthirds*gradu(i,1)*gradu(i,1) &
-                       + gradv(i,1)*gradv(i,1) &
-                       + gradw(i,1)*gradw(i,1)
-              store_diff_E(i) = store_diff_E(i) + visc(i)*tmp_visc
+   
+           !! Viscous energy term: div.(tau u) (N.B. for walls, many terms in tmp_visc will =0)
+           tmp_visc = (fourthirds*gradu(i,1) - twothirds*gradv(i,2) - twothirds*gradw(i,3))*gradu(i,1) &
+                    + (fourthirds*gradv(i,2) - twothirds*gradw(i,3) - twothirds*gradu(i,1))*gradv(i,2) &
+                    + (fourthirds*gradw(i,3) - twothirds*gradu(i,1) - twothirds*gradv(i,2))*gradw(i,3) &
+                    + (gradu(i,2)+gradv(i,1))**two + (gradu(i,3)+gradw(i,1))**two &
+                    + (gradv(i,3)+gradw(i,2))**two         
+           store_diff_E(i) = store_diff_E(i) + visc(i)*tmp_visc           
 
-              lapT_tmp = grad2T(j,2) + grad2T(j,3)
-#ifdef wall_isoT
-              lapT_tmp = lapT_tmp + grad2T(j,1)   !! Isothermal walls can have heat flux in normal
-#endif              
+           !! Evaluate thermal conductivity gradient
+           gradlambda(:) = lambda_th(i)*r_temp_dependence*gradT(i,:)/T(i)  + lambda_th(i)*gradcp(i,:)/cp(i)   
 
-              !! Add thermal diffusion term: div.(lambda*gradT)
-              store_diff_E(i) = store_diff_E(i) + lambda_th(i)*lapT_tmp
-              gradlambda(:) = lambda_th(i)*r_temp_dependence*gradT(i,:)/T(i)  + lambda_th(i)*gradcp(i,:)/cp(i)
-#ifdef wall_isoT
-              store_diff_E(i) = store_diff_E(i) + dot_product(gradlambda(:),gradT(i,:))!! isoT-walls can have normal heat flux
-#else
-              store_diff_E(i) = store_diff_E(i) + dot_product(gradlambda(2:3),gradT(i,2:3))!! adiabatic
-#endif              
-                        
-              !! RHS (visc + cond + transverse + source)
-              rhs_roE(i) = -roE(i)*gradv(i,2) - roE(i)*gradw(i,3) &
-                           -p(i)*gradv(i,2) - p(i)*gradw(i,3) &
-                           + store_diff_E(i)             
-           else !! Inflow/outflow  (is in the x-y coordinate system)
-              !! Viscous energy term: div.(tau u)
-              tmp_visc = (fourthirds*gradu(i,1) - twothirds*gradv(i,2) - twothirds*gradw(i,3))*gradu(i,1) &
-                       + (fourthirds*gradv(i,2) - twothirds*gradw(i,3) - twothirds*gradu(i,1))*gradv(i,2) &
-                       + (fourthirds*gradw(i,3) - twothirds*gradu(i,1) - twothirds*gradv(i,2))*gradw(i,3) &
-                       + (gradu(i,2)+gradv(i,1))**two + (gradu(i,3)+gradw(i,1))**two &
-                       + (gradv(i,3)+gradw(i,2))**two         
-              store_diff_E(i) = store_diff_E(i) + visc(i)*tmp_visc
-              
-              !! Add thermal diffusion term: div.(lambda*gradT)
-              gradlambda(:) = lambda_th(i)*r_temp_dependence*gradT(i,:)/T(i)  + lambda_th(i)*gradcp(i,:)/cp(i)   
-              if(node_type(i).eq.1) then    !! Inflows
-                 lapT_tmp = lapT(i)
-              else if(node_type(i).eq.2) then  !! outflows  - zero normal heat flux
-                 gradlambda(1) = zero                
-                 lapT_tmp = grad2T(j,2) + grad2T(j,3)                        
-              end if              
-              store_diff_E(i) = store_diff_E(i) + lambda_th(i)*lapT_tmp + dot_product(gradlambda(:),gradT(i,:))               
-                        
-              !! RHS (visc + cond + transverse + source)
-              rhs_roE(i) = - v(i)*gradroE(i,2) - roE(i)*gradv(i,2) - w(i)*gradroE(i,3) - roE(i)*gradw(i,3) &
-                         - p(i)*gradv(i,2) - v(i)*gradp(i,2) - p(i)*gradw(i,3) - w(i)*gradp(i,3) &
-                         + store_diff_E(i) 
-           end if
+           !! Evaluate temperature Laplacian and zero parts as required
+           if(znf_tdiff(j)) then
+              lapT_tmp = grad2T(j,2) + grad2T(j,3)  !! No normal d2T/dn2
+              gradlambda(1) = zero                  !! dlambda/dn=0
+           else
+              lapT_tmp = lapT(i)
+           end if                    
+           
+           !! Add thermal diffusion term: div.(lambda*gradT)              
+           store_diff_E(i) = store_diff_E(i) + lambda_th(i)*lapT_tmp + dot_product(gradlambda(:),gradT(i,:))               
+                     
+           !! RHS (visc + cond + transverse + source)
+           rhs_roE(i) = - v(i)*gradroE(i,2) - roE(i)*gradv(i,2) - w(i)*gradroE(i,3) - roE(i)*gradw(i,3) &
+                      - p(i)*gradv(i,2) - v(i)*gradp(i,2) - p(i)*gradw(i,3) - w(i)*gradp(i,3) &
+                      + store_diff_E(i) 
         end do
         !$omp end parallel do
         deallocate(grad2T)
@@ -792,16 +769,22 @@ contains
       
      segment_tstart = omp_get_wtime()
      
-     !! Filter variables
+     !! Filter density logarithm
      call calc_filtered_var(lnro)
+     
+     !! Filter velocity components
      call calc_filtered_var(u)
      call calc_filtered_var(v)
 #ifdef dim3
      call calc_filtered_var(w)
 #endif     
+ 
+     !! Filter energy
 #ifndef isoT     
      call calc_filtered_var(roE)       
 #endif     
+
+     !! Filter mass fractions
 #ifdef ms
      do ispec=1,nspec
         call calc_filtered_var(Yspec(:,ispec))

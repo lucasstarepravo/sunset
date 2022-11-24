@@ -27,7 +27,7 @@ contains
      !! easier for the multi-process version.
      integer(ikind),intent(in) :: kk
      integer(ikind) :: ll,i,j,k
-     real(rkind),dimension(dims) :: rij,gradw,dr_tmp
+     real(rkind),dimension(dims) :: rij,gradkernel,dr_tmp
      real(rkind),dimension(:,:),allocatable :: dr
      real(rkind) :: rad,tmp,qq
      real(rkind) :: qkd_mag,ns,drmag
@@ -51,7 +51,7 @@ contains
 
       
         !! Find shifting vector...
-        !$OMP PARALLEL DO PRIVATE(k,j,rij,rad,qq,gradw,dr_tmp,qkd_mag)
+        !$OMP PARALLEL DO PRIVATE(k,j,rij,rad,qq,gradkernel,dr_tmp,qkd_mag)
         do i=1,npfb
            if(node_type(i).eq.999) then
               qkd_mag = 1.0d-1*h(i)
@@ -60,9 +60,9 @@ contains
                  j=ij_link(i,k)
                  rij = rp(i,:)-rp(j,:);rad=sqrt(dot_product(rij,rij));qq=hovs_local*rad/h(i)
 
-                 gradw(:) = qkd_mag*((half*qq - one)**1.0)*rij(:)/max(rad,epsilon(rad))
-                 if(qq.gt.2.0) gradw(:) = zero            
-                 dr_tmp = dr_tmp + gradw(:)
+                 gradkernel(:) = qkd_mag*((half*qq - one)**1.0)*rij(:)/max(rad,epsilon(rad))
+                 if(qq.gt.2.0) gradkernel(:) = zero            
+                 dr_tmp = dr_tmp + gradkernel(:)
               end do
               dr(i,:) = dr_tmp
               rad = sqrt(dot_product(dr_tmp,dr_tmp))

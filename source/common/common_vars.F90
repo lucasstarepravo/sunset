@@ -48,6 +48,9 @@ module common_vars
   integer(ikind) :: polyorder_cp,ncoefs_cp  !! polynomial order,number of coefs
   real(rkind) :: T_low,T_high
   
+  !! Velocity gradients  
+  real(rkind),dimension(:,:),allocatable :: gradu,gradv,gradw
+  
   !! Chemical kinetics control data
   integer(ikind) :: nsteps,nthirdbodies,nlindemann,num_gibbs_species
   real(rkind),dimension(:,:), allocatable :: Arrhenius_coefs
@@ -108,19 +111,6 @@ module common_vars
   
   !! Finite Difference weightings 
   real(rkind),dimension(:),allocatable :: ij_fd_grad,ij_fd_grad2,ij_fd_hyp         
-#define FDORDER 8               
-  !! Size of Stencil
-#if FDORDER==4
-  integer(ikind),parameter :: ij_count_fd = 5
-#elif FDORDER==6
-  integer(ikind),parameter :: ij_count_fd = 7
-#elif FDORDER==8
-  integer(ikind),parameter :: ij_count_fd = 9
-#elif FDORDER==10
-  integer(ikind),parameter :: ij_count_fd = 11
-#elif FDORDER==12
-  integer(ikind),parameter :: ij_count_fd = 13
-#endif    
   
   !! Parents and boundaries... 
   integer(ikind),dimension(:),allocatable :: irelation,vrelation  ! used for periodic and symmetric boundaries
@@ -129,10 +119,17 @@ module common_vars
   integer(ikind) :: xbcond,ybcond !! BC flags for "simple" geometries without boundary nodes...
   integer(ikind),dimension(:),allocatable :: btype !! What type of BC is node i?
   integer(ikind),dimension(:),allocatable :: fd_parent !! pointer to the boundary node which is parent 
+  
+  !! Characteristic BC bits
   real(rkind),dimension(:),allocatable :: T_bound
   real(rkind) :: p_outflow   !! Desired pressure on outflow boundary
   real(rkind),dimension(:),allocatable :: sumoverspecies_homega
   real(rkind),dimension(:,:),allocatable :: reaction_rate_bound 
+  
+  !! Flags for flux-zero-ing on boundaries
+  logical,dimension(:),allocatable :: znf_mdiff,znf_tdiff,znf_vdiff,znf_vtdiff
+  
+  
   
   !! Profiling and openMP parallelisation
   real(rkind) ts_start,ts_end,t_run,t_per_dt,t_last_X

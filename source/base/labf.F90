@@ -63,6 +63,8 @@ contains
      k=9
 #elif ORDER==10
      k=10
+#elif ORDER==12
+     k=12     
 #endif
      nsizeG=(k*k+3*k)/2   !!  5,9,14,20,27,35,44... for k=2,3,4,5,6,7,8...
      nsize_large = nsizeG
@@ -199,10 +201,15 @@ contains
         bvechyp(:)=zero;bvechyp(36)=-one;bvechyp(38)=-4.0d0;bvechyp(40)=-6.0d0;bvechyp(42)=-4.0d0;bvechyp(44)=-one
         bvechyp(:)=bvechyp(:)/hh/hh/hh/hh/hh/hh/hh/hh
         i1=0;i2=0;nsize=nsizeG    
-#else        
+#elif ORDER<=11      
         bvechyp(:)=zero;bvechyp(55)=one;bvechyp(57)=5.0d0;bvechyp(59)=10.0d0;bvechyp(61)=10.0d0
         bvechyp(63)=5.0d0;bvechyp(65)=one
         bvechyp(:)=bvechyp(:)/hh/hh/hh/hh/hh/hh/hh/hh/hh/hh
+        i1=0;i2=0;nsize=nsizeG                
+#else        
+        bvechyp(:)=zero;bvechyp(78)=-one;bvechyp(80)=-6.0d0;bvechyp(82)=-15.0d0;bvechyp(84)=-20.0d0
+        bvechyp(86)=-15.0d0;bvechyp(88)=-6.0d0;bvechyp(90)=-one
+        bvechyp(:)=bvechyp(:)/hh/hh/hh/hh/hh/hh/hh/hh/hh/hh/hh/hh
         i1=0;i2=0;nsize=nsizeG                
 #endif
 
@@ -250,11 +257,13 @@ contains
         
         write(2,*) "" !! Temporary fix for a weird openblas/lapack/openmp bug 
         !! The bug may be due to a race condition or something, but not really sure
-        !! What's the best way to fix this??       
+        !! What's the best way to fix this??   
      end do
      !$OMP END PARALLEL DO
      deallocate(amatx,amaty,amatxx,amatxy,amatyy,amathyp)
      deallocate(bvecx,bvecy,bvecxx,bvecxy,bvecyy,bvechyp,gvec,xvec)   
+    
+     write(6,*) "iproc",iproc,"LABFM weights calculated"
     
      return
   end subroutine calc_labf_weights
@@ -402,13 +411,14 @@ contains
            if(node_type(j).eq.-3)  ij_wb_grad2(1,k,jj) = -56.0d0/12.0d0/dx2              
            if(node_type(j).eq.-4)  ij_wb_grad2(1,k,jj) =  11.0d0/12.0d0/dx2
               
-           !! Filter in boundary normal direction (WORKS WITHOUT)
-!           if(j.eq.i)              ij_w_hyp(k,i) = -zero   !! 4th DERIV
-!           if(node_type(j).eq.-1)  ij_w_hyp(k,i) =  4.0d0/dx4
-!           if(node_type(j).eq.-2)  ij_w_hyp(k,i) = -6.0d0/dx4
-!           if(node_type(j).eq.-3)  ij_w_hyp(k,i) =  4.0d0/dx4
-!           if(node_type(j).eq.-4)  ij_w_hyp(k,i) = -one/dx4                !! made negative (need coeff -1)...   
-
+           !! Filter in boundary normal direction, but only for outflows. Not required walls and inflows
+           if(node_type(i).eq.2) then
+              if(j.eq.i)              ij_w_hyp(k,i) = -zero   !! 4th DERIV
+              if(node_type(j).eq.-1)  ij_w_hyp(k,i) =  4.0d0/dx4
+              if(node_type(j).eq.-2)  ij_w_hyp(k,i) = -6.0d0/dx4
+              if(node_type(j).eq.-3)  ij_w_hyp(k,i) =  4.0d0/dx4
+              if(node_type(j).eq.-4)  ij_w_hyp(k,i) = -one/dx4     !! made negative (need coeff -1)...   
+           end if
            end if
         end do
      end do
@@ -430,23 +440,7 @@ contains
               if(node_type(j).eq.-3.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) = -half/dx              
               if(node_type(j).eq.-4.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) =  one/12.0d0/dx                 
            end do
-        end if
-if(.false.)then
-        if(node_type(i).eq.-2) then
-           dx = s(i)        
-           ij_w_grad(:,:,i) = zero
-           do k=1,ij_count(i)
-              j=ij_link(k,i)          
-              !! Normal derivatives
-              if(j.gt.npfb) cycle !! Eliminate halos and ghosts from search (entire FD stencil in one processor)              
-              if(j.eq.fd_parent(i))                                   ij_w_grad(1,k,i) =  one/12.0d0/dx     !! FIRST DERIV
-              if(node_type(j).eq.-1.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) = -twothirds/dx    
-              if(j.eq.i)                                              ij_w_grad(1,k,i) =  zero
-              if(node_type(j).eq.-3.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) =  twothirds/dx
-              if(node_type(j).eq.-4.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) = -one/12.0d0/dx              
-           end do
-        end if
-endif        
+        end if    
      end do       
 
 
@@ -459,10 +453,9 @@ endif
      allocate(amatt(nsizeG,nsizeG),amattt(nsizeG,nsizeG),amatthyp(nsizeG,nsizeG))
      allocate(bvect(nsizeG),bvectt(nsizeG),bvecthyp(nsizeG),xvec(nsizeG),gvec(nsizeG))
      
-     !! Boundary and first 2 rows: set gradients
+     !! Boundary and first rows: set gradients
      do i=1,npfb
-!        if(node_type(i).ge.-2.and.node_type(i).le.2) then
-if(node_type(i).ge.-1.and.node_type(i).le.2) then
+        if(node_type(i).ge.-1.and.node_type(i).le.2) then
         
            amatt=zero;bvect=zero;xvec = zero;gvec = zero
            xt=-rnorm(i,2);yt=rnorm(i,1)  !! unit tangent vector
@@ -589,12 +582,13 @@ if(node_type(i).ge.-1.and.node_type(i).le.2) then
         end do
                
      end do        
-        
-        
+       
+     !! Clear 1D labfm vectors and matrices       
      deallocate(bvect,bvectt,gvec,xvec,amatt,amattt)
      
-     !! Find the local radius of curvature...
-     !! N.B. find 1/radius, as it is only used as denominator, so we are wary of instances when R->infinity
+     !! Wall boundaries: find local radius of curvature
+     !! N.B.: find 1/radius, as it is only used as denominator, so we are wary of instances when R->infinity
+     !! N.B.2: This is in dimensionless units. Scalings to grad, grad2 etc are applied later.
      allocate(ooRcurve(nb));ooRcurve=zero
      do jj=1,nb
         i=boundary_list(jj)
@@ -611,32 +605,31 @@ if(node_type(i).ge.-1.and.node_type(i).le.2) then
            ooRcurve(jj) = sqrt(-tmp_t)  !! 1/radius of curvature...  
         end if     
      end do
-     !! PART 3: second cross derivatives... finite difference operating on labfm...
-     !! Loop boundary nodes
      
-     !! Inflow & outflow are in x-y coord system
+     !! Outflow boundaries: reverse first derivative weights
      do jj=1,nb
         i=boundary_list(jj)
         if(node_type(i).eq.2) then
            ij_w_grad(:,:,i)=-ij_w_grad(:,:,i)    !! Reverse first derivative weights
         end if
-     end do
+     end do         
           
-     !! PART 4: Map derivatives into correct FoR.
-     do jj=1,nb  !! Laplacian in boundary mapped to non-curved boundary oriented coords
+     !! Wall boundary: map grad2 and laplacian onto orthog. boundary oriented coords.
+     do jj=1,nb  
         i=boundary_list(jj)
         if(node_type(i).eq.0)then
            do k=1,ij_count(i)  !! Will result in Laplacian being correct... (but d2/dn2 incorrect)
-              ij_wb_grad2(1,k,jj) = ij_wb_grad2(1,k,jj) + ij_w_grad(1,k,i)*ooRcurve(jj) 
+!              ij_wb_grad2(1,k,jj) = ij_wb_grad2(1,k,jj) + ij_w_grad(1,k,i)*ooRcurve(jj)
+              ij_wb_grad2(2,k,jj) = ij_wb_grad2(2,k,jj) + ij_w_grad(1,k,i)*ooRcurve(jj)                
               ij_w_lap(k,i) = ij_wb_grad2(1,k,jj) + ij_wb_grad2(2,k,jj)
            end do
         end if
      end do
 
+     !! First row: map gradients onto x-y frame
      do jj=1,npfb-nb
         i = internal_list(jj)
-!        if(node_type(i).eq.-1.or.node_type(i).eq.-2) then  !! For first and second row fluid nodes
-if(node_type(i).eq.-1) then  !! For first and second row fluid nodes        
+        if(node_type(i).eq.-1) then  !! For first row
            xn = rnorm(i,1);yn=rnorm(i,2)
            Jinv(1,1)=xn;Jinv(1,2)=-yn;Jinv(2,1)=yn;Jinv(2,2)=xn   !! Jacobian for normal-tangent to x-y
            do k=1,ij_count(i)             
@@ -723,6 +716,10 @@ if(node_type(i).eq.-1) then  !! For first and second row fluid nodes
      k=9
 #elif ORDER==10
      k=10
+#elif ORDER==11
+     k=11     
+#elif ORDER==12
+     k=12
 #endif
      nsizeG=(k*k+3*k)/2   !!  5,9,14,20,27,35,44... for k=2,3,4,5,6,7,8...
 
@@ -743,10 +740,16 @@ if(node_type(i).eq.-1) then  !! For first and second row fluid nodes
 
      !! Set parameters of h-reduction
      reduction_factor = 0.98 
+     !! N.B. Need to modify this to work for 4th, 10th and 12th order
 !     res_tol = 5.0d-3*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)     
-     res_tol = 5.0d-5*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !  5.0d-5 !! For 6th order
-#if ORDER==8
-     res_tol = 1.0d-4*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !  5.0d-5 !! For 8th order    
+#if ORDER==6
+     res_tol = 5.0d-5*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 6th order
+#elif ORDER==8
+     res_tol = 1.0d-4*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 8th order    
+#elif ORDER==10     
+     res_tol = 1.0d-4*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 10th order --> needs tweaking
+#elif ORDER==12
+     res_tol = 1.0d-8*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 12th order --> set so no reduction    
 #endif     
      nk = 32   !! How many wavenumbers between 1 and Nyquist to check... ! 16
      amp_tol = 1.0001d0   !! Maximum allowable amplification
@@ -838,8 +841,6 @@ if(node_type(i).eq.-1) then  !! For first and second row fluid nodes
               hchecksum = hchecksum + xvec(i1)**2
            end do
            hchecksum = sqrt(hchecksum/dble(nsizeG))
-
-
            
            !! Second check for h-reduction: amplification of wavenumbers below Nyquist
            i1=0
@@ -897,6 +898,10 @@ if(node_type(i).eq.-1) then  !! For first and second row fluid nodes
                     hchecksum = two*res_tol/hh
 !write(6,*) i,i1,"stopping because of Y",ii
                  end if
+                 if(isnan(hchecksum)) then
+                    hchecksum = two*res_tol/hh
+write(6,*) i,i1,"stopping because of NaN",ii                    
+                 end if
               
               end do
            end if
@@ -910,6 +915,12 @@ if(node_type(i).eq.-1) then  !! For first and second row fluid nodes
 
 !hchecksum = 2.0*res_tol/hh
            !! Check the h-reduction criteria
+#if ORDER==12
+           hchecksum = two*res_tol/hh
+#endif       
+!#if ORDER==4
+!           hchecksum = two*res_tol/hh
+!#endif    
            if(hchecksum.ge.res_tol/hh)then   !! breakout of do-while
               reduce_h=.false.
 !write(6,*) i,i1,"stopping because of residual",ii,hchecksum,res_tol/hh 
@@ -1098,8 +1109,12 @@ if(node_type(i).eq.-1) then  !! For first and second row fluid nodes
      real(rkind),dimension(54) :: cxvec
 #elif ORDER==10
      real(rkind),dimension(65) :: cxvec
+#elif ORDER==11
+     real(rkind),dimension(77) :: cxvec
+#elif ORDER==12     
+     real(rkind),dimension(90) :: cxvec
 #endif     
-     real(rkind) :: x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8,x9,y9,x10,y10
+     real(rkind) :: x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8,x9,y9,x10,y10,x11,y11,x12,y12
  
 #if ORDER>=2
      x2=x*x;y2=y*y
@@ -1135,11 +1150,11 @@ if(node_type(i).eq.-1) then  !! For first and second row fluid nodes
 #endif
 #if ORDER>=6
      x6=x5*x;y6=y5*y         
-     cxvec(21) = (one/720.0)*x6
+     cxvec(21)= (one/720.0)*x6
      cxvec(22)=(one/120.0)*x5*y
      cxvec(23)=(one/48.0)*x4*y2
      cxvec(24)=(one/36.0)*x3*y3
-     cxvec(25) = (one/48.0)*x2*y4
+     cxvec(25)=(one/48.0)*x2*y4
      cxvec(26)=(one/120.0)*x*y5
      cxvec(27)=(one/720.0)*y6
 #endif
@@ -1181,17 +1196,48 @@ if(node_type(i).eq.-1) then  !! For first and second row fluid nodes
 #endif
 #if ORDER>=10
      x10=x9*x;y10=y9*y
-     cxvec(55) = (one/3628800.0)*x10
+     cxvec(55)=(one/3628800.0)*x10
      cxvec(56)=(one/362880.0)*x9*y
      cxvec(57)=(one/80640.0)*x8*y2
      cxvec(58)=(one/30240.0)*x7*y3
      cxvec(59)=(one/17280.0)*x6*y4
-     cxvec(60) = (one/14400.0)*x5*y5
+     cxvec(60)=(one/14400.0)*x5*y5
      cxvec(61)=(one/17280.0)*x4*y6
      cxvec(62)=(one/30240.0)*x3*y7
      cxvec(63)=(one/80640.0)*x2*y8
-     cxvec(64) = (one/362880.0)*x*y9
-     cxvec(65) = (one/3628800.0)*y10
+     cxvec(64)=(one/362880.0)*x*y9
+     cxvec(65)=(one/3628800.0)*y10
+#endif
+#if ORDER>=11
+     x11=x10*x;y11=y10*y
+     cxvec(66)=(one/39916800.0)*x11
+     cxvec(67)=(one/3628800.0)*x10*y
+     cxvec(68)=(one/725760.0)*x9*y2
+     cxvec(69)=(one/241920.0)*x8*y3
+     cxvec(70)=(one/120960.0)*x7*y4
+     cxvec(71)=(one/86400.0)*x6*y5
+     cxvec(72)=(one/86400.0)*x5*y6
+     cxvec(73)=(one/120960.0)*x4*y7
+     cxvec(74)=(one/241920.0)*x3*y8
+     cxvec(75)=(one/725760.0)*x2*y9
+     cxvec(76)=(one/3628800.0)*x*y10
+     cxvec(77)=(one/39916800.0)*y11     
+#endif
+#if ORDER>=12
+     x12=x11*x;y12=y11*y
+     cxvec(78)=(one/479001600.0)*x12
+     cxvec(79)=(one/3991680.0)*x11*y
+     cxvec(80)=(one/7257600.0)*x10*y2
+     cxvec(81)=(one/2177280.0)*x9*y3
+     cxvec(82)=(one/967680.0)*x8*y4
+     cxvec(83)=(one/604800.0)*x7*y5
+     cxvec(84)=(one/518400.0)*x6*y6
+     cxvec(85)=(one/604800.0)*x5*y7
+     cxvec(86)=(one/967680.0)*x4*y8
+     cxvec(87)=(one/2177280.0)*x3*y9
+     cxvec(88)=(one/7257600.0)*x2*y10
+     cxvec(89)=(one/3991680.0)*x*y11
+     cxvec(90)=(one/479001600.0)*y12               
 #endif
   end function monomials
 !! ------------------------------------------------------------------------------------------------
@@ -1220,6 +1266,10 @@ if(node_type(i).eq.-1) then  !! For first and second row fluid nodes
      real(rkind),dimension(54) :: ggvec
 #elif ORDER==10
      real(rkind),dimension(65) :: ggvec
+#elif ORDER==11
+     real(rkind),dimension(77) :: ggvec
+#elif ORDER==12
+     real(rkind),dimension(90) :: ggvec
 #endif
      real(rkind) :: rad3,rad2,r15,r13,r11,r9,r7,r5
      real(rkind) :: x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8
@@ -1330,6 +1380,10 @@ if(node_type(i).eq.-1) then  !! For first and second row fluid nodes
      real(rkind),dimension(54) :: ggvec
 #elif ORDER==10
      real(rkind),dimension(65) :: ggvec
+#elif ORDER==11
+     real(rkind),dimension(77) :: ggvec
+#elif ORDER==12
+     real(rkind),dimension(90) :: ggvec
 #endif
      !! Scale xx and yy (Probablists to physicists)
      xx = oosqrt2*x;yy=oosqrt2*y
@@ -1417,11 +1471,42 @@ if(node_type(i).eq.-1) then  !! For first and second row fluid nodes
      ggvec(64)= ff1*Hermite1(xx)*Hermite9(yy)*0.03125d0
      ggvec(65)= ff1*Hermite10(yy)*0.03125d0
 #endif
+#if ORDER>=11
+     ggvec(66) = ff1*Hermite11(xx)*0.03125d0*oosqrt2
+     ggvec(67) = ff1*Hermite10(xx)*Hermite1(yy)*0.03125d0*oosqrt2
+     ggvec(68) = ff1*Hermite9(xx)*Hermite2(yy)*0.03125d0*oosqrt2
+     ggvec(69) = ff1*Hermite8(xx)*Hermite3(yy)*0.03125d0*oosqrt2
+     ggvec(70) = ff1*Hermite7(xx)*Hermite4(yy)*0.03125d0*oosqrt2
+     ggvec(71) = ff1*Hermite6(xx)*Hermite5(yy)*0.03125d0*oosqrt2
+     ggvec(72) = ff1*Hermite5(xx)*Hermite6(yy)*0.03125d0*oosqrt2
+     ggvec(73) = ff1*Hermite4(xx)*Hermite7(yy)*0.03125d0*oosqrt2
+     ggvec(74) = ff1*Hermite3(xx)*Hermite8(yy)*0.03125d0*oosqrt2
+     ggvec(75) = ff1*Hermite2(xx)*Hermite9(yy)*0.03125d0*oosqrt2
+     ggvec(76) = ff1*Hermite1(xx)*Hermite10(yy)*0.03125d0*oosqrt2
+     ggvec(76) = ff1*Hermite11(yy)*0.03125d0*oosqrt2
+#endif
+#if ORDER>=12
+     ggvec(78) = ff1*Hermite12(xx)*0.015625d0
+     ggvec(79) = ff1*Hermite11(xx)*Hermite1(yy)*0.015625d0
+     ggvec(80) = ff1*Hermite10(xx)*Hermite2(yy)*0.015625d0
+     ggvec(81) = ff1*Hermite9(xx)*Hermite3(yy)*0.015625d0
+     ggvec(82) = ff1*Hermite8(xx)*Hermite4(yy)*0.015625d0
+     ggvec(83) = ff1*Hermite7(xx)*Hermite5(yy)*0.015625d0
+     ggvec(84) = ff1*Hermite6(xx)*Hermite6(yy)*0.015625d0
+     ggvec(85) = ff1*Hermite5(xx)*Hermite7(yy)*0.015625d0
+     ggvec(86) = ff1*Hermite4(xx)*Hermite8(yy)*0.015625d0
+     ggvec(87) = ff1*Hermite3(xx)*Hermite9(yy)*0.015625d0
+     ggvec(88) = ff1*Hermite2(xx)*Hermite10(yy)*0.015625d0
+     ggvec(89) = ff1*Hermite1(xx)*Hermite11(yy)*0.015625d0
+     ggvec(90) = ff1*Hermite12(yy)*0.015625d0
+#endif
+
   end function abfs
 !! ------------------------------------------------------------------------------------------------
 #elif ABF==3
 !! LEGENDRE ABFs: Legendre polynomials
 !! NB ff1 multiplies the Legendre polynomial by an RBF to improve spectral accuracy
+!! Only implemented up to O10
 !! ------------------------------------------------------------------------------------------------
   function abfs(dummy,x,y,ff1) result(ggvec)         !! TEN
      real(rkind),intent(in) :: x,y,ff1,dummy
@@ -1443,6 +1528,10 @@ if(node_type(i).eq.-1) then  !! For first and second row fluid nodes
      real(rkind),dimension(54) :: ggvec
 #elif ORDER==10
      real(rkind),dimension(65) :: ggvec
+#elif ORDER==11
+     real(rkind),dimension(77) :: ggvec
+#elif ORDER==12
+     real(rkind),dimension(90) :: ggvec
 #endif
      
 #if ORDER>=2
@@ -1600,6 +1689,22 @@ if(node_type(i).eq.-1) then  !! For first and second row fluid nodes
      Hres = 1024.0d0*z4*z4*z2 - 23040.0d0*z4*z4 + 161280.0d0*z4*z2 - 403200.0d0*z4 &
             + 302400.0d0*z2 - 30240.0d0
   end function Hermite10
+  function Hermite11(z) result(Hres)
+     real(rkind),intent(in) :: z
+     real(rkind) :: z2,z4
+     real(rkind) :: Hres
+     z2=z*z;z4=z2*z2
+     Hres = 2048.0d0*z4*z4*z2*z - 56320.0d0*z4*z4*z + 506880.0d0*z4*z2*z - 1774080.0d0*z4*z &
+            + 2217600.0d0*z2*z - 665280.0d0*z
+  end function Hermite11
+  function Hermite12(z) result(Hres)
+     real(rkind),intent(in) :: z
+     real(rkind) :: z2,z4
+     real(rkind) :: Hres
+     z2=z*z;z4=z2*z2
+     Hres = 4096.0d0*z4*z4*z4 - 135168.0d0*z4*z4*z2 + 1520640.0d0*z4*z4 - 7096320.0d0*z4*z2 &
+            + 13305600.0d0*z4 - 7983360.0d0*z2 + 665280.0d0
+  end function Hermite12  
 !! ------------------------------------------------------------------------------------------------
 !! Univariate Legendre polynomials
 !! ------------------------------------------------------------------------------------------------
