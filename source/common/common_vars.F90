@@ -20,7 +20,7 @@ module common_vars
   real(rkind) :: u_inflow,Lz,Time_char  !! build from L_char,U_char
   real(rkind), dimension(dims) :: grav !! Gravity    
   real(rkind) :: rho_char,T_ref,visc_ref,p_ref
-  real(rkind) :: Pr,Ma,Re,Mdiff_ref
+  real(rkind) :: Pr,Ma,Re,Mdiff_ref,Wi
 #ifdef isoT
   real(rkind) :: csq
 #endif  
