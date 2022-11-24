@@ -26,8 +26,8 @@
 # For thermal flows with real gas properties:
 # make thermo=1 dim3=X mpi=X pgrad=X tdtp=1
 #
-# For thermal flows with fixed cp, visc, lambda
-# make thermo=1 dim3=X mpi=X pgrad=X tdtp=0
+# For thermal flows with fixed cp, visc, lambda, use a runfile w/ zero temp dependence, and
+# make thermo=1 react=0 multispec=0 dim3=X mpi=X pgrad=X yout=0
 
 #
 # Choose compiler depending on whether mpi
