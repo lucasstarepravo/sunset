@@ -43,7 +43,7 @@ contains
      cput = ts_end-ts_start
      call MPI_ALLREDUCE(cput,cput_global,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
      if(iproc.eq.0) then 
-        write(191,*) itime,cput_global
+        write(191,*) itime,cput_global/(dble(nprocs)+one)
         flush(191)
      end if
 #else
