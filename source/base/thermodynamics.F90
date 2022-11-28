@@ -14,7 +14,7 @@ module thermodynamics
   !! 1) isoT      - ISOTHERMAL FLOW. Don't solve an energy equation, p=ro*c*c with c a constant. Many
   !!                arrays are not used, and so not allocated.
   !! 2) not(isoT) - THERMAL FLOW: cp is a polynomial function of T (it can be a polynomial of 
-  !!                order 0), and T is obtained from lnro,u,roE,Y via solution of a non-linear 
+  !!                order 0), and T is obtained from ro,u,roE,Y via solution of a non-linear 
   !!                equation with a Newton-Raphson method. Within thermal framework, we have two 
   !!                options:
   !!     a) tdtp       - The temperature dependence of the viscosity, thermal conductivity, and
@@ -68,8 +68,8 @@ contains
            end do
            Rgas_mix(i) = Rgas_mix(i)*Rgas_universal     
           
-           !! Density from its logarithm  
-           tmpro = exp(lnro(i)) 
+           !! Store local density
+           tmpro = ro(i) 
          
            !!Initialise coefficients:
            fT_coef_C0 = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i)) - roE(i)/tmpro
@@ -173,8 +173,7 @@ contains
      T(:) = zero
      !$omp parallel do private(tmpro)
      do i=1,np    !! N.B. this is over ALL nodes.
-        tmpro = exp(lnro(i))
-        p(i) = csq*tmpro
+        p(i) = csq*ro(i)
      end do
      !$omp end parallel do      
      
@@ -288,7 +287,7 @@ contains
 #else
      visc(:) = visc_ref
 #ifdef ms
-     roMdiff(:,:) = exp(lnro(i))*Mdiff_ref
+     roMdiff(:,:) = ro(i)*Mdiff_ref
 #endif     
 #endif     
   
@@ -307,7 +306,7 @@ contains
   end function evaluate_sound_speed_at_node
 !! ------------------------------------------------------------------------------------------------  
   subroutine set_energy_on_bound(i,tmpT)
-     !! Evaluate roE based on u,lnro,T at a specific node
+     !! Evaluate roE based on u,ro,T at a specific node
      integer(ikind),intent(in) :: i
      real(rkind),intent(in) :: tmpT
      integer(ikind) :: ispec,j,nsum
@@ -317,8 +316,8 @@ contains
         !! Initialise roE with K.E. term
         roE(i) = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))
         
-        !! Evaluate density from its logarithm
-        tmpro = exp(lnro(i))
+        !! Store local density
+        tmpro = ro(i) 
 
         !! Loop over species
         Rgas_mix_local = zero
@@ -345,7 +344,7 @@ contains
   end subroutine set_energy_on_bound 
 !! ------------------------------------------------------------------------------------------------
   subroutine initialise_energy
-     !! Evaluate roE based on u,lnro,T, over the whole domain. 
+     !! Evaluate roE based on u,ro,T, over the whole domain. 
      !! This routine is only called at start-up, and it is because loading temperature is a more
      !! intuitive variable to use for input than roE...
      
@@ -362,8 +361,8 @@ contains
         !! Initialise roE with K.E. term
         roE(i) = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))
         
-        !! Evaluate density from its logarithm
-        tmpro = exp(lnro(i))
+        !! Store local density
+        tmpro = ro(i) 
 
         !! Loop over species
         Rgas_mix_local = zero

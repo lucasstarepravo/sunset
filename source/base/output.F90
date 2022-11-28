@@ -106,7 +106,7 @@ contains
         write(6,*) "Max |w|:",max(maxval(w(1:npfb)),abs(minval(w(1:npfb))))
         write(6,*) "Max/min roE:",maxval(roE(1:npfb)),minval(roE(1:npfb))
         write(6,*) "Max/min T:",maxval(T(1:npfb)),minval(T(1:npfb))        
-        write(6,*) "max/min ro:",exp(maxval(lnro(1:npfb))),exp(minval(lnro(1:npfb)))   
+        write(6,*) "max/min ro:",maxval(ro(1:npfb)),minval(ro(1:npfb))   
         write(6,*) "Number of threads=",n_threads,"Run time=",t_run
         write(6,*) "run-time/itime=",t_per_dt,"Moving avg=",t_last_X/dble(scr_freq)
         t_last_X = 0.0d0
@@ -219,7 +219,7 @@ contains
         open(unit = 20,file=fname)  
         write(20,*) np_out_local
         do i=1,np_out_local
-           tmpro = exp(lnro(i))
+           tmpro = ro(i)
 #ifndef isoT
            tmpT = T(i)
 #else
@@ -295,10 +295,12 @@ contains
      do i=1,npfb
         x=rp(i,1);y=rp(i,2)
         if(abs(y).le.s(i)) then  !! For nodes within a node-spacing of y=0
-           write(20,*) x,y,u(i),v(i),w(i),exp(lnro(i)),roE(i),T(i),p(i),Yspec(i,1:nspec)
-!write(511,*) x,y,u(i),v(i),w(i),exp(lnro(i)),roE(i),T(i),p(i),Yspec(i,1:nspec)              
+           write(20,*) x,y,u(i),v(i),w(i),ro(i),roE(i),T(i),p(i),Yspec(i,1:nspec)
+!write(511,*) x,y,u(i),v(i),w(i),ro(i),roE(i),T(i),p(i),Yspec(i,1:nspec)              
         end if
      end do
+     flush(20)
+     close(20)
 #endif
     return
   end subroutine output_laminar_flame_structure 

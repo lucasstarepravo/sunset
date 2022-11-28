@@ -33,6 +33,9 @@ module common_parameter
   real(rkind), parameter :: hovs = 2.7d0   !! stencil scale over discretisation scale (h/s)
   real(rkind), parameter :: hovs_bound = 2.4d0 !! as above, reduced near bounds for stability
   real(rkind), parameter :: ss = 2.0d0       !! Stencil size (radius, in multiples of h)
+  
+  !! Boundary condition constants -----------------------------------------------------------------
+  real(rkind), parameter :: outflow_coeff = 2.87d-1
 
   !! Maximum allowable number of species
   integer(ikind), parameter :: nspec_max = 20     
@@ -56,7 +59,7 @@ module common_parameter
   real(rkind),dimension(4),parameter :: rk3_4s_2r_bmbh = rk3_4s_2r_b - rk3_4s_2r_bh
 
   !! Normalisation constants and parameters for PID error estimators (OK for combustion at standard P,T)
-  real(rkind), parameter :: elnro_norm = 1.0d-10
+  real(rkind), parameter :: ero_norm = 1.0d-10
   real(rkind), parameter :: eu_norm = 1.0d-2 
   real(rkind), parameter :: ev_norm = 1.0d-2 !! 1d-6 might be necessary for steadier flows.
   real(rkind), parameter :: ew_norm = 1.0d-2 !! 1d-2 is better for dealing with initial shocks

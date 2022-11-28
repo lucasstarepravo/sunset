@@ -156,10 +156,10 @@ contains
            gradv0(:) = matmul(Jinv,gradv(i,:))           
            
            !! Total stress on surface
-           sigma(1,1) = visc(i)*(fourthirds*gradu0(1)-twothirds*gradv0(2)) - csq*(exp(lnro(i))-one)
+           sigma(1,1) = visc(i)*(fourthirds*gradu0(1)-twothirds*gradv0(2)) - csq*(ro(i)-one)
            sigma(1,2) = visc(i)*(gradu0(2)+gradv0(1))
            sigma(2,1) = visc(i)*(gradu0(2)+gradv0(1))           
-           sigma(2,2) = visc(i)*(fourthirds*gradv0(2)-twothirds*gradu0(1)) - csq*(exp(lnro(i))-one)
+           sigma(2,2) = visc(i)*(fourthirds*gradv0(2)-twothirds*gradu0(1)) - csq*(ro(i)-one)
           
            Fn(:) = matmul(sigma,rnorm(i,:))   !! Force on surface (sigma.n)
                      
@@ -198,7 +198,7 @@ contains
      tot_u = zero
      !$omp parallel do private(tmpro,tmpvel,dVi) reduction(+:tot_vel,tot_vol,tot_u)
      do i=1,npfb
-        tmpro = exp(lnro(i))
+        tmpro = ro(i)
         dVi = s(i)*s(i) !! assume square nodes for now...
 #ifdef dim3
         dVi = dVi*dz
@@ -271,7 +271,7 @@ contains
      tot_mass = zero;tot_vol = zero;tot_roE = zero
      !$omp parallel do private(tmpro,dVi) reduction(+:tot_mass,tot_vol,tot_roE)
      do i=1,npfb
-        tmpro = exp(lnro(i))
+        tmpro = ro(i)
         dVi = s(i)*s(i) !! assume square nodes for now...
 #ifdef dim3
         dVi = dVi*dz
@@ -325,7 +325,7 @@ contains
      tot_vol = zero
      !$omp parallel do private(tmpro,dVi,ispec,tmpY,sumY) reduction(+:tot_Yspec,tot_error,tot_vol)
      do i=1,npfb
-        tmpro = exp(lnro(i))
+        tmpro = ro(i)
         dVi = s(i)*s(i)*L_char*L_char !! assume square nodes for now...
 #ifdef dim3
         dVi = dVi*dz*L_char
@@ -484,7 +484,7 @@ contains
         sum_vol = sum_vol + vol_i
         
         !!
-        sum_ke = sum_ke + exp(lnro(i))*(u(i)**two + v(i)**two + w(i)**two)*vol_i
+        sum_ke = sum_ke + ro(i)*(u(i)**two + v(i)**two + w(i)**two)*vol_i
      end do
      !$omp end parallel do
      

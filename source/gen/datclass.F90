@@ -55,132 +55,10 @@ program datgen
 
   select case (itest) 
 !! ------------------------------------------------------------------------------------------------
-case(1) !! Box for Rayleigh Taylor
-
-     yl=1.0d0;h0=0.125*yl
-     xl=1.0d0
-     dx0=yl/75.0!0.025d0
-     xbcond=1;ybcond=1
-
-     !   JRCK boundary conditions
-     nb_patches = 4
-     allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
-     allocate(b_type(nb_patches))
-     b_type(:) = (/ 3, 3, 3, 3/)  
-     b_node(1,:) = (/-0.5d0*xl,-0.5d0*yl /)
-     b_node(2,:) = (/ 0.5d0*xl,-0.5d0*yl /)
-     b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
-     b_node(4,:) = (/-0.5d0*xl, 0.5d0*yl /)
-     nb_blobs = 0
-!     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,6),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
-!     blob_centre(1,:)=(/0.d0,0.d0/);blob_coeffs(1,:)=h0*(/1.25d0,0.8d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(1)=-pi/6.0d0
-!     blob_ellipse(:)=1
-
-     call make_boundary_edge_vectors
-
-     xb_min = minval(b_node(:,1));xb_max = maxval(b_node(:,1));yb_min = minval(b_node(:,2));yb_max = maxval(b_node(:,2))
-
-     !! outsource making wall particles... JRCK
-     varresratio = 1.0d0
-     dxmax = dx0
-     dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dx_in=dxmax;dx_out=dxmax
-     call make_boundary_particles
-     call make_boundary_blobs               
-     ipart = nb   
-         
-     ! -- fluid particles--
-     nsearch = 2*ceiling((yb_max-yb_min)/dxmin)  !! How far back we search (only last few rows)
-     call random_seed()
-     x=xb_min + 0.5d0*dxmin
-     do while(x.le.xb_max)
-        y=yb_min + 0.5d0*dxmin
-        do while(y.le.yb_max-0.5d0*dxmin)
-
-           keepgoing = .true.
-
-           !! Are we within the object!!?!?!
-           do i=1,nb_blobs
-              temp = sqrt((x-blob_centre(i,1))**2. + (y-blob_centre(i,2))**2.)
-              if(x-blob_centre(i,1).ge.0.0d0)then
-                 tmp2 = asin((y-blob_centre(i,2))/temp)
-              else
-                 tmp2 = pi-asin((y-blob_centre(i,2))/temp)
-              endif              
-              tmp2 = tmp2 - blob_rotation(i)
-              if(blob_ellipse(i).eq.0)then !! blob is blob
-                 r_mag = blob_coeffs(i,1) + blob_coeffs(i,2)*sin(tmp2) + blob_coeffs(i,3)*sin(2.0*tmp2) + &
-                      blob_coeffs(i,4)*sin(3.0*tmp2) + blob_coeffs(i,5)*sin(4.0*tmp2) + blob_coeffs(i,6)*sin(5.0*tmp2)
-              else              !! blob is ellipse
-                 r_mag = blob_coeffs(i,1)*blob_coeffs(i,2) &
-                 /sqrt(blob_coeffs(i,2)*blob_coeffs(i,2)*cos(tmp2)**2. + &
-                   blob_coeffs(i,1)*blob_coeffs(i,1)*sin(tmp2)**2.)                       
-              end if                      
-              if(temp.le.r_mag)then
-                 keepgoing = .false.
-              end if
-           end do
-
-
-           !! What is the local dx (based on a function)        
-           dx = dxmax
-           dist2bound = xb_max-xb_min + 100.0d0
-           !! Find distance from boundaries...
-           i=1
-           do while(i.le.nb.and.keepgoing)
-              tmpN(1) = x - xp(i);tmpN(2) = y - yp(i);temp = sqrt(dot_product(tmpN,tmpN))
-              if(i.gt.nbio.and.temp.le.dist2bound) dist2bound = temp
-              i=i+1
-              if(temp.le.4.25*dxp(i-1)) keepgoing = .false. !! Too close to bound, leave it.
-           end do
-           if(dist2bound.le.0.05d0) then
-              dx = dxmin
-           else if(dist2bound.le.0.25d0)then
-              dx = 0.5d0*(dxmax+dxmin) - 0.5d0*(dxmax-dxmin)*cos((dist2bound-0.05d0)*pi/0.2d0)  
-!              dx = dxmax - (dxmax-dxmin)*exp(-50.0*(dist2bound-5.0*dxmin)**2.0d0)
-           else  
-              dx = dxmax
-           end if
-           
-           !! Are we too close to a boundary?
-           if(x-0.5d0*dx.le.xb_min.or.x+0.5d0*dx.ge.xb_max.or.y-0.5d0*dx.le.yb_min.or.y+0.5d0*dx.ge.yb_max)then
-              keepgoing = .false.
-           end if                
-                   
-           i=ipart  !! Loop backwards, as most likely near recent nodes...
-           do while(keepgoing.and.i.ge.max(nb,ipart-nsearch))  !! Only check the most recent few strips
-              tmpN(1)=x-xp(i)
-              if(abs(tmpN(1)).le.dx)then              
-                 tmpN(2)=y-yp(i)
-                 temp = sqrt(dot_product(tmpN,tmpN))
-                 if(temp.le.0.7d0*dx) keepgoing = .false.
-              end if
-              i=i-1
-           end do
-                               
-           !! if not, place the node
-           if(keepgoing) then
-              ipart = ipart + 1
-              call random_number(temp);temp = temp -0.5d0;xp(ipart)=x + temp*dxmin*0.5d0
-              call random_number(temp);temp = temp -0.5d0;yp(ipart)=y + temp*dxmin*0.5d0       
-              dxp(ipart)=dx
-           end if
-           
-           y=y+dxmin  !! Move a tiny amount
-        end do
-        x=x+dxmin  !! Move a tiny amount...
-        write(6,*) ipart,(x-xb_min)/(xb_max-xb_min)
-     end do  
-
-     npfb = ipart
-     dx0 = maxval(dxp(1:npfb))
-
-     write(*,*) 'nb,npfb= ', nb,npfb,nbio
-
+  case(1)   
+      !! EMPTY
 !! ------------------------------------------------------------------------------------------------
   case(2) !! GRID!
-
-
      yl=0.0125d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
      dx0=xl/1000.0       !15
@@ -505,7 +383,7 @@ case(4) !! A sort of porous media... for porous Rayleigh-Taylor stuff
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.025!0.0125d0  ! channel width
+     yl=0.0125d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
      dx0=xl/1000.0       !15
      xbcond=0;ybcond=1     
@@ -533,7 +411,7 @@ case(5) !! Inflow/outflow tube for simple flames
      varresratio = 1.0d0  !! Ratio for scaling near the solid objects
      dxmax = dx0  
      dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dx_in=2.0d0*dxmax;dx_out=dx0*2.0d0  !! dx for solids and in/outs..
+     dxb=dx0/varresratio;dx_in=1.0d0*dxmax;dx_out=dx0*1.0d0  !! dx for solids and in/outs..
      call make_boundary_particles
      call make_boundary_blobs               
      ipart = nb   
@@ -728,10 +606,10 @@ endif
 case(6) !! Channel flows, propagating front
 
      xl=1.0d0 ! channel length
-     h0=xl/24.0d0   !cylinder radius
-     yl=4.0d0*h0  ! channel width
-     dx0=xl/600.0       !15
-     xbcond=0;ybcond=1     
+     h0=xl/20.0d0   !cylinder radius
+     yl=8.0d0*h0  ! channel width
+     dx0=h0/20.0       !15
+     xbcond=0;ybcond=2     
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -744,7 +622,7 @@ case(6) !! Channel flows, propagating front
      nb_blobs = 1
      allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,6),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
      b0=2.5d0*h0;b1=b0*sqrt(3.0d0)/2.0d0;b2=b0/2.0d0
-     blob_centre(1,:)=(/-1.5d0*h0,0.d0/); !! Central
+     blob_centre(1,:)=(/-0.0d0*h0,0.d0/); !! Central
      do i=1,nb_blobs
         blob_coeffs(i,:)=h0*(/1.0d0,1.0d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0;blob_ellipse(i)=1
      end do
@@ -753,10 +631,10 @@ case(6) !! Channel flows, propagating front
 
      xb_min = minval(b_node(:,1));xb_max = maxval(b_node(:,1));yb_min = minval(b_node(:,2));yb_max = maxval(b_node(:,2))
 
-     varresratio = 4.0d0  !! Ratio for scaling near the solid objects
+     varresratio = 2.0d0  !! Ratio for scaling near the solid objects
      dxmax = dx0  
      dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dx_in=4.0d0*dxmax;dx_out=0.5*dx_in  !! dx for solids and in/outs...!! 
+     dxb=dx0/varresratio;dx_in=2.0d0*dxmax;dx_out=2.0d0*dxmax  !! dx for solids and in/outs...!! 
      call make_boundary_particles
      call make_boundary_blobs               
      ipart = nb   
@@ -802,7 +680,7 @@ case(6) !! Channel flows, propagating front
      
 !! Stretch high-res region downstream of flameholder        
 if((x-blob_centre(1,1)).gt.0.0d0) then
- temp = max(exp(-(x-blob_centre(1,1))/h0),0.4d0)
+ temp = max(exp(-(x-blob_centre(1,1))/h0),1.0d0)
  dist2bound = dist2bound*temp
  dxio = dx_out
 else

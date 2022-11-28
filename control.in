@@ -4,13 +4,13 @@
 0.01d0
 
 !! Characteristic velocity scale (U_char)
-2.05d0
+4.05d0
 
 !! Start and end time (in multiples of L_char/Uchar)
-0.0d0 1.0d0
+0.0d0 3.0d0
 
 !! Output period (in multiples of L_char/U_char)
-0.001d0
+0.01d0
 
 !! Gravity vector (grav)
 0.0d0 0.0d0 0.0d0

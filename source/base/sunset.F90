@@ -119,7 +119,7 @@ subroutine deallocate_everything
   deallocate(rp,s)
   
   !! Primary properties
-  deallocate(u,v,w,lnro,roE,Yspec)
+  deallocate(u,v,w,ro,roE,Yspec)
   
   !! Secondary properties & transport vars
   deallocate(T,p,cp,visc,Rgas_mix)

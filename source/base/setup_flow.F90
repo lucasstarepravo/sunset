@@ -27,9 +27,9 @@ contains
      real(rkind) :: x,y,z,tmp,tmpro     
      
      !! Allocate arrays for properties - primary
-     allocate(u(np),v(np),w(np),lnro(np),roE(np),divvel(np))
+     allocate(u(np),v(np),w(np),ro(np),roE(np),divvel(np))
      allocate(Yspec(np,nspec))
-     u=zero;v=zero;w=zero;lnro=zero;roE=one;Yspec=one;divvel=zero
+     u=zero;v=zero;w=zero;ro=zero;roE=one;Yspec=one;divvel=zero
 
      !! Secondary properties
      allocate(T(np));T=T_ref
@@ -76,7 +76,7 @@ contains
 #endif
      !! =======================================================================
             
-     !! Set energy from lnro,u,Y,T
+     !! Set energy from ro,u,Y,T
      call initialise_energy         
    
      !! Mirrors and halos                        
@@ -447,7 +447,7 @@ contains
      real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z
 
      !! Position and scale     
-     flame_location = zero
+     flame_location = 0.4d0!zero
      flame_thickness = 5.0d-4/L_char !! Scale thickness because position vectors are scaled...
 
      !! Temperatures
@@ -482,10 +482,10 @@ contains
         Rmix_local = Rmix_local*Rgas_universal
         
         !! Density
-        lnro(i) = log(P_flame) - log(Rmix_local) - log(T(i))
+        ro(i) = P_flame/(Rmix_local*T(i))
         
         !! Velocity
-        u(i) = u_reactants*rho_char/exp(lnro(i))
+        u(i) = u_reactants*rho_char/ro(i)
         v(i) = zero
         w(i) = zero
                         
@@ -498,7 +498,7 @@ contains
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! wall initial conditions
               u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
-              T(i) = T_reactants !+ half*half*(T_products-T_reactants)
+              T(i) = T_products !+ half*half*(T_products-T_reactants)
            end if                 
            if(node_type(i).eq.1) then !! inflow initial conditions
               u(i)=u_char                
@@ -512,7 +512,7 @@ contains
   
      return
   end subroutine make_1d_1step_flame
-!! ------------------------------------------------------------------------------------------------
+!! ------------------------------------------------------------------------------------------------ 
   subroutine make_1d_21step_flame
      !! Make a 21 step (9 species) H2-AIR flame. Initial profiles are erf(x').
      integer(ikind) :: i,ispec,j
@@ -569,10 +569,10 @@ contains
         Rmix_local = Rmix_local*Rgas_universal
         
         !! Density
-        lnro(i) = log(P_flame) - log(Rmix_local) - log(T(i))
+        ro(i) = P_flame/(Rmix_local*T(i))
         
         !! Velocity
-        u(i) = u_reactants*rho_char/exp(lnro(i))
+        u(i) = u_reactants*rho_char/ro(i)
         v(i) = zero
         w(i) = zero
                         
@@ -660,10 +660,10 @@ contains
         Rmix_local = Rmix_local*Rgas_universal
         
         !! Density
-        lnro(i) = log(P_flame) - log(Rmix_local) - log(T(i))
+        ro(i) = P_flame/(Rmix_local*T(i))
         
         !! Velocity
-        u(i) = u_reactants*rho_char/exp(lnro(i))
+        u(i) = u_reactants*rho_char/ro(i)
         v(i) = zero
         w(i) = zero
                         
@@ -749,7 +749,7 @@ contains
         cell_pos= x/dx_flamein - dble(j-1)
         
         !! Copy data
-        lnro(i) = log(flamein_ro(j)*(one - cell_pos) + flamein_ro(j+1)*cell_pos)
+        ro(i) = flamein_ro(j)*(one - cell_pos) + flamein_ro(j+1)*cell_pos
         u(i) = flamein_u(j)*(one - cell_pos) + flamein_u(j+1)*cell_pos
         v(i) = flamein_v(j)*(one - cell_pos) + flamein_v(j+1)*cell_pos
         w(i) = flamein_w(j)*(one - cell_pos) + flamein_w(j+1)*cell_pos
@@ -771,7 +771,7 @@ contains
      !$omp parallel do
      do i=npfb+1,np
         roE(i) = roE(1)
-        lnro(i) = lnro(1)
+        ro(i) = ro(1)
         u(i) = u(1);v(i) = v(1);w(i) = w(1)
         Yspec(i,:) = Yspec(1,:)
      end do
@@ -824,16 +824,16 @@ contains
         tmp = -tmp*(one/16.0d0)*(cos(two*x)+cos(two*y))*(two+cos(two*z))        
         T(i) = T_ref
 
-        lnro(i) = log(rho_char + tmp)
+        ro(i) = rho_char + tmp
 
-              
 #ifdef ms    
         tmp = one - half*(one + erf(5.0d0*x))
         Yspec(i,1) = tmp
 #else
         Yspec(i,1) = one
 #endif         
-                    
+
+                   
      end do
      !$OMP END PARALLEL DO
      
@@ -900,7 +900,7 @@ contains
            stop
 #endif
         end if
-        lnro(i) = log(tmpro)
+        ro(i) = tmpro
      end do
      
      !! Re-specify the boundary temperatures

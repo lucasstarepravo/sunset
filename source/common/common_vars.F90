@@ -27,7 +27,7 @@ module common_vars
   real(rkind) :: r_temp_dependence
   
   !! Evolved fluid quantities
-  real(rkind), dimension(:), allocatable, target :: u,v,w,lnro,roE
+  real(rkind), dimension(:), allocatable, target :: u,v,w,ro,roE
   real(rkind), dimension(:,:), allocatable :: Yspec  
   real(rkind), dimension(:),allocatable :: alpha_out
   
@@ -64,7 +64,7 @@ module common_vars
   
   
   !! Right-hand-sides
-  real(rkind),dimension(:),allocatable :: rhs_lnro,rhs_u,rhs_v,rhs_w,rhs_roE
+  real(rkind),dimension(:),allocatable :: rhs_ro,rhs_u,rhs_v,rhs_w,rhs_roE
   real(rkind),dimension(:,:),allocatable :: rhs_Yspec
     
   !! Discretisation properties

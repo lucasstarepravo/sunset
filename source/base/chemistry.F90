@@ -25,7 +25,7 @@ contains
      integer(ikind) :: j,i,ispec,istep,jspec,jstep,ithirdbody,kspec
      real(rkind) :: arrhenius_rate_back,gibbs_tmp,tmpro
      real(rkind) :: mass_production_rate,arrhenius_rate0,arrhenius_rate
-     real(rkind) :: p_reduced,net_rate,logYovW,enthalpy,heat_release
+     real(rkind) :: p_reduced,net_rate,logroYovW,enthalpy,heat_release
      real(rkind),dimension(:,:),allocatable :: rateYspec,gibbs
      real(rkind),dimension(:),allocatable :: rate,third_body_conc,backward_rate
          
@@ -94,7 +94,7 @@ contains
                                       Yspec(i,ispec)* &
                                       one_over_molar_mass(ispec)
               end do
-              third_body_conc(i) = third_body_conc(i)*exp(lnro(i))
+              third_body_conc(i) = third_body_conc(i)*ro(i)
            end do
            !$omp end parallel do           
         else
@@ -133,15 +133,15 @@ contains
         !! At this stage, forward rate contains ln(k) for both regular and Lindemann steps
                    
         !! Finalise forward rate ==============================================
-        !$omp parallel do private(jspec,ispec,logYovW)
+        !$omp parallel do private(jspec,ispec,logroYovW)
         do i=1,npfb
            !! Multiply up each reactant contrib (in log space)
            do jspec = 1,num_reactants(istep)
               ispec = reactant_list(istep,jspec)  !! ispec is the jspec-th reactant of step istep
               
-              logYovW = log(max(Yspec(i,ispec),verysmall)*one_over_molar_mass(ispec))
+              logroYovW = log(ro(i)*max(Yspec(i,ispec),verysmall)*one_over_molar_mass(ispec))
               
-              rate(i) = rate(i) + nu_dash(istep,ispec)*(lnro(i)+logYovW)
+              rate(i) = rate(i) + nu_dash(istep,ispec)*logroYovW
            end do
            !! exponential 
            rate(i) = exp(rate(i))  
@@ -152,7 +152,7 @@ contains
         if(gibbs_rate_flag(istep).eq.1) then
 
            !! Evaluate backwards rate                           
-           !$omp parallel do private(jspec,ispec,logYovW)
+           !$omp parallel do private(jspec,ispec,logroYovW)
            do i=1,npfb
            
               !! Loop over all species in step
@@ -170,10 +170,9 @@ contains
               do jspec = 1,num_products(istep)
                  ispec = product_list(istep,jspec)
                  
-                 logYovW = log(max(Yspec(i,ispec),verysmall)*one_over_molar_mass(ispec))
+                 logroYovW = log(ro(i)*max(Yspec(i,ispec),verysmall)*one_over_molar_mass(ispec))
                  
-                 backward_rate(i) = backward_rate(i) + nu_ddash(istep,ispec)* &
-                                    (lnro(i) + logYovW)           
+                 backward_rate(i) = backward_rate(i) + nu_ddash(istep,ispec)*logroYovW           
               end do
               !! exponential 
               backward_rate(i) = exp(backward_rate(i))
@@ -214,7 +213,7 @@ contains
      !! Add rate onto RHS =====================================================
      !$omp parallel do private(ispec,tmpro,heat_release,mass_production_rate)
      do i=1,npfb       
-        tmpro = exp(-lnro(i))    !! N.B. tmpro holds 1/ro here.
+        tmpro = one/ro(i)    !! N.B. tmpro holds 1/ro here.
      
         !! Zero heat release
         heat_release = zero

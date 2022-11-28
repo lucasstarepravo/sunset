@@ -35,7 +35,7 @@ contains
      i = boundary_list(j)
 
      !! Store the density
-     tmpro = exp(lnro(i))
+     tmpro = ro(i)
 
      !! Store the sound speed
 #ifndef isoT       
@@ -100,10 +100,10 @@ contains
 
   end subroutine specify_characteristics_wall
 !! ------------------------------------------------------------------------------------------------
-  subroutine specify_characteristics_inflow(j,Lchar,gradb_lnro,gradb_p,gradb_u,gradb_v,gradb_w)
+  subroutine specify_characteristics_inflow(j,Lchar,gradb_ro,gradb_p,gradb_u,gradb_v,gradb_w)
      integer(ikind),intent(in) :: j
      real(rkind),dimension(:),intent(inout) :: Lchar
-     real(rkind),dimension(:),intent(in) :: gradb_lnro,gradb_p,gradb_u,gradb_v,gradb_w
+     real(rkind),dimension(:),intent(in) :: gradb_ro,gradb_p,gradb_u,gradb_v,gradb_w
      integer(ikind) :: i,ispec
      real(rkind) :: tmpro,c,gammagasm1,gammagas
      
@@ -111,7 +111,7 @@ contains
      i = boundary_list(j)
 
      !! Store the density
-     tmpro = exp(lnro(i))
+     tmpro = ro(i)
 
      !! Store the sound speed
 #ifndef isoT       
@@ -156,9 +156,9 @@ contains
     gammagas = cp(i)/(cp(i)-Rgas_mix(i))
     gammagasm1 = gammagas - one
     Lchar(2) = (T_bound(j)-T(i))*c*0.278d0/L_domain_x/gammagas &  !! Track T_bound(j)
-             - (v(i)*gradb_lnro(2)*tmpro + tmpro*gradb_v(2) + &
+             - (v(i)*gradb_ro(2) + tmpro*gradb_v(2) + &
                 v(i)*gradb_p(2)/c/c + gammagas*p(i)*gradb_v(2)/c/c) &
-             - (w(i)*gradb_lnro(3)*tmpro + tmpro*gradb_w(3) + &
+             - (w(i)*gradb_ro(3) + tmpro*gradb_w(3) + &
                 w(i)*gradb_p(3)/c/c + gammagas*p(i)*gradb_w(3)/c/c)
              !! + visc + source terms TBC
     Lchar(3) = v(i)*0.278d0*c/L_domain_x &        !! track v=zero
@@ -194,8 +194,8 @@ contains
              
     !! Fixed density (and hence mass flux) option             
     Lchar(2) = -Lchar(1)/c/c &
-               -tmpro*v(i)*gradb_lnro(2) - tmpro*gradb_v(2) &  !! trans 1 term
-               -tmpro*w(i)*gradb_lnro(3) - tmpro*gradb_w(3)    !! trans 2 term
+               -v(i)*gradb_ro(2) - tmpro*gradb_v(2) &  !! trans 1 term
+               -w(i)*gradb_ro(3) - tmpro*gradb_w(3)    !! trans 2 term
 
 #ifdef ms
     Lchar(5+1:5+nspec) = zero                                  
@@ -217,7 +217,7 @@ contains
      i = boundary_list(j)
 
      !! Store the density
-     tmpro = exp(lnro(i))
+     tmpro = ro(i)
      
      !! Store the sound speed
 #ifndef isoT       
@@ -246,7 +246,7 @@ contains
      if(u(i).le.c) then !! Subsonic. If supersonic, just use L1 from definition...
      
         gammagas = cp(i)/(cp(i)-Rgas_mix(i))     
-        Lchar(1) = (p(i)-p_outflow)*0.278d0*c*(one)/two/L_domain_x &                               !! track p_outflow
+        Lchar(1) = (p(i)-p_outflow)*outflow_coeff*c*(one)/two/L_domain_x &                               !! track p_outflow
                  - (one-u(i)/c)*half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2) - &
                                       tmpro*c*v(i)*gradb_u(2)) & !! trans1 conv.
                  - (one-u(i)/c)*half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3) - &

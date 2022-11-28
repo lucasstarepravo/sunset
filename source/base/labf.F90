@@ -253,6 +253,7 @@ contains
            ij_w_grad(2,k,i) = dot_product(bvecy,gvec)
            ij_w_lap(k,i) = dot_product(bvecxx+bvecyy,gvec)
            ij_w_hyp(k,i) = dot_product(bvechyp,gvec)
+           
         end do
         
         write(2,*) "" !! Temporary fix for a weird openblas/lapack/openmp bug 

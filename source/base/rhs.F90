@@ -12,7 +12,7 @@ module rhs
   !! calls to specific thermodynamics routines.
   
   !! Although separate subroutines, they must be called in correct order, as they rely
-  !! on each other (e.g. divvel calculated in calc_rhs_lnro, also used in calc_rhs_vel)
+  !! on each other (e.g. divvel calculated in calc_rhs_ro, also used in calc_rhs_vel)
   
   !! We use the lists internal_list and boundary_list to loop through internal and boundary
   !! nodes respectively. The L arrays for boundaries run from 1 to nb, and so use index j
@@ -31,7 +31,7 @@ module rhs
   public calc_all_rhs,filter_variables
 
   !! Allocatable arrays for 1st and 2nd gradients
-  real(rkind),dimension(:,:),allocatable :: gradlnro,gradp  !! Velocity gradients defined in common, as used elsewhere too
+  real(rkind),dimension(:,:),allocatable :: gradro,gradp  !! Velocity gradients defined in common, as used elsewhere too
   real(rkind),dimension(:,:),allocatable :: gradroE
   real(rkind),dimension(:,:),allocatable :: graddivvel
   real(rkind),dimension(:),allocatable :: lapu,lapv,lapw
@@ -42,7 +42,7 @@ module rhs
   real(rkind),dimension(:),allocatable :: enth
   real(rkind),dimension(:,:),allocatable :: grad_enth
   
-  real(rkind) :: dlnrodn,dlnrodt,dundn,dundt,dutdn,dutdt,dpdn,dpdt
+  real(rkind) :: drodn,drodt,dundn,dundt,dutdn,dutdt,dpdn,dpdt
   real(rkind) :: xn,yn,un,ut
   
   !! Characteristic boundary condition formulation
@@ -79,12 +79,12 @@ contains
      end if
 
      !! Initialise right hand sides to zero
-     rhs_lnro=zero;rhs_u=zero;rhs_v=zero;rhs_w=zero;rhs_roE=zero;rhs_Yspec=zero
+     rhs_ro=zero;rhs_u=zero;rhs_v=zero;rhs_w=zero;rhs_roE=zero;rhs_Yspec=zero
      
      !! Calculate derivatives of primary variables
-     allocate(gradlnro(npfb,dims));gradlnro=zero  
+     allocate(gradro(npfb,dims));gradro=zero  
      allocate(gradu(npfb,dims),gradv(npfb,dims),gradw(npfb,dims));gradw=zero
-     call calc_gradient(lnro,gradlnro)     
+     call calc_gradient(ro,gradro)     
      call calc_gradient(u,gradu)
      call calc_gradient(v,gradv)     
 #ifdef dim3
@@ -103,7 +103,7 @@ contains
      !! Call individual routines to build the RHSs
      !! N.B. second derivatives and derivatives of secondary variables are calculated within
      !! these subroutines
-     call calc_rhs_lnro
+     call calc_rhs_ro
      call calc_rhs_Yspec
      call calc_rhs_vel
      call calc_rhs_roE
@@ -127,7 +127,7 @@ contains
      end if    
      
      !! Clear space no longer required
-     deallocate(gradlnro,gradu,gradv,gradw,gradp)
+     deallocate(gradro,gradu,gradv,gradw,gradp)
 #ifndef isoT     
      deallocate(gradroE)
      deallocate(gradT)
@@ -143,8 +143,8 @@ contains
      return
   end subroutine calc_all_rhs
 !! ------------------------------------------------------------------------------------------------
-  subroutine calc_rhs_lnro
-     !! Construct the RHS for lnro-equation
+  subroutine calc_rhs_ro
+     !! Construct the RHS for ro-equation
      integer(ikind) :: i,j
      real(rkind),dimension(dims) :: tmp_vec
      real(rkind) :: tmp_scal
@@ -154,10 +154,10 @@ contains
      do j=1,npfb-nb
         i=internal_list(j)
         tmp_vec(1) = u(i);tmp_vec(2) = v(i);tmp_vec(3)= w(i)
-        tmp_scal = dot_product(tmp_vec,gradlnro(i,:))
+        tmp_scal = dot_product(tmp_vec,gradro(i,:))
 !        divvel(i) = gradu(i,1) + gradv(i,2) + gradw(i,3)
 
-        rhs_lnro(i) = -divvel(i) - tmp_scal  
+        rhs_ro(i) = -ro(i)*divvel(i) - tmp_scal  
      end do
      !$omp end parallel do
 
@@ -166,23 +166,22 @@ contains
         !$omp parallel do private(i,tmp_scal,xn,yn,un,ut,dutdt)
         do j=1,nb
            i=boundary_list(j)
-           tmp_scal = exp(lnro(i))
            if(node_type(i).eq.0)then  !! in bound norm coords for walls
               xn=rnorm(i,1);yn=rnorm(i,2)
               un = u(i)*xn + v(i)*yn; ut = -u(i)*yn + v(i)*xn  !! Normal and transverse components of velocity           
               dutdt = -yn*gradu(i,2)+xn*gradv(i,2) !! Transverse derivative of transverse velocity...
               
 
-              rhs_lnro(i) = - dutdt - gradw(i,3)
+              rhs_ro(i) = - ro(i)*dutdt - gradw(i,3)
            else !! In x-y coords for inflow, outflow
-              rhs_lnro(i) = -v(i)*gradlnro(i,2) - gradv(i,2) - w(i)*gradlnro(i,3) - gradw(i,3)
+              rhs_ro(i) = -v(i)*gradro(i,2) - ro(i)*gradv(i,2) - w(i)*gradro(i,3) - ro(i)*gradw(i,3)
            end if         
         end do
         !$omp end parallel do 
      end if       
 
      return
-  end subroutine calc_rhs_lnro
+  end subroutine calc_rhs_ro
 !! ------------------------------------------------------------------------------------------------  
   subroutine calc_rhs_Yspec
      !! Construct the RHS for species Yspec equation
@@ -221,7 +220,7 @@ contains
         !$omp dcpdT,cpispec,tmpro)
         do j=1,npfb-nb
            i=internal_list(j)
-           tmpro = exp(-lnro(i)) !! tmpro contains 1/ro
+           tmpro = one/ro(i) !! tmpro contains 1/ro
            tmp_vec(1) = u(i);tmp_vec(2) = v(i);tmp_vec(3) = w(i)
 
            !! Advection term                    
@@ -278,7 +277,7 @@ contains
            !$omp ,gradroMdiff,divroDgradY,enthalpy,grad_enthalpy,tmpro,cpispec,dcpdT)
            do j=1,nb
               i=boundary_list(j)
-              tmpro = exp(-lnro(i))  !! tmpro contains 1/ro
+              tmpro = one/ro(i)  !! tmpro contains 1/ro
               
               !! Evaluate gradient of molecular diffusivity              
 #ifndef isoT                 
@@ -353,7 +352,7 @@ contains
      !! Run through species again and finalise rhs and diffusion store for energy
      !$omp parallel do private(enthalpy,grad_enthalpy,tmpro,ispec)
      do i=1,npfb
-        tmpro = exp(-lnro(i)) !! tmpro contains 1/ro
+        tmpro = one/ro(i) !! tmpro contains 1/ro
         do ispec=1,nspec                                
 
            !! Add the diffusion correction term to the rhs
@@ -419,7 +418,7 @@ contains
      !! Evaluate the pressure gradient (from density gradient
      !$omp parallel do
      do i=1,npfb  
-        gradp(i,:) = p(i)*gradlnro(i,:)  !! N.B. not precisely correct for isothermal multispec
+        gradp(i,:) = csq*gradro(i,:)  !! N.B. not precisely correct for isothermal multispec
      end do
      !$omp end parallel do
 #endif                           
@@ -454,7 +453,7 @@ contains
 #endif        
       
         !! Local density 
-        tmpro = exp(lnro(i));one_over_ro = one/tmpro
+        tmpro = ro(i);one_over_ro = one/tmpro
 
         !! Body force
         body_force_u = grav(1) + driving_force(1)*one_over_ro
@@ -492,7 +491,7 @@ contains
         !$omp ,dpdn,dundn,dutdn,gradvisc,one_over_ro,f_visc_w)
         do j=1,nb
            i=boundary_list(j)
-           tmpro = exp(lnro(i));one_over_ro = one/tmpro
+           tmpro = ro(i);one_over_ro = one/tmpro
 #ifndef isoT           
            c=evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
 #else
@@ -507,7 +506,7 @@ contains
               dutdn = -yn*gradu(i,1)+xn*gradv(i,1)
 
               L(j,1) = half*(un-c)*(dpdn - tmpro*c*dundn) !! L1 
-              L(j,2) = un*(tmpro*gradlnro(i,1) - gradp(i,1)/c/c)
+              L(j,2) = un*(gradro(i,1) - gradp(i,1)/c/c)
               L(j,3) = un*dutdn !! L3 
               L(j,4) = un*(gradw(i,1)*xn + gradw(i,2)*yn) !! L4
               L(j,5) = half*(un+c)*(dpdn + tmpro*c*dundn) !! L5 
@@ -524,7 +523,7 @@ contains
            else    !! In/out is in x-y coord system
 
               L(j,1) = half*(u(i)-c)*(dpdn - tmpro*c*gradu(i,1))
-              L(j,2) = un*(tmpro*gradlnro(i,1) - gradp(i,1)/c/c)
+              L(j,2) = u(i)*(gradro(i,1) - gradp(i,1)/c/c)
               L(j,3) = u(i)*gradv(i,1)
               L(j,4) = u(i)*gradw(i,1)
               L(j,5) = half*(u(i)+c)*(dpdn + tmpro*c*gradu(i,1))
@@ -695,7 +694,7 @@ contains
     !! This routine asks boundaries module to prescribe L as required, then builds the final 
     !! rhs for each equation. It should only be called if nb.ne.0
     integer(ikind) :: i,j,ispec
-    real(rkind) :: tmpro,c,tmp_scal,cv,gammagasm1
+    real(rkind) :: tmpro,c,tmp_scal,cv,gammagasm1,enthalpy
            
     !! Loop over boundary nodes and specify L as required
     !$omp parallel do private(i)
@@ -708,7 +707,7 @@ contains
 
        !! INFLOW BOUNDARY
        else if(node_type(i).eq.1) then 
-          call specify_characteristics_inflow(j,L(j,:),gradlnro(i,:),gradp(i,:),gradu(i,:),gradv(i,:),gradw(i,:))       
+          call specify_characteristics_inflow(j,L(j,:),gradro(i,:),gradp(i,:),gradu(i,:),gradv(i,:),gradw(i,:))       
  
        !! OUTFLOW BOUNDARY 
        else if(node_type(i).eq.2) then   
@@ -719,10 +718,10 @@ contains
     
     !! ==================================================================================
     !! Use L to update the rhs on boundary nodes
-    !$omp parallel do private(i,tmpro,c,tmp_scal,cv,ispec,gammagasm1)
+    !$omp parallel do private(i,tmpro,c,tmp_scal,cv,ispec,gammagasm1,enthalpy)
     do j=1,nb
        i=boundary_list(j)
-       tmpro = exp(lnro(i))
+       tmpro = ro(i)
 #ifndef isoT       
        c=evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
        gammagasm1 = Rgas_mix(i)/(cp(i)-Rgas_mix(i))
@@ -730,11 +729,11 @@ contains
        c=sqrt(csq)
 #endif       
 
-       !! This quantity appears in rhs_lnro and rhs_roE, so save in tmp_scal
+       !! This quantity appears in rhs_ro and rhs_roE, so save in tmp_scal
        tmp_scal = (c*c*L(j,2) + L(j,5) + L(j,1))/c/c
        
        !! RHS for density logarithm
-       rhs_lnro(i) = rhs_lnro(i) - tmp_scal/tmpro
+       rhs_ro(i) = rhs_ro(i) - tmp_scal
 
        !! Velocity components       
        rhs_u(i) = rhs_u(i) - (L(j,5)-L(j,1))/(tmpro*c)       
@@ -752,6 +751,16 @@ contains
 #ifdef ms
        do ispec=1,nspec
           rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) - L(j,5+ispec) 
+          
+#ifndef isoT
+          !! Evaluate enthalpy
+          call evaluate_enthalpy_only_at_node(T(i),ispec,enthalpy)            
+
+          !! Reduced enthalpy
+          enthalpy = enthalpy - cp(i)*T(i)*Rgas_universal*one_over_molar_mass(ispec)/Rgas_mix(i)
+
+          rhs_roE(i) = rhs_roE(i) - tmpro*enthalpy*L(j,5+ispec)
+#endif          
        end do
 #endif          
     end do
@@ -764,13 +773,13 @@ contains
 !! ------------------------------------------------------------------------------------------------  
   subroutine filter_variables
      !! This routine calls the specific filtering routine (within derivatives module) for each
-     !! variable - lnro,u,v,w,roE,Yspec - and forces certain values on boundaries as required.
+     !! variable - ro,u,v,w,roE,Yspec - and forces certain values on boundaries as required.
      integer(ikind) :: ispec
       
      segment_tstart = omp_get_wtime()
      
-     !! Filter density logarithm
-     call calc_filtered_var(lnro)
+     !! Filter density
+     call calc_filtered_var(ro)
      
      !! Filter velocity components
      call calc_filtered_var(u)

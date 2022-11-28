@@ -243,7 +243,7 @@ contains
      do j=npfb+1,np
 #endif
         i = irelation(j)
-        lnro(j) = lnro(i)
+        ro(j) = ro(i)
         if(vrelation(j).eq.1)then
            u(j) = u(i)
            v(j) = v(i) 
@@ -263,7 +263,7 @@ contains
         
         !! Calculate hydrostatic energy gradient
         rij = rp(j,:)-rp(i,:)
-        delta_roE = exp(lnro(i))*dot_product(grav,rij)!/gammagasm1  MODIFY
+        delta_roE = ro(i)*dot_product(grav,rij)!/gammagasm1  MODIFY
          
         roE(j) = roE(i) + delta_roE
 #ifdef ms
