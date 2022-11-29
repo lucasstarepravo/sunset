@@ -447,7 +447,7 @@ contains
      real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z
 
      !! Position and scale     
-     flame_location = 0.4d0!zero
+     flame_location = 0.25d0!zero
      flame_thickness = 5.0d-4/L_char !! Scale thickness because position vectors are scaled...
 
      !! Temperatures
@@ -466,7 +466,8 @@ contains
         
         !! Error function based progress variable
         c = half*(one + erf((x-flame_location)/flame_thickness))
-        
+        c = exp(-((x-flame_location)/flame_thickness)**two)
+                
         !! Temperature profile
         T(i) = T_reactants + (T_products - T_reactants)*c
         
@@ -485,7 +486,7 @@ contains
         ro(i) = P_flame/(Rmix_local*T(i))
         
         !! Velocity
-        u(i) = u_reactants*rho_char/ro(i)
+        u(i) = u_reactants!*rho_char/ro(i)
         v(i) = zero
         w(i) = zero
                         

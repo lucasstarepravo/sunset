@@ -211,7 +211,7 @@ contains
      end do !! End of steps loop ==============================================
          
      !! Add rate onto RHS =====================================================
-     !$omp parallel do private(ispec,tmpro,heat_release,mass_production_rate)
+     !$omp parallel do private(ispec,tmpro,heat_release)
      do i=1,npfb       
         tmpro = one/ro(i)    !! N.B. tmpro holds 1/ro here.
      
@@ -222,10 +222,10 @@ contains
         do ispec = 1,nspec
         
            !! Convert from molar to mass production rate
-           mass_production_rate = rateYspec(i,ispec)*molar_mass(ispec)
+           rateYspec(i,ispec) = rateYspec(i,ispec)*molar_mass(ispec)
         
            !! Augment the RHS of Yspec for species ispec
-           rhs_yspec(i,ispec) = rhs_Yspec(i,ispec) + mass_production_rate*tmpro           
+           rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) + rateYspec(i,ispec)*tmpro           
                               
            !! Augment the heat release (production rate x enthalpy of formation)
            heat_release = heat_release - mass_production_rate*coef_h(ispec,polyorder_cp+2)
@@ -239,17 +239,16 @@ alpha_out(i) = heat_release
 
      !! Build contribution to source terms for boundary conditions ============
      if(nb.ne.0) then
-        allocate(sumoverspecies_homega(nb))
-        allocate(reaction_rate_bound(nb,nspec))
-        !$omp parallel do private(j,ispec,enthalpy)
+        allocate(sumoverspecies_homega(nb));sumoverspecies_homega=zero
+        allocate(reaction_rate_bound(nb,nspec));reaction_rate_bound=zero
+        !$omp parallel do private(i,ispec,enthalpy)
         do j=1,nb
            i=boundary_list(j)
               
-           sumoverspecies_homega(j) = zero
            !! Loop over species
            do ispec=1,nspec                                    
               !! Store the reaction rate on the boundary
-              reaction_rate_bound(j,ispec) = rateYspec(i,ispec)*molar_mass(ispec)                                     
+              reaction_rate_bound(j,ispec) = rateYspec(i,ispec)                                   
               
               !! Evaluate enthalpy of species ispec
               call evaluate_enthalpy_only_at_node(T(i),ispec,enthalpy)           
@@ -259,7 +258,7 @@ alpha_out(i) = heat_release
            
               !! Augment sum of reduced_h*omega
               sumoverspecies_homega(j) = sumoverspecies_homega(j) + &
-                                      enthalpy*reaction_rate_bound(j,ispec)        
+                                      enthalpy*rateYspec(i,ispec)        
               
            end do
         end do

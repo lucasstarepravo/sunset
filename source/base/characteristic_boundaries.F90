@@ -256,7 +256,8 @@ contains
 #ifdef react
         Lchar(1) = Lchar(1) - half*(gammagas-one)*sumoverspecies_homega(j)
 #endif
-              
+      
+if(iRKstep.eq.1.and.j.eq.1) write(711,*) time,p(i)              
      end if
      !Lchar(2) is outgoing
      !Lchar(3) is outgoing
@@ -268,8 +269,12 @@ contains
      !! Sometimes we have a little inflow at an outflow boundary. In this case, set Lchar(3)=Lchar(4)=zero
      !! to suppress shear 
      if(u(i).le.zero) then
+        Lchar(2)=zero !! no incoming entropy
         Lchar(3)=zero !! no incoming shear if outflow velocity is zero...
         Lchar(4)=zero
+#ifdef ms
+        Lchar(6:5+nspec)=zero !! No incoming composition waves??
+#endif        
      end if   
          
 

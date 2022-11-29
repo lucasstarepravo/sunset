@@ -27,7 +27,7 @@ module common_vars
   real(rkind) :: r_temp_dependence
   
   !! Evolved fluid quantities
-  real(rkind), dimension(:), allocatable, target :: u,v,w,ro,roE
+  real(rkind), dimension(:), allocatable, target :: rou,rov,row,ro,roE
   real(rkind), dimension(:,:), allocatable :: Yspec  
   real(rkind), dimension(:),allocatable :: alpha_out
   
@@ -35,7 +35,7 @@ module common_vars
   integer(ikind) :: nspec
      
   !! Secondary fluid quantities
-  real(rkind), dimension(:), allocatable, target :: p,T
+  real(rkind), dimension(:), allocatable, target :: p,T,u,v,w
   real(rkind), dimension(:), allocatable :: divvel  
   
   !! Transport properties
