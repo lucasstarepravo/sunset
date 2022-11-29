@@ -27,13 +27,14 @@ contains
      real(rkind) :: x,y,z,tmp,tmpro     
      
      !! Allocate arrays for properties - primary
-     allocate(u(np),v(np),w(np),ro(np),roE(np),divvel(np))
+     allocate(rou(np),rov(np),row(np),ro(np),roE(np),divvel(np))
      allocate(Yspec(np,nspec))
-     u=zero;v=zero;w=zero;ro=zero;roE=one;Yspec=one;divvel=zero
+     rou=zero;rov=zero;row=zero;ro=zero;roE=one;Yspec=one;divvel=zero
 
      !! Secondary properties
      allocate(T(np));T=T_ref
      allocate(p(np));p=zero
+     allocate(u(np),v(np),w(np));u=zero;v=zero;w=zero
      allocate(alpha_out(np));alpha_out = zero     
      
      !! Transport properties
@@ -77,7 +78,16 @@ contains
      !! =======================================================================
             
      !! Set energy from ro,u,Y,T
-     call initialise_energy         
+     call initialise_energy      
+     
+     !! Convert from velocity to momentum
+     !$omp parallel do
+     do i=1,np
+        rou(i) = ro(i)*u(i)
+        rov(i) = ro(i)*v(i)
+        row(i) = ro(i)*w(i)                
+     end do
+     !$omp end parallel do   
    
      !! Mirrors and halos                        
      call reapply_mirror_bcs

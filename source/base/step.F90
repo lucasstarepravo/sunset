@@ -28,7 +28,7 @@ module step
          set_tstep_PID
   
   !! Error norms for RK3(2)4S[2R+]C scheme
-  real(rkind) :: enrm_ro,enrm_u,enrm_v,enrm_E,enrm_w
+  real(rkind) :: enrm_ro,enrm_rou,enrm_rov,enrm_E,enrm_row
   real(rkind),dimension(nspec_max) :: enrm_Yspec
 
 contains
@@ -40,13 +40,13 @@ contains
      !! Implemented over three registers, because speed is more
      !! important than memory at present.    
      
-     !! Register 1 is ro_reg1,u_reg1,v_reg1 etc
+     !! Register 1 is ro_reg1,rou_reg1,rov_reg1 etc
      !! Register 2 is ro,u,v etc
-     !! Register 3 is rhs_ro, rhs_u, rhs_v etc
+     !! Register 3 is rhs_ro, rhs_rou, rhs_rov etc
      use derivatives
      integer(ikind) :: i,k,ispec
      real(rkind) :: time0
-     real(rkind),dimension(:),allocatable :: u_reg1,v_reg1,w_reg1,ro_reg1,roE_reg1
+     real(rkind),dimension(:),allocatable :: rou_reg1,rov_reg1,row_reg1,ro_reg1,roE_reg1
      real(rkind),dimension(:,:),allocatable :: Yspec_reg1
      real(rkind),dimension(3) :: RKa
      real(rkind),dimension(4) :: RKb
@@ -55,14 +55,14 @@ contains
      RKa(:) = dt*rk3_4s_2r_a(:)
      RKb(:) = dt*rk3_4s_2r_b(:)
 
-     allocate(u_reg1(npfb),v_reg1(npfb),ro_reg1(npfb),roE_reg1(npfb),w_reg1(npfb))
-     allocate(rhs_u(npfb),rhs_v(npfb),rhs_ro(npfb),rhs_roE(npfb),rhs_w(npfb))
+     allocate(rou_reg1(npfb),rov_reg1(npfb),ro_reg1(npfb),roE_reg1(npfb),row_reg1(npfb))
+     allocate(rhs_rou(npfb),rhs_rov(npfb),rhs_ro(npfb),rhs_roE(npfb),rhs_row(npfb))
      allocate(Yspec_reg1(npfb,nspec),rhs_Yspec(npfb,nspec))
 
      !! Store primary variables in register 1 (w-register)
      !$omp parallel do private(ispec)
      do i=1,npfb
-        ro_reg1(i)=ro(i);u_reg1(i)=u(i);v_reg1(i)=v(i);w_reg1(i)=w(i);roE_reg1(i)=roE(i)
+        ro_reg1(i)=ro(i);rou_reg1(i)=rou(i);rov_reg1(i)=rov(i);row_reg1(i)=row(i);roE_reg1(i)=roE(i)
         do ispec=1,nspec
            Yspec_reg1(i,ispec) = Yspec(i,ispec)
         end do
@@ -83,9 +83,9 @@ contains
         do i=1,npfb
            !! Store next U in register 2
            ro(i) = ro_reg1(i) + RKa(k)*rhs_ro(i)
-           u(i) = u_reg1(i) + RKa(k)*rhs_u(i)
-           v(i) = v_reg1(i) + RKa(k)*rhs_v(i)
-           w(i) = w_reg1(i) + RKa(k)*rhs_w(i)           
+           rou(i) = rou_reg1(i) + RKa(k)*rhs_rou(i)
+           rov(i) = rov_reg1(i) + RKa(k)*rhs_rov(i)
+           row(i) = row_reg1(i) + RKa(k)*rhs_row(i)           
 #ifndef isoT           
            roE(i) = roE_reg1(i) + RKa(k)*rhs_roE(i)
 #endif
@@ -97,9 +97,9 @@ contains
 
            !! Store next S in register 1
            ro_reg1(i) = ro_reg1(i) + RKb(k)*rhs_ro(i)
-           u_reg1(i) = u_reg1(i) + RKb(k)*rhs_u(i)
-           v_reg1(i) = v_reg1(i) + RKb(k)*rhs_v(i) 
-           w_reg1(i) = w_reg1(i) + RKb(k)*rhs_w(i)            
+           rou_reg1(i) = rou_reg1(i) + RKb(k)*rhs_rou(i)
+           rov_reg1(i) = rov_reg1(i) + RKb(k)*rhs_rov(i) 
+           row_reg1(i) = row_reg1(i) + RKb(k)*rhs_row(i)            
 #ifndef isoT
            roE_reg1(i) = roE_reg1(i) + RKb(k)*rhs_roE(i)
 #endif
@@ -115,6 +115,9 @@ contains
         call apply_time_dependent_bounds        
         call reapply_mirror_bcs
         call halo_exchanges_all
+        
+        !! Get velocity from momentum
+        call get_velocity_from_momentum
         
         !! Velocity divergence
         call calc_divergence(u,v,w,divvel(1:npfb))
@@ -132,9 +135,9 @@ contains
      do i=1,npfb
         !! Final values of prim vars
         ro(i) = ro_reg1(i) + RKb(4)*rhs_ro(i)
-        u(i) = u_reg1(i) + RKb(4)*rhs_u(i)
-        v(i) = v_reg1(i) + RKb(4)*rhs_v(i)
-        w(i) = w_reg1(i) + RKb(4)*rhs_w(i)        
+        rou(i) = rou_reg1(i) + RKb(4)*rhs_rou(i)
+        rov(i) = rov_reg1(i) + RKb(4)*rhs_rov(i)
+        row(i) = row_reg1(i) + RKb(4)*rhs_row(i)        
 #ifndef isoT
         roE(i) = roE_reg1(i) + RKb(4)*rhs_roE(i)
 #endif
@@ -147,8 +150,8 @@ contains
      !$omp end parallel do  
 
      !! Deallocation
-     deallocate(u_reg1,v_reg1,w_reg1,ro_reg1,roE_reg1,Yspec_reg1)
-     deallocate(rhs_u,rhs_v,rhs_w,rhs_ro,rhs_roE,rhs_Yspec)     
+     deallocate(rou_reg1,rov_reg1,row_reg1,ro_reg1,roE_reg1,Yspec_reg1)
+     deallocate(rhs_rou,rhs_rov,rhs_row,rhs_ro,rhs_roE,rhs_Yspec)     
 
      !! Set the new time   
      time = time0 + dt
@@ -165,6 +168,9 @@ contains
      call apply_time_dependent_bounds
      call reapply_mirror_bcs
      call halo_exchanges_all
+     
+     !! Get velocity from momentum
+     call get_velocity_from_momentum     
 
      !! Velocity divergence
      call calc_divergence(u,v,w,divvel(1:npfb))
@@ -175,6 +181,23 @@ contains
      return
   end subroutine step_rk3_4S_2R
 !! ------------------------------------------------------------------------------------------------
+  subroutine get_velocity_from_momentum
+     !! Divide momentum by density to get velocities
+     integer(ikind) :: i
+     real(rkind) :: ooro
+     
+     !$omp parallel do private(ooro)
+     do i=1,np
+        ooro = one/ro(i)
+        u(i) = rou(i)*ooro
+        v(i) = rov(i)*ooro
+        w(i) = row(i)*ooro
+     end do
+     !$omp end parallel do
+     
+     return
+  end subroutine get_velocity_from_momentum  
+!! ------------------------------------------------------------------------------------------------
   subroutine step_rk3_4S_2R_EE
      use derivatives  
      !! 3rd order 4step 2 register Runge Kutta, with embedded 2nd order
@@ -184,14 +207,14 @@ contains
      !! Implemented over three registers, because speed is more
      !! important than memory at present.    
      
-     !! Register 1 is ro_reg1,u_reg1,v_reg1 etc
+     !! Register 1 is ro_reg1,rou_reg1,rov_reg1 etc
      !! Register 2 is ro,u,v etc...
-     !! Register 3 is rhs_ro,rhs_u,rhs_v (only used for RHS)
-     !! Register 4 is e_acc_ro,e_acc_u,e_acc_v - error accumulator
+     !! Register 3 is rhs_ro,rhs_rou,rhs_rov (only used for RHS)
+     !! Register 4 is e_acc_ro,e_acc_rou,e_acc_rov - error accumulator
      integer(ikind) :: i,k,ispec
      real(rkind) :: time0,emax_Y,tmpro
-     real(rkind),dimension(:),allocatable :: u_reg1,v_reg1,w_reg1,ro_reg1,roE_reg1
-     real(rkind),dimension(:),allocatable :: e_acc_ro,e_acc_u,e_acc_v,e_acc_E,e_acc_w
+     real(rkind),dimension(:),allocatable :: rou_reg1,rov_reg1,row_reg1,ro_reg1,roE_reg1
+     real(rkind),dimension(:),allocatable :: e_acc_ro,e_acc_rou,e_acc_rov,e_acc_E,e_acc_row
      real(rkind),dimension(:,:),allocatable :: Yspec_reg1,e_acc_Yspec
      real(rkind),dimension(3) :: RKa
      real(rkind),dimension(4) :: RKb,RKbmbh
@@ -204,16 +227,16 @@ contains
      RKb(:) = dt*rk3_4s_2r_b(:)
      RKbmbh(:) = dt*rk3_4s_2r_bmbh(:)
 
-     allocate(u_reg1(npfb),v_reg1(npfb),ro_reg1(npfb),roE_reg1(npfb),w_reg1(npfb))
-     allocate(rhs_u(npfb),rhs_v(npfb),rhs_ro(npfb),rhs_roE(npfb),rhs_w(npfb))
-     allocate(e_acc_ro(npfb),e_acc_u(npfb),e_acc_v(npfb),e_acc_E(npfb),e_acc_w(npfb))
+     allocate(rou_reg1(npfb),rov_reg1(npfb),ro_reg1(npfb),roE_reg1(npfb),row_reg1(npfb))
+     allocate(rhs_rou(npfb),rhs_rov(npfb),rhs_ro(npfb),rhs_roE(npfb),rhs_row(npfb))
+     allocate(e_acc_ro(npfb),e_acc_rou(npfb),e_acc_rov(npfb),e_acc_E(npfb),e_acc_row(npfb))
      allocate(Yspec_reg1(npfb,nspec),rhs_Yspec(npfb,nspec),e_acc_Yspec(npfb,nspec))
-     e_acc_ro=zero;e_acc_u=zero;e_acc_v=zero;e_acc_E=zero;e_acc_Yspec=zero;e_acc_w=zero
+     e_acc_ro=zero;e_acc_rou=zero;e_acc_rov=zero;e_acc_E=zero;e_acc_Yspec=zero;e_acc_row=zero
      
      !! Store prim vars in register 1 (w-register)
      !$omp parallel do private(ispec)
      do i=1,npfb
-        ro_reg1(i)=ro(i);u_reg1(i)=u(i);v_reg1(i)=v(i);w_reg1(i)=w(i);roE_reg1(i)=roE(i)
+        ro_reg1(i)=ro(i);rou_reg1(i)=rou(i);rov_reg1(i)=rov(i);row_reg1(i)=row(i);roE_reg1(i)=roE(i)
         do ispec=1,nspec
            Yspec_reg1(i,ispec)=Yspec(i,ispec) 
         end do
@@ -238,9 +261,9 @@ contains
         
            !! Store next U in register 2
            ro(i) = ro_reg1(i) + RKa(k)*rhs_ro(i)
-           u(i) = u_reg1(i) + RKa(k)*rhs_u(i)
-           v(i) = v_reg1(i) + RKa(k)*rhs_v(i)
-           w(i) = w_reg1(i) + RKa(k)*rhs_w(i)           
+           rou(i) = rou_reg1(i) + RKa(k)*rhs_rou(i)
+           rov(i) = rov_reg1(i) + RKa(k)*rhs_rov(i)
+           row(i) = row_reg1(i) + RKa(k)*rhs_row(i)           
 #ifndef isoT           
            roE(i) = roE_reg1(i) + RKa(k)*rhs_roE(i)
 #endif
@@ -252,9 +275,9 @@ contains
 
            !! Store next S in register 1
            ro_reg1(i) = ro_reg1(i) + RKb(k)*rhs_ro(i)
-           u_reg1(i) = u_reg1(i) + RKb(k)*rhs_u(i)
-           v_reg1(i) = v_reg1(i) + RKb(k)*rhs_v(i) 
-           w_reg1(i) = w_reg1(i) + RKb(k)*rhs_w(i)            
+           rou_reg1(i) = rou_reg1(i) + RKb(k)*rhs_rou(i)
+           rov_reg1(i) = rov_reg1(i) + RKb(k)*rhs_rov(i) 
+           row_reg1(i) = row_reg1(i) + RKb(k)*rhs_row(i)            
 #ifndef isoT
            roE_reg1(i) = roE_reg1(i) + RKb(k)*rhs_roE(i)
 #endif
@@ -266,9 +289,9 @@ contains
            
            !! Error accumulation
            e_acc_ro(i) = e_acc_ro(i) + RKbmbh(k)*rhs_ro(i)       
-           e_acc_u(i) = e_acc_u(i) + RKbmbh(k)*rhs_u(i)
-           e_acc_v(i) = e_acc_v(i) + RKbmbh(k)*rhs_v(i)  
-           e_acc_w(i) = e_acc_w(i) + RKbmbh(k)*rhs_w(i)             
+           e_acc_rou(i) = e_acc_rou(i) + RKbmbh(k)*rhs_rou(i)
+           e_acc_rov(i) = e_acc_rov(i) + RKbmbh(k)*rhs_rov(i)  
+           e_acc_row(i) = e_acc_row(i) + RKbmbh(k)*rhs_row(i)             
 #ifndef isoT
            e_acc_E(i) = e_acc_E(i) + RKbmbh(k)*rhs_roE(i)                    
 #endif
@@ -285,6 +308,9 @@ contains
         call reapply_mirror_bcs
         call halo_exchanges_all
         
+        !! Get velocity from momentum
+        call get_velocity_from_momentum           
+        
         !! Velocity divergence
         call calc_divergence(u,v,w,divvel(1:npfb))
         call reapply_mirror_bcs_divvel_only
@@ -297,15 +323,15 @@ contains
      iRKstep = iRKstep + 1
      call calc_all_rhs    
      
-     enrm_ro=zero;enrm_u=zero;enrm_v=zero;enrm_E=zero;enrm_Yspec=zero;enrm_w=zero
-     !$omp parallel do private(ispec) reduction(max:enrm_ro,enrm_u,enrm_v,enrm_E,enrm_Yspec,enrm_w)
+     enrm_ro=zero;enrm_rou=zero;enrm_rov=zero;enrm_E=zero;enrm_Yspec=zero;enrm_row=zero
+     !$omp parallel do private(ispec) reduction(max:enrm_ro,enrm_rou,enrm_rov,enrm_E,enrm_Yspec,enrm_row)
      do i=1,npfb
      
         !! Final values of prim vars
         ro(i) = ro_reg1(i) + RKb(4)*rhs_ro(i)
-        u(i) = u_reg1(i) + RKb(4)*rhs_u(i)
-        v(i) = v_reg1(i) + RKb(4)*rhs_v(i)
-        w(i) = w_reg1(i) + RKb(4)*rhs_w(i)        
+        rou(i) = rou_reg1(i) + RKb(4)*rhs_rou(i)
+        rov(i) = rov_reg1(i) + RKb(4)*rhs_rov(i)
+        row(i) = row_reg1(i) + RKb(4)*rhs_row(i)        
 #ifndef isoT
         roE(i) = roE_reg1(i) + RKb(4)*rhs_roE(i)
 #endif
@@ -317,9 +343,9 @@ contains
         
         !! Final error accumulators
         e_acc_ro(i) = e_acc_ro(i) + RKbmbh(4)*rhs_ro(i)       
-        e_acc_u(i) = e_acc_u(i) + RKbmbh(4)*rhs_u(i)
-        e_acc_v(i) = e_acc_v(i) + RKbmbh(4)*rhs_v(i) 
-        e_acc_w(i) = e_acc_w(i) + RKbmbh(4)*rhs_w(i)         
+        e_acc_rou(i) = e_acc_rou(i) + RKbmbh(4)*rhs_rou(i)
+        e_acc_rov(i) = e_acc_rov(i) + RKbmbh(4)*rhs_rov(i) 
+        e_acc_row(i) = e_acc_row(i) + RKbmbh(4)*rhs_row(i)         
 #ifndef isoT
         e_acc_E(i) = e_acc_E(i) + RKbmbh(4)*rhs_roE(i)   
 #endif
@@ -336,12 +362,12 @@ contains
         !! the constraint on the velocity a bit by increasing eu_norm, ev_norm & ew_norm.
         enrm_ro = max(enrm_ro, &
                      abs(e_acc_ro(i))/(ro(i)+ero_norm))      
-        enrm_u = max(enrm_u, &
-                     abs(e_acc_u(i))/(abs(u(i)) + eu_norm))
-        enrm_v = max(enrm_v, &
-                     abs(e_acc_v(i))/(abs(v(i)) + ev_norm))  
-        enrm_w = max(enrm_w, &
-                     abs(e_acc_w(i))/(abs(w(i)) + ew_norm))      
+        enrm_rou = max(enrm_rou, &
+                     abs(e_acc_rou(i))/(abs(u(i)) + eu_norm))
+        enrm_rov = max(enrm_rov, &
+                     abs(e_acc_rov(i))/(abs(v(i)) + ev_norm))  
+        enrm_row = max(enrm_row, &
+                     abs(e_acc_row(i))/(abs(w(i)) + ew_norm))      
 #ifndef isoT
         enrm_E = max(enrm_E, &
                      abs(e_acc_E(i))/(abs(roE(i)) + eroE_norm))
@@ -356,9 +382,9 @@ contains
      !$omp end parallel do  
 
      !! Deallocation
-     deallocate(u_reg1,v_reg1,w_reg1,ro_reg1,roE_reg1,Yspec_reg1)
-     deallocate(rhs_u,rhs_v,rhs_w,rhs_ro,rhs_roE,rhs_Yspec) 
-     deallocate(e_acc_ro,e_acc_u,e_acc_v,e_acc_E,e_acc_Yspec,e_acc_w)
+     deallocate(rou_reg1,rov_reg1,row_reg1,ro_reg1,roE_reg1,Yspec_reg1)
+     deallocate(rhs_rou,rhs_rov,rhs_row,rhs_ro,rhs_roE,rhs_Yspec) 
+     deallocate(e_acc_ro,e_acc_rou,e_acc_rov,e_acc_E,e_acc_Yspec,e_acc_row)
      
      !! Finalise L_infinity error norms: find max and ensure it's >0     
 #ifdef ms
@@ -370,8 +396,8 @@ contains
                     max( &
                         max(enrm_ro,enrm_E), &
                         max( &
-                            max(enrm_u,enrm_v),&
-                            max(enrm_w,emax_Y) &
+                            max(enrm_rou,enrm_rov),&
+                            max(enrm_row,emax_Y) &
                             ) &
                         ), &
                     1.0d-16)
@@ -391,6 +417,9 @@ contains
      call apply_time_dependent_bounds
      call reapply_mirror_bcs
      call halo_exchanges_all
+     
+     !! Get velocity from momentum
+     call get_velocity_from_momentum        
      
      !! Velocity divergence
      call calc_divergence(u,v,w,divvel(1:npfb))

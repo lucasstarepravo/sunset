@@ -245,20 +245,20 @@ contains
         i = irelation(j)
         ro(j) = ro(i)
         if(vrelation(j).eq.1)then
-           u(j) = u(i)
-           v(j) = v(i) 
+           rou(j) = rou(i)
+           rov(j) = rov(i) 
         else if(vrelation(j).eq.2)then
-           u(j) = -u(i)
-           v(j) = v(i)        
+           rou(j) = -rou(i)
+           rov(j) = rov(i)        
         else if(vrelation(j).eq.3)then
-           u(j) = u(i)
-           v(j) = -v(i) 
+           rou(j) = rou(i)
+           rov(j) = -rov(i) 
         else if(vrelation(j).eq.4)then
-           u(j) = -u(i)
-           v(j) = -v(i) 
+           rou(j) = -rou(i)
+           rov(j) = -rov(i) 
         end if   
 #ifdef dim3
-        w(j) = w(i) !! Never reversed for periodic or symmetric BCs in X-Y plane
+        row(j) = row(i) !! Never reversed for periodic or symmetric BCs in X-Y plane
 #endif              
         
         !! Calculate hydrostatic energy gradient

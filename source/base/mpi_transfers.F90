@@ -78,15 +78,15 @@ contains
      segment_tstart = omp_get_wtime()
 
 #ifdef mp 
-     !! u-velocity
-     call halo_exchange(u)
+     !! u-momentum
+     call halo_exchange(rou)
     
-     !! v-velocity
-     call halo_exchange(v)
+     !! v-momentum
+     call halo_exchange(rov)
 
-     !! w-velocity
+     !! w-momentum
 #ifdef dim3
-     call halo_exchange(w)
+     call halo_exchange(row)
 #endif     
 
      !! density logarithm

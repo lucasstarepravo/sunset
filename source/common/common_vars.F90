@@ -64,7 +64,7 @@ module common_vars
   
   
   !! Right-hand-sides
-  real(rkind),dimension(:),allocatable :: rhs_ro,rhs_u,rhs_v,rhs_w,rhs_roE
+  real(rkind),dimension(:),allocatable :: rhs_ro,rhs_rou,rhs_rov,rhs_row,rhs_roE
   real(rkind),dimension(:,:),allocatable :: rhs_Yspec
     
   !! Discretisation properties

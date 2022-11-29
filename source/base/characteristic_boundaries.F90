@@ -127,9 +127,9 @@ contains
      !Lchar(1) is outgoing, so doesn't require modification
      Lchar(2) = zero
      Lchar(3) = v(i)*0.278d0*c/L_domain_x &        !! track v=zero
-              + rhs_v(i)                           !! rhs_v contains transverse and visc terms needed
+              + rhs_rov(i)                           !! rhs_v contains transverse and visc terms needed
      Lchar(4) = w(i)*0.278d0*c/L_domain_x &        !! track w=zero
-              + rhs_w(i)                           !! rhs_w contains transverse and visc terms needed
+              + rhs_row(i)                           !! rhs_w contains transverse and visc terms needed
      Lchar(5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &     !! Track u_inflow
               - half*(v(i)*gradb_p(2)+p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2)) &    !! transverse 1 conv. terms
               - half*(w(i)*gradb_p(3)+p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))      !! transverse 2 conv. terms 
@@ -162,9 +162,9 @@ contains
                 w(i)*gradb_p(3)/c/c + gammagas*p(i)*gradb_w(3)/c/c)
              !! + visc + source terms TBC
     Lchar(3) = v(i)*0.278d0*c/L_domain_x &        !! track v=zero
-             + rhs_v(i)                           !! rhs_v contains transverse and visc terms needed
+             + rhs_rov(i)                           !! rhs_v contains transverse and visc terms needed
     Lchar(4) = w(i)*0.278d0*c/L_domain_x &        !! track w=zero
-             + rhs_w(i)                           !! rhs_w contains transverse and visc terms needed
+             + rhs_row(i)                           !! rhs_w contains transverse and visc terms needed
 
     Lchar(5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &      !! Track u_inflow
              - half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2))  & !! transverse 1 conv. terms

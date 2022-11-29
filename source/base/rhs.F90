@@ -12,7 +12,7 @@ module rhs
   !! calls to specific thermodynamics routines.
   
   !! Although separate subroutines, they must be called in correct order, as they rely
-  !! on each other (e.g. divvel calculated in calc_rhs_ro, also used in calc_rhs_vel)
+  !! on each other (e.g. divvel calculated in calc_rhs_ro, also used in calc_rhs_rovel)
   
   !! We use the lists internal_list and boundary_list to loop through internal and boundary
   !! nodes respectively. The L arrays for boundaries run from 1 to nb, and so use index j
@@ -79,7 +79,7 @@ contains
      end if
 
      !! Initialise right hand sides to zero
-     rhs_ro=zero;rhs_u=zero;rhs_v=zero;rhs_w=zero;rhs_roE=zero;rhs_Yspec=zero
+     rhs_ro=zero;rhs_rou=zero;rhs_rov=zero;rhs_row=zero;rhs_roE=zero;rhs_Yspec=zero
      
      !! Calculate derivatives of primary variables
      allocate(gradro(npfb,dims));gradro=zero  
@@ -105,7 +105,7 @@ contains
      !! these subroutines
      call calc_rhs_ro
      call calc_rhs_Yspec
-     call calc_rhs_vel
+     call calc_rhs_rovel
      call calc_rhs_roE
 
      !! Calculate chemical production rates and add these to rhs of species equation
@@ -384,7 +384,7 @@ contains
      return
   end subroutine calc_rhs_Yspec    
 !! ------------------------------------------------------------------------------------------------
-  subroutine calc_rhs_vel
+  subroutine calc_rhs_rovel
      !! Construct the RHS for u-equation
      integer(ikind) :: i,j
      real(rkind),dimension(dims) :: tmp_vec,gradvisc
@@ -425,13 +425,13 @@ contains
          
      !! Build RHS for internal nodes
      !$omp parallel do private(i,tmp_vec,tmp_scal_u,tmp_scal_v,tmp_scal_w,f_visc_u,f_visc_v,f_visc_w,tmpro &
-     !$omp ,body_force_u,body_force_v,body_force_w,gradvisc,one_over_ro)
+     !$omp ,body_force_u,body_force_v,body_force_w,gradvisc)
      do j=1,npfb-nb
         i=internal_list(j)
         tmp_vec(1) = u(i);tmp_vec(2) = v(i);tmp_vec(3) = w(i) !! tmp_vec holds (u,v,w) for node i
-        tmp_scal_u = dot_product(tmp_vec,gradu(i,:))      !! convective term for u
-        tmp_scal_v = dot_product(tmp_vec,gradv(i,:))      !! Convective term for v   
-        tmp_scal_w = dot_product(tmp_vec,gradw(i,:))      !! Convective term for w    
+        tmp_scal_u = ro(i)*dot_product(tmp_vec,gradu(i,:)) - u(i)*rhs_ro(i) !! convective term for u
+        tmp_scal_v = ro(i)*dot_product(tmp_vec,gradv(i,:)) - v(i)*rhs_ro(i) !! Convective term for v   
+        tmp_scal_w = ro(i)*dot_product(tmp_vec,gradw(i,:)) - w(i)*rhs_ro(i) !! Convective term for w    
                 
         !! Viscous term (Lap(U) + (1/3)grad(div.U) formulation - avoids explicit calculation of cross derivs)
         f_visc_u = visc(i)*(lapu(i) + onethird*graddivvel(i,1))
@@ -453,26 +453,26 @@ contains
 #endif        
       
         !! Local density 
-        tmpro = ro(i);one_over_ro = one/tmpro
+        tmpro = ro(i)
 
         !! Body force
-        body_force_u = grav(1) + driving_force(1)*one_over_ro
-        body_force_v = grav(2) + driving_force(2)*one_over_ro
-        body_force_w = grav(3) + driving_force(3)*one_over_ro
+        body_force_u = tmpro*grav(1) + driving_force(1)
+        body_force_v = tmpro*grav(2) + driving_force(2)
+        body_force_w = tmpro*grav(3) + driving_force(3)
 
         !! Store u.(F_visc + F_body/ro) for use in energy eqn later 
-        store_diff_E(i) = store_diff_E(i) + u(i)*(f_visc_u + body_force_u*tmpro) &
-                                          + v(i)*(f_visc_v + body_force_v*tmpro) &
-                                          + w(i)*(f_visc_w + body_force_w*tmpro)
+        store_diff_E(i) = store_diff_E(i) + u(i)*(f_visc_u + body_force_u) &
+                                          + v(i)*(f_visc_v + body_force_v) &
+                                          + w(i)*(f_visc_w + body_force_w)
                         
                         
         !! RHS 
-        rhs_u(i) = -tmp_scal_u - gradp(i,1)*one_over_ro + body_force_u + f_visc_u*one_over_ro 
-        rhs_v(i) = -tmp_scal_v - gradp(i,2)*one_over_ro + body_force_v + f_visc_v*one_over_ro
+        rhs_rou(i) = -tmp_scal_u - gradp(i,1) + body_force_u + f_visc_u 
+        rhs_rov(i) = -tmp_scal_v - gradp(i,2) + body_force_v + f_visc_v
 #ifdef dim3
-        rhs_w(i) = -tmp_scal_w - gradp(i,3)*one_over_ro + body_force_w + f_visc_w*one_over_ro
+        rhs_row(i) = -tmp_scal_w - gradp(i,3) + body_force_w + f_visc_w
 #else
-        rhs_w(i) = zero
+        rhs_row(i) = zero
 #endif                       
      end do
      !$omp end parallel do
@@ -488,10 +488,10 @@ contains
    
      
         !$omp parallel do private(i,tmpro,c,xn,yn,un,ut,f_visc_u,f_visc_v,body_force_u,body_force_v &
-        !$omp ,dpdn,dundn,dutdn,gradvisc,one_over_ro,f_visc_w)
+        !$omp ,dpdn,dundn,dutdn,gradvisc,f_visc_w,tmp_vec,tmp_scal_u,tmp_scal_v,tmp_scal_w)
         do j=1,nb
            i=boundary_list(j)
-           tmpro = ro(i);one_over_ro = one/tmpro
+           tmpro = ro(i)
 #ifndef isoT           
            c=evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
 #else
@@ -511,16 +511,23 @@ contains
               L(j,4) = un*(gradw(i,1)*xn + gradw(i,2)*yn) !! L4
               L(j,5) = half*(un+c)*(dpdn + tmpro*c*dundn) !! L5 
               
-              !! Should evaluate viscous terms here, but a) rhs_u,v =0, and b) they aren't needed for
+              !! Should evaluate viscous terms here, but a) rhs_rou,v =0, and b) they aren't needed for
               !! subsequent energy equation 
-              rhs_u(i) = zero
-              rhs_v(i) = zero    
-              rhs_w(i) = zero     
+              rhs_rou(i) = zero
+              rhs_rov(i) = zero    
+              rhs_row(i) = zero     
               
               !! Don't augment store_diff_E as velocity is zero
 !              store_diff_E(i) = store_diff_E(i) + zero 
               
            else    !! In/out is in x-y coord system
+
+              !! Convective terms
+              tmp_vec(1) = zero;tmp_vec(2) = v(i);tmp_vec(3) = w(i) !! tmp_vec holds (0,v,w) for node i
+              tmp_scal_u = ro(i)*dot_product(tmp_vec,gradu(i,:)) - u(i)*rhs_ro(i) !! convective term for u
+              tmp_scal_v = ro(i)*dot_product(tmp_vec,gradv(i,:)) - v(i)*rhs_ro(i) !! Convective term for v   
+              tmp_scal_w = ro(i)*dot_product(tmp_vec,gradw(i,:)) - w(i)*rhs_ro(i) !! Convective term for w 
+
 
               L(j,1) = half*(u(i)-c)*(dpdn - tmpro*c*gradu(i,1))
               L(j,2) = u(i)*(gradro(i,1) - gradp(i,1)/c/c)
@@ -566,19 +573,19 @@ contains
               end if
      
               !! Body force
-              body_force_u = grav(1) + driving_force(1)*one_over_ro
-              body_force_v = grav(2) + driving_force(2)*one_over_ro
-              body_force_w = grav(3) + driving_force(3)*one_over_ro            
+              body_force_u = tmpro*grav(1) + driving_force(1)
+              body_force_v = tmpro*grav(2) + driving_force(2)
+              body_force_w = tmpro*grav(3) + driving_force(3)            
                 
               !! Viscous dissipation term for energy equation   
-              store_diff_E(i) = store_diff_E(i) + u(i)*(f_visc_u + body_force_u*tmpro) &
-                                                + v(i)*(f_visc_v + body_force_v*tmpro) &
-                                                + w(i)*(f_visc_w + body_force_w*tmpro)
+              store_diff_E(i) = store_diff_E(i) + u(i)*(f_visc_u + body_force_u) &
+                                                + v(i)*(f_visc_v + body_force_v) &
+                                                + w(i)*(f_visc_w + body_force_w)
 
               !! Transverse + visc + source terms only
-              rhs_u(i) = -v(i)*gradu(i,2) - w(i)*gradu(i,3) + f_visc_u*one_over_ro + body_force_u  
-              rhs_v(i) = -v(i)*gradv(i,2) - w(i)*gradv(i,3) - gradp(i,2)*one_over_ro + f_visc_v*one_over_ro + body_force_v
-              rhs_w(i) = -v(i)*gradw(i,2) - w(i)*gradw(i,3) - gradp(i,3)*one_over_ro + f_visc_w*one_over_ro + body_force_w 
+              rhs_rou(i) = -v(i)*gradu(i,2) - w(i)*gradu(i,3) + f_visc_u + body_force_u  
+              rhs_rov(i) = -v(i)*gradv(i,2) - w(i)*gradv(i,3) - gradp(i,2) + f_visc_v + body_force_v
+              rhs_row(i) = -v(i)*gradw(i,2) - w(i)*gradw(i,3) - gradp(i,3) + f_visc_w + body_force_w 
            end if
         end do
         !$omp end parallel do 
@@ -590,7 +597,7 @@ contains
      deallocate(graddivvel) 
 
      return
-  end subroutine calc_rhs_vel
+  end subroutine calc_rhs_rovel
 !! ------------------------------------------------------------------------------------------------  
   subroutine calc_rhs_roE
      !! Construct the RHS for energy equation. Do (almost) nothing if isothermal
@@ -736,9 +743,9 @@ contains
        rhs_ro(i) = rhs_ro(i) - tmp_scal
 
        !! Velocity components       
-       rhs_u(i) = rhs_u(i) - (L(j,5)-L(j,1))/(tmpro*c)       
-       rhs_v(i) = rhs_v(i) - L(j,3)
-       rhs_w(i) = rhs_w(i) - L(j,4)
+       rhs_rou(i) = rhs_rou(i) - u(i)*tmp_scal - (L(j,5)-L(j,1))/c
+       rhs_rov(i) = rhs_rov(i) - v(i)*tmp_scal - ro(i)*L(j,3)
+       rhs_row(i) = rhs_row(i) - w(i)*tmp_scal - ro(i)*L(j,4)
 
        !! Energy
 #ifndef isoT
@@ -782,10 +789,10 @@ contains
      call calc_filtered_var(ro)
      
      !! Filter velocity components
-     call calc_filtered_var(u)
-     call calc_filtered_var(v)
+     call calc_filtered_var(rou)
+     call calc_filtered_var(rov)
 #ifdef dim3
-     call calc_filtered_var(w)
+     call calc_filtered_var(row)
 #endif     
  
      !! Filter energy
