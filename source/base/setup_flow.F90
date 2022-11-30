@@ -76,19 +76,22 @@ contains
      call load_restart_file(2)
 #endif
      !! =======================================================================
-            
-     !! Set energy from ro,u,Y,T
-     call initialise_energy      
      
-     !! Convert from velocity to momentum
-     !$omp parallel do
+     !! Convert from velocity to momentum and Y to roY
+     !$omp parallel do private(ispec)
      do i=1,np
         rou(i) = ro(i)*u(i)
         rov(i) = ro(i)*v(i)
         row(i) = ro(i)*w(i)                
+        do ispec=1,nspec
+           Yspec(i,ispec) = Yspec(i,ispec)*ro(i)
+        end do
      end do
      !$omp end parallel do   
-   
+              
+     !! Set energy from ro,u,Y,T
+     call initialise_energy      
+
      !! Mirrors and halos                        
      call reapply_mirror_bcs
 #ifdef mp
@@ -448,6 +451,10 @@ contains
      
      return
   end subroutine load_chemistry_data    
+!! ------------------------------------------------------------------------------------------------
+!! N.B. In the routines below here, we are loading or generating initial conditions on the
+!! primitive variables (ro,u,v,w,T,Y), and hence Yspec holds Y. Everywhere else in the code, 
+!! Yspec holds roY.
 !! ------------------------------------------------------------------------------------------------
   subroutine make_1d_1step_flame
      !! Make a single-step fixed stoichiometry flame

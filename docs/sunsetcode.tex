@@ -47,7 +47,7 @@ The \textbf{S}calable \textbf{U}nstructured \textbf{N}ode-\textbf{SET} code (SUN
 \section{Governing Equations}\label{ge}
 
 The code solves the compressible Navier-Stokes equations in the form
-\begin{equation}\frac{\partial\ln\rho}{\partial{t}}+\bm{u}\cdot\nabla\ln\rho=-\nabla\cdot\bm{u}\label{eq:mass}\end{equation}
+\begin{equation}\frac{\partial\rho}{\partial{t}}+\bm{u}\cdot\nabla\rho=-\rho\nabla\cdot\bm{u}\label{eq:mass}\end{equation}
 \begin{equation}\frac{\partial\bm{u}}{\partial{t}}+\bm{u}\cdot\nabla\bm{u}=-\frac{1}{\rho}\nabla{p}+\frac{1}{\rho}\nabla\cdot\bm{\tau}+\bm{f}\label{eq:mom}\end{equation}
 \begin{equation}\frac{\partial\rho{E}}{\partial{t}}+\nabla\cdot\left(\bm{u}\rho{E}\right)=-\nabla\cdot\left(p\bm{u}\right)-\nabla\cdot\bm{q}+\nabla\cdot\left(\bm{\tau}\bm{u}\right)+\bm{u}\cdot\bm{f}\label{eq:en}\end{equation}
 and

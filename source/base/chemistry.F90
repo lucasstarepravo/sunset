@@ -10,6 +10,7 @@ module chemistry
   !! This module contains routines to evaluate chemical production rates for reacting flows.
   !! If the flow is inert, it does nothing. 
   !! Reaction rates are added to the rhs_Yspec arrays.
+  !! N.B. Yspec contains ro*Y
   use kind_parameters
   use common_parameter
   use common_vars
@@ -94,7 +95,6 @@ contains
                                       Yspec(i,ispec)* &
                                       one_over_molar_mass(ispec)
               end do
-              third_body_conc(i) = third_body_conc(i)*ro(i)
            end do
            !$omp end parallel do           
         else
@@ -139,7 +139,7 @@ contains
            do jspec = 1,num_reactants(istep)
               ispec = reactant_list(istep,jspec)  !! ispec is the jspec-th reactant of step istep
               
-              logroYovW = log(ro(i)*max(Yspec(i,ispec),verysmall)*one_over_molar_mass(ispec))
+              logroYovW = log(max(Yspec(i,ispec),verysmall)*one_over_molar_mass(ispec))
               
               rate(i) = rate(i) + nu_dash(istep,ispec)*logroYovW
            end do
@@ -170,7 +170,7 @@ contains
               do jspec = 1,num_products(istep)
                  ispec = product_list(istep,jspec)
                  
-                 logroYovW = log(ro(i)*max(Yspec(i,ispec),verysmall)*one_over_molar_mass(ispec))
+                 logroYovW = log(max(Yspec(i,ispec),verysmall)*one_over_molar_mass(ispec))
                  
                  backward_rate(i) = backward_rate(i) + nu_ddash(istep,ispec)*logroYovW           
               end do
@@ -225,7 +225,7 @@ contains
            rateYspec(i,ispec) = rateYspec(i,ispec)*molar_mass(ispec)
         
            !! Augment the RHS of Yspec for species ispec
-           rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) + rateYspec(i,ispec)*tmpro           
+           rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) + rateYspec(i,ispec)           
                               
            !! Augment the heat release (production rate x enthalpy of formation)
            heat_release = heat_release - mass_production_rate*coef_h(ispec,polyorder_cp+2)

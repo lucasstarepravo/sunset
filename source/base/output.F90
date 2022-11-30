@@ -219,7 +219,7 @@ contains
         open(unit = 20,file=fname)  
         write(20,*) np_out_local
         do i=1,np_out_local
-           tmpro = ro(i)
+           tmpro = one/ro(i) !! Store inverse of density
 #ifndef isoT
            tmpT = T(i)
 #else
@@ -231,11 +231,11 @@ contains
            tmpVort = alpha_out(i)!vort(i)
 
 #ifdef dim3
-           write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),h(i),node_type(i),tmpro, &
-                       u(i),v(i),w(i),tmpVort,tmpT,Yspec(i,1:nspec_out)        
+           write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),h(i),node_type(i),ro(i), &
+                       u(i),v(i),w(i),tmpVort,tmpT,Yspec(i,1:nspec_out)*tmpro       
 #else
-           write(20,*) rp(i,1),rp(i,2),s(i),h(i),node_type(i),tmpro,u(i),v(i),tmpVort, &
-                       tmpT,Yspec(i,1:nspec_out)
+           write(20,*) rp(i,1),rp(i,2),s(i),h(i),node_type(i),ro(i),u(i),v(i),tmpVort, &
+                       tmpT,Yspec(i,1:nspec_out)*tmpro
 #endif
         end do
 
@@ -270,7 +270,7 @@ contains
      integer(ikind),intent(in) :: n_out !! Number of output file
 #ifdef output_composition     
      integer(ikind) :: i,j,k
-     real(rkind) :: x,y
+     real(rkind) :: x,y,tmpro
      character(70) :: fname
    
      !! set the name of the file...
@@ -295,8 +295,10 @@ contains
      do i=1,npfb
         x=rp(i,1);y=rp(i,2)
         if(abs(y).le.s(i)) then  !! For nodes within a node-spacing of y=0
-           write(20,*) x,y,u(i),v(i),w(i),ro(i),roE(i),T(i),p(i),Yspec(i,1:nspec)
-!write(511,*) x,y,u(i),v(i),w(i),ro(i),roE(i),T(i),p(i),Yspec(i,1:nspec)              
+           tmpro = one/ro(i) !! Store inverse of density
+        
+           write(20,*) x,y,u(i),v(i),w(i),ro(i),roE(i),T(i),p(i),Yspec(i,1:nspec)*tmpro
+!write(511,*) x,y,u(i),v(i),w(i),ro(i),roE(i),T(i),p(i),Yspec(i,1:nspec)*tmpro
         end if
      end do
      flush(20)

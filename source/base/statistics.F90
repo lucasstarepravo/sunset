@@ -314,7 +314,7 @@ contains
   subroutine species_check
      !! This subroutine calculates total quantity of each species in the domain
      integer(ikind) :: i,ispec
-     real(rkind) :: tot_vol,tmpro,dVi,tot_vol_tmp,tmpY,sumY,tot_error,tot_error_tmp
+     real(rkind) :: tot_vol,dVi,tot_vol_tmp,tmpY,sumY,tot_error,tot_error_tmp
      real(rkind),dimension(:),allocatable :: tot_Yspec,tot_Yspec_tmp
 #ifdef ms     
      
@@ -323,9 +323,8 @@ contains
      tot_Yspec = zero     
      tot_error = zero
      tot_vol = zero
-     !$omp parallel do private(tmpro,dVi,ispec,tmpY,sumY) reduction(+:tot_Yspec,tot_error,tot_vol)
+     !$omp parallel do private(dVi,ispec,tmpY,sumY) reduction(+:tot_Yspec,tot_error,tot_vol)
      do i=1,npfb
-        tmpro = ro(i)
         dVi = s(i)*s(i)*L_char*L_char !! assume square nodes for now...
 #ifdef dim3
         dVi = dVi*dz*L_char
@@ -337,7 +336,7 @@ contains
         do ispec=1,nspec
            tmpY = Yspec(i,ispec)
            !! Total mass of species in domain
-           tot_Yspec(ispec) = tot_Yspec(ispec) + dVi*tmpY*tmpro
+           tot_Yspec(ispec) = tot_Yspec(ispec) + dVi*tmpY
            
            sumY = sumY + tmpY
         end do

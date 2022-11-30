@@ -57,116 +57,93 @@ contains
      !$omp cp_tmp,tmpro) &
      !$omp reduction(max:maxiters) reduction(+:sumiters)
      do i=1,np
-        
-        !! For fluid/boundary nodes, and halo nodes, solve non-linear equation
-!        if(i.le.npfb.or.i.gt.np_nohalo)then      
-        
-           !! Evaluate the gas constant for the mixture
-           Rgas_mix(i) = zero
-           do ispec = 1,nspec
-              Rgas_mix(i) = Rgas_mix(i) + Yspec(i,ispec)*one_over_molar_mass(ispec)
-           end do
-           Rgas_mix(i) = Rgas_mix(i)*Rgas_universal     
-          
-           !! Store local density
-           tmpro = ro(i) 
-         
-           !!Initialise coefficients:
-           fT_coef_C0 = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i)) - roE(i)/tmpro
-           fT_coef_C(1) = -Rgas_mix(i)
-           fT_coef_C(2:polyorder_cp+1) = zero
-        
-           !! Build coefficients
-           do iorder = 1,polyorder_cp+1
-              do ispec=1,nspec
-                 fT_coef_C(iorder) = fT_coef_C(iorder) + Yspec(i,ispec)*coef_h(ispec,iorder)
-              end do       
-           end do
-           do ispec = 1,nspec
-              fT_coef_C0 = fT_coef_C0 + Yspec(i,ispec)*coef_cp(ispec,polyorder_cp+2)
-           end do
-        
-           !! Make coefficients for dfT
-           do iorder = 1,polyorder_cp+1
-              dfT_coef_C(iorder) = dble(iorder)*fT_coef_C(iorder)
-           end do
-        
-           !! Initial guess for T is current temperature..
-           T_tmp = T(i)
-        
-           !! Newton-Raphson iterations
-           keepgoing = .true.
-           NRiters = 0
-           do while(keepgoing)
-              NRiters = NRiters + 1
-        
-              !! Evaluate f(T) and f'(T)
-              fT = fT_coef_C(polyorder_cp+1)*T_tmp
-              dfT = dfT_coef_C(polyorder_cp+1)
-              do iorder = polyorder_cp,1,-1
-                 fT = (fT + fT_coef_C(iorder))*T_tmp
-                 dfT = dfT*T_tmp + dfT_coef_C(iorder)
-              end do
-              fT = fT + fT_coef_C0
-        
-!if(iproc.eq.0.and.i.eq.100) then
-!     write(6,*) roE(i),NRiters,T_tmp,fT,dfT
-!end if        
-              !! Calculate new T
-              deltaT = - fT/(dfT)
-              T_tmp = T_tmp + deltaT
+                  
+        !! Store inverse of density
+        tmpro = one/ro(i) 
 
-              !! Check for convergence
-              if(abs(deltaT).le.T_tolerance) then
-                 keepgoing = .false.
-              end if
-              if(NRiters.ge.NRiters_max) then
-                 keepgoing = .false.
-              end if
-           
-           end do
+        !! Evaluate the gas constant for the mixture
+        Rgas_mix(i) = zero
+        do ispec = 1,nspec
+           Rgas_mix(i) = Rgas_mix(i) + Yspec(i,ispec)*one_over_molar_mass(ispec)
+        end do
+        Rgas_mix(i) = tmpro*Rgas_mix(i)*Rgas_universal     
+                  
+        !!Initialise coefficients:
+        fT_coef_C0 = half*ro(i)*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i)) - roE(i)  !! K.E. - roE
+        fT_coef_C(1) = -Rgas_mix(i)*ro(i)      !! ro*R
+        fT_coef_C(2:polyorder_cp+1) = zero
         
-           !! Pass new T back to temperature array
-           T(i) = T_tmp
-                
-           !! Find the maximum number of iterations over this processor and sum of iterations
-           maxiters = max(NRiters,maxiters)
-           sumiters = sumiters + NRiters
-        
-           !! Evaluate the specific heat capacity of the mixture
-           cp(i) = zero
+        !! Build coefficients
+        do iorder = 1,polyorder_cp+1
            do ispec=1,nspec
-              cp_tmp = coef_cp(ispec,polyorder_cp+1)
-              do iorder=polyorder_cp,1,-1
-                 cp_tmp = cp_tmp*T(i) + coef_cp(ispec,iorder)
-              end do  
-              cp(i) = cp(i) + Yspec(i,ispec)*cp_tmp          
-           end do      
+              fT_coef_C(iorder) = fT_coef_C(iorder) + Yspec(i,ispec)*coef_h(ispec,iorder)
+           end do       
+        end do
+        do ispec = 1,nspec
+           fT_coef_C0 = fT_coef_C0 + Yspec(i,ispec)*coef_cp(ispec,polyorder_cp+2)
+        end do
+        
+        !! Make coefficients for dfT
+        do iorder = 1,polyorder_cp+1
+           dfT_coef_C(iorder) = dble(iorder)*fT_coef_C(iorder)
+        end do
+        
+        !! Initial guess for T is current temperature..
+        T_tmp = T(i)
+        
+        !! Newton-Raphson iterations
+        keepgoing = .true.
+        NRiters = 0
+        do while(keepgoing)
+           NRiters = NRiters + 1
+     
+           !! Evaluate f(T) and f'(T)
+           fT = fT_coef_C(polyorder_cp+1)*T_tmp
+           dfT = dfT_coef_C(polyorder_cp+1)
+           do iorder = polyorder_cp,1,-1
+              fT = (fT + fT_coef_C(iorder))*T_tmp
+              dfT = dfT*T_tmp + dfT_coef_C(iorder)
+           end do
+           fT = fT + fT_coef_C0
+        
+           !! Calculate new T
+           deltaT = - fT/(dfT)
+           T_tmp = T_tmp + deltaT
 
-           !! Evaluate the pressure        
-           p(i) = tmpro*Rgas_mix(i)*T(i)
+           !! Check for convergence
+           if(abs(deltaT).le.T_tolerance) then
+              keepgoing = .false.
+           end if
+           if(NRiters.ge.NRiters_max) then
+              keepgoing = .false.
+           end if
            
-!        endif        
+        end do
+        
+        !! Pass new T back to temperature array
+        T(i) = T_tmp
+                
+        !! Find the maximum number of iterations over this processor and sum of iterations
+        maxiters = max(NRiters,maxiters)
+        sumiters = sumiters + NRiters
+        
+        !! Evaluate the specific heat capacity of the mixture
+        cp(i) = zero
+        do ispec=1,nspec
+           cp_tmp = coef_cp(ispec,polyorder_cp+1)
+           do iorder=polyorder_cp,1,-1
+              cp_tmp = cp_tmp*T(i) + coef_cp(ispec,iorder)
+           end do  
+           cp(i) = cp(i) + Yspec(i,ispec)*cp_tmp          
+        end do      
+        cp(i) = cp(i)*tmpro !! Divide by ro to get cp
+
+        !! Evaluate the pressure        
+        p(i) = ro(i)*Rgas_mix(i)*T(i)           
+
      end do
      !$omp end parallel do
      
-     !! For mirrors, copy properties (as opposed to solving non-linear equation)
-!     !$omp parallel do private(i)
-!#ifdef mp
-!     do j=npfb+1,np_nohalo
-!#else
-!     do j=npfb+1,np
-!#endif     
-!        i=irelation(j)
-!        T(j) = T(i)
-!        p(j) = p(i)
-!        cp(j) = cp(i)
-!        Rgas_mix(j) = Rgas_mix(i)
-!     
-!     end do
-!     !$omp end parallel do
-
-
      deallocate(fT_coef_C,dfT_coef_C)
 #else
      !! Isothermal, set constant T, and p proportional to density
@@ -310,14 +287,11 @@ contains
      integer(ikind),intent(in) :: i
      real(rkind),intent(in) :: tmpT
      integer(ikind) :: ispec,j,nsum
-     real(rkind) :: enthalpy,Rgas_mix_local,p_local,psum,tmpro,cpispec,dummy_real
+     real(rkind) :: enthalpy,Rgas_mix_local,p_local,psum,cpispec,dummy_real
      
 #ifndef isoT              
         !! Initialise roE with K.E. term
-        roE(i) = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))
-        
-        !! Store local density
-        tmpro = ro(i) 
+        roE(i) = half*ro(i)*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))
 
         !! Loop over species
         Rgas_mix_local = zero
@@ -328,15 +302,13 @@ contains
            !! Add species enthalpy contribution
            roE(i) = roE(i) + Yspec(i,ispec)*enthalpy
            
-           !! Build the local mixture gas constant
+           !! Build the local mixture gas constant - actually holds ro*R
            Rgas_mix_local = Rgas_mix_local + Yspec(i,ispec)*Rgas_universal*one_over_molar_mass(ispec)
         end do           
 
-        !! Subtract RgasT
+        !! Subtract roRgasT
         roE(i) = roE(i) - Rgas_mix_local*T(i)     
-                  
-        !! Multiply to get roE
-        roE(i) = roE(i)*tmpro        
+                    
 #endif
 
        
@@ -359,7 +331,7 @@ contains
      do i=1,npfb
           
         !! Initialise roE with K.E. term
-        roE(i) = half*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))
+        roE(i) = half*ro(i)*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))
         
         !! Store local density
         tmpro = ro(i) 
@@ -373,21 +345,15 @@ contains
            !! Add species enthalpy contribution
            roE(i) = roE(i) + Yspec(i,ispec)*enthalpy
            
-           !! Build the local mixture gas constant
+           !! Build the local mixture gas constant - actually holds ro*R
            Rgas_mix_local = Rgas_mix_local + Yspec(i,ispec)*Rgas_universal*one_over_molar_mass(ispec)
         end do           
 
         !! Evaluate the pressure           
-        p(i) = tmpro*Rgas_mix_local*T(i)
+        p(i) = Rgas_mix_local*T(i)
 
-        !! Subtract RgasT
-        roE(i) = roE(i) - Rgas_mix_local*T(i)     
-        
-!if(node_type(i).eq.1) write(6,*) "reactants",roE(i),tmpro,p(i)
-!if(node_type(i).eq.2) write(6,*) "products",roE(i),tmpro,p(i)
-           
-        !! Multiply to get roE
-        roE(i) = roE(i)*tmpro
+        !! Subtract p=ro*R*T
+        roE(i) = roE(i) - p(i)
         
      end do
      !$omp end parallel do
