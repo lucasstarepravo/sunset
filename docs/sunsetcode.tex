@@ -43,30 +43,35 @@ This document contains a brief description and guide to the SUNSET code. Numeric
 
 The \textbf{S}calable \textbf{U}nstructured \textbf{N}ode-\textbf{SET} code (SUNSET code) is designed for high fidelity simulations of fluid flows on non-trivial geometries. The spatial discretisation is by a combination of LABFM~\cite{king_labfm_2021,king_labfm_2022} and finite differences. Order of accuracy of spatial discretisation can be specified (between $4^{th}$ and $12^{th}$). Time integration via explicit $3^{rd}$ order Runge-Kutta scheme. Boundary conditions with the characteristic based formulation, with non-periodic boundaries dropping to $4^{th}$ order at walls, inflows and outflows. Resolution is non-uniform in first two dimensions. Scalable via OpenMP and MPI. Thermodynamics can vary from isothermal to thermal, with temperature dependent transport properties. Solves for an arbitrary number of miscible chemical species.
 
+\subsection{A comment on notation}
+
+Subscripts $i$, $j$, and $k$ are vector indices for Einstein notation.
+Subscripts $\alpha$ and $\beta$ indicate chemical species.
+Subscripts $a$ and $b$ indicate collocation point indices.
+
 
 \section{Governing Equations}\label{ge}
 
-The code solves the compressible Navier-Stokes equations in the form
-\begin{equation}\frac{\partial\rho}{\partial{t}}+\bm{u}\cdot\nabla\rho=-\rho\nabla\cdot\bm{u}\label{eq:mass}\end{equation}
-\begin{equation}\frac{\partial\bm{u}}{\partial{t}}+\bm{u}\cdot\nabla\bm{u}=-\frac{1}{\rho}\nabla{p}+\frac{1}{\rho}\nabla\cdot\bm{\tau}+\bm{f}\label{eq:mom}\end{equation}
-\begin{equation}\frac{\partial\rho{E}}{\partial{t}}+\nabla\cdot\left(\bm{u}\rho{E}\right)=-\nabla\cdot\left(p\bm{u}\right)-\nabla\cdot\bm{q}+\nabla\cdot\left(\bm{\tau}\bm{u}\right)+\bm{u}\cdot\bm{f}\label{eq:en}\end{equation}
-and
-\begin{equation}\frac{\partial{Y}_{\alpha}}{\partial{t}}+\bm{u}\cdot\nabla{Y}_{\alpha}=\frac{\dot\omega_{\alpha}}{\rho}-\frac{1}{\rho}\nabla\cdot\left(\rho\bm{V}_{\alpha}Y_{\alpha}\right)\qquad\forall\alpha\in\left[1,N_{S}\right]\label{eq:Y}\end{equation}
-where $\rho$ is the density, $\bm{u}$ the velocity, $p$ the pressure, $E$ the total energy, $\bm{\tau}$ the viscous stress, $\bm{f}$ a body force, $\bm{q}$ the heat flux, $Y_{\alpha}$ the concentration of species $\alpha\in\left[1,N_{S}\right]$, and $\bm{V}_{\alpha}$ is the molecular diffusion velocity of species $\alpha$. $\dot\omega_{\alpha}$ is the production rate of species $\alpha$.
+The code solves the compressible Navier-Stokes equations in conservative form
+\begin{subequations}\begin{align}
+\frac{\partial\rho}{\partial{t}}+\frac{\partial\rho{u}_{k}}{\partial{x}_{k}}=&0\label{eq:mass}\\
+\frac{\partial\rho{u}_{i}}{\partial{t}}+\frac{\partial\rho{u}_{i}u_{k}}{\partial{x}_{k}}=&-\frac{\partial{p}}{\partial{x}_{i}}+\frac{\partial\tau_{ki}}{\partial{x}_{k}}+\rho{f}_{i}\label{eq:mom}\\
+\frac{\partial\rho{E}}{\partial{t}}+\frac{\partial\rho{u}_{k}E}{\partial{x}_{k}}=&-\frac{\partial{p}u_{k}}{\partial{x}_{k}}-\frac{\partial{q}_{k}}{\partial{x}_{k}}+\frac{\partial\tau_{ki}u_{i}}{\partial{x}_{k}}+{u}_{k}f_{k}\label{eq:en}\\
+\frac{\partial\rho{Y}_{\alpha}}{\partial{t}}+\frac{\partial\rho{u}_{k}Y_{\alpha}}{\partial{x}_{k}}=&\dot\omega_{\alpha}-\frac{\partial\rho{V}_{\alpha,k}Y_{\alpha}}{\partial{x}_{k}}\qquad\forall\alpha\in\left[1,N_{S}\right]\label{eq:Y}\\
+\end{align}
+\end{subequations}
+where $\rho$ is the density, ${u}_{i}$ the $i$-th component velocity, $p$ the pressure, $E$ the total energy, $\tau$ the viscous stress, $f$ a body force, $q$ the heat flux, $Y_{\alpha}$ the concentration of species $\alpha\in\left[1,N_{S}\right]$, and $V_{\alpha,k}$ is the $k$-th component of the molecular diffusion velocity of species $\alpha$. $\dot\omega_{\alpha}$ is the production rate of species $\alpha$.
 
 The viscous stress is defined as 
-\begin{equation}\bm{\tau}=\mu\left(\nabla\bm{u}+\nabla\bm{u}^{T}-\frac{2}{3}\bm{I}\nabla\cdot\bm{u}\right)\label{eq:tau},\end{equation}
-where $\mu$ is the dynamic viscosity and $\bm{I}$ is the identity tensor. The energy is
-\begin{equation}E=\displaystyle\sum_{\alpha}h_{\alpha}Y_{\alpha}-\frac{p}{\rho}+\frac{1}{2}\bm{u}\cdot\bm{u}\label{eq:E}\end{equation}
-where the sum over $\alpha$ is over all $\alpha\in\left[1,N_{S}\right]$, and $h_{\alpha}$ is the enthalpy of species $\alpha$, given by
-\begin{equation}h_{\alpha}=\displaystyle\int_{T_{ref}}^{T}c_{p,\alpha}dT + h_{\alpha,ref}\label{eq:h}\end{equation}
-with $h_{\alpha,ref}$ the enthalpy of species $\alpha$ at the reference temperature $T_{ref}$, and $c_{p,\alpha}$ the specific heat capacity at constant pressure of species $\alpha$, which in general may be a function of temperature $T$.
-The molecular diffusion term in~\eqref{eq:Y} is modelled as a Fickian diffusion process with
-\begin{equation}-\rho\bm{V}_{\alpha}Y_{\alpha}=\rho{D}_{\alpha}\nabla{Y}_{\alpha}-Y_{\alpha}\displaystyle\sum_{\beta\in\left[1,N_{S}\right]}\rho{D}_{\beta}\nabla{Y}_{\beta}\label{eq:fickdiff},\end{equation}
+\begin{equation}\tau_{ki}=\mu\left(\frac{\partial{u}_{k}}{\partial{x}_{i}}+\frac{\partial{u}_{i}}{\partial{x}_{k}}-\frac{2}{3}\frac{\partial{u}_{j}}{\partial{x}_{j}}\delta_{ik}\right)\label{eq:tau},\end{equation}
+where $\mu$ is the dynamic viscosity and $\delta_{ik}$ is the Kronecker delta. The energy is
+\begin{equation}E=\displaystyle\sum_{\alpha}h_{\alpha}Y_{\alpha}-\frac{p}{\rho}+\frac{1}{2}{u}_{i}{u}_{i}\label{eq:E}\end{equation}
+where the sum over $\alpha$ is over all $\alpha\in\left[1,N_{S}\right]$, and $h_{\alpha}$ is the enthalpy of species $\alpha$. The molecular diffusion term in~\eqref{eq:Y} is modelled as a Fickian diffusion process with
+\begin{equation}-\rho{V}_{\alpha,k}Y_{\alpha}=\rho{D}_{\alpha}\frac{\partial{Y}_{\alpha}}{\partial{x}_{k}}-Y_{\alpha}\displaystyle\sum_{\beta\in\left[1,N_{S}\right]}\rho{D}_{\beta}\frac{\partial{Y}_{\beta}}{\partial{x}_{k}}\label{eq:fickdiff},\end{equation}
 in which $D_{\alpha}$ is the molecular diffusivity of species $\alpha$, and the final term is a correction to ensure that 
 \begin{equation}\displaystyle\sum_{\alpha}Y_{\alpha}=1.\end{equation}
-The heat flux vector $\bm{q}$ is then given by
-\begin{equation}\bm{q}=-\lambda\nabla{T}+\displaystyle\sum_{\alpha}\rho\bm{V}_{\alpha}Y_{\alpha}h_{\alpha}\label{eq:hfv},\end{equation}
+The heat flux vector is then given by
+\begin{equation}q_{k}=-\lambda\frac{\partial{T}}{\partial{x}_{k}}+\displaystyle\sum_{\alpha}\rho{V}_{\alpha,k}Y_{\alpha}h_{\alpha}\label{eq:hfv},\end{equation}
 where $\lambda$ is the thermal conductivity of the mixture.
 The system is closed with an ideal gas equation of state
 \begin{equation}p=\rho{R}_{mix}T=\rho{R}_{0}T\displaystyle\sum_{\alpha}\frac{Y_{\alpha}}{W_{\alpha}}\label{eq:eos}\end{equation}
@@ -158,24 +163,18 @@ Aside from the complexities of indexing and derivative evaluation associated wit
 
 \subsection{Evaluation of derivatives}
 
-Derivatives of the primary variables $\ln\rho$, $\bm{u}$, $\rho{E}$ and $Y_{\alpha}$ are evaluated with the LABFM method~\cite{king_labfm_2022}. Temperature gradients $\nabla{T}$ are also evaluated using LABFM, as are Laplacians where required (i.e. $\nabla^{2}\bm{u}$, $\nabla^{2}{T}$, $\nabla^{2}Y_{\alpha}$). 
+Derivatives of the conservative variables $\rho$, $\rho{u}_{i}$, $\rho{E}$ and $\rho{Y}_{\alpha}$, and also the temperature and pressure,  are evaluated directly with the LABFM method~\cite{king_labfm_2022} in the $x-y$ plane, and central finite differences in $z$. To avoid the explicit evaluation of cross-second derivatives of velocity, the viscous stress divergence is evaluated as
+\begin{equation}\frac{\partial\tau_{ki}}{\partial{x}_{k}}=\frac{1}{\mu}\frac{\partial\mu}{\partial{x}_{k}}\tau_{ki}+\mu\left(\frac{\partial^{2}{u}_{i}}{\partial{x}_{k}\partial{x}_{k}}+\frac{1}{3}\frac{\partial^{2}{u}_{k}}{\partial{x}_{i}\partial{x}_{k}}\right)\label{eq:divtau},\end{equation}
+where the final term is the gradient of the velocity divergence, which is calculated through two iterations of first derivative evalations. Laplacians are also evaluated directly using LABFM combined with finite differences. This formulation permits smaller computational stencils, and reduces the amount of MPI communication required.
 
-To avoid the explicit evaluation of cross-second derivatives of velocity (which appear in the terms $\nabla\cdot\bm{\tau}$ and $\nabla\cdot\left(\bm{\tau}\bm{u}\right)$), these terms are constructed by evaluating the gradient of the velocity divergence $\nabla\cdot\bm{u}$, with
-\begin{equation}\nabla\cdot\bm{\tau}=\frac{\nabla\mu}{\mu}\bm{\tau}+\mu\left(\nabla^{2}\bm{u}+\frac{1}{3}\nabla\left(\nabla\cdot\bm{u}\right)\right)\label{eq:divtau}\end{equation}
-In Einstein notation, this is written
-\begin{equation}\frac{\partial\tau_{ji}}{\partial{x}_{j}}=\frac{\tau_{ji}}{\mu}\frac{\partial\mu}{\partial{x}_{j}}+\mu\left[\frac{\partial^{2}u_{i}}{\partial{x}_{j}\partial{x}_{j}}+\frac{1}{3}\frac{\partial{u}_{j}}{\partial{x}_{i}\partial{x}_{j}}\right].\end{equation}
-
-The evaluation of derivatives using LABFM constitutes the bulk of the computational cost, and it is hence desirable avoid where possible. Gradients of secondary properties may be evaluated from analytic expressions as follows. The pressure gradient is calculated from the temperature gradient as 
-\begin{equation}\nabla{p}=p\left(\frac{R_{0}}{R_{mix}}\displaystyle\sum_{\alpha}\frac{\nabla{Y}_{\alpha}}{W_{\alpha}}+\frac{1}{T}\nabla{T}+\nabla\ln\rho\right).\label{eq:gradp}\end{equation}
-Gradients of mixture specific heat capacity and enthalpy are also evaluated through analytic expressions in terms of temperature gradients TBC.
-Similarly, the gradients of the transport properties, which have analytic relations with the thermodynamic quantities, are evaluated as
-\begin{equation}\nabla\mu=\frac{r_{T}\mu}{T}\nabla{T}\end{equation}
-\begin{equation}\nabla\lambda=\frac{r_{T}\lambda}{T}\nabla{T}+\frac{\lambda}{c_{p}}\nabla{c_{p}}\end{equation}
-\begin{equation}\nabla\rho{D}_{\alpha}=\frac{r_{T}D_{\alpha}}{T}\nabla{T}\end{equation}
+The evaluation of derivatives using LABFM constitutes the bulk of the computational cost, and it is hence desirable avoid where possible. Gradients of secondary properties are evaluated from analytic expressions in terms of gradients of primary properties as follows
+\begin{equation}\frac{\partial\mu}{\partial{x}_{k}}=\frac{r_{T}\mu}{T}\frac{\partial{T}}{\partial{x}_{k}}\end{equation}
+\begin{equation}\frac{\partial\lambda}{\partial{x}_{k}}=\frac{r_{T}\lambda}{T}\frac{\partial{T}}{\partial{x}_{k}}+\frac{\lambda}{c_{p}}\frac{\partial{c_{p}}}{\partial{x}_{k}}\end{equation}
+\begin{equation}\frac{\partial\rho{D}_{\alpha}}{\partial{x}_{k}}=\frac{r_{T}D_{\alpha}}{T}\frac{\partial{T}}{\partial{x}_{k}}\end{equation}
 The gradient of the enthalpy of species $\alpha$ is given by
-\begin{equation}\nabla{h}_{\alpha}=\frac{dh_{\alpha}}{dT}\nabla{T}=c_{p,\alpha}\nabla{T},\end{equation}
+\begin{equation}\frac{\partial{h}_{\alpha}}{\partial{x}_{k}}=\frac{dh_{\alpha}}{dT}\frac{\partial{T}}{\partial{x}_{k}}=c_{p,\alpha}\frac{\partial{T}}{\partial{x}_{k}},\end{equation}
 and the gradient of the mixture specific heat capacity is
-\begin{equation}\nabla{c}_{p}=\displaystyle\sum_{\alpha}\left[Y_{\alpha}\frac{dc_{p,\alpha}}{dT}\nabla{T}+c_{p,\alpha}\nabla{Y}_{\alpha}\right].\end{equation}
+\begin{equation}\frac{\partial{c}_{p}}{\partial{x}_{k}}=\displaystyle\sum_{\alpha}\left[Y_{\alpha}\frac{dc_{p,\alpha}}{dT}\frac{\partial{T}}{\partial{x}_{k}}+c_{p,\alpha}\frac{\partial{Y}_{\alpha}}{\partial{x}_{k}}\right].\end{equation}
 
 \subsection{Boundaries}
 
@@ -278,9 +277,9 @@ The following cases are currently included in \verb|datclass.F90|:
 \appendix
 \section{Equations written out in full, in Einstein notation}\label{fulleqns}
 
-\begin{equation}\frac{\partial\ln\rho}{\partial{t}}+u_{i}\frac{\partial\ln\rho}{\partial{x}_{i}}=-\frac{\partial{u}_{i}}{\partial{x}_{i}}\end{equation}
+\begin{equation}\frac{\partial\rho}{\partial{t}}+\frac{\partial\rho{u}_{i}}{\partial{x}_{i}}=0\end{equation}
 
-\begin{equation}\frac{\partial{u}_{i}}{\partial{t}}+u_{j}\frac{\partial{u}_{i}}{\partial{x}_{j}}=-\frac{1}{\rho}\frac{\partial{p}}{\partial{x}_{i}}+\frac{\mu}{\rho}\left[\frac{\partial^{2}u_{i}}{\partial{x}_{j}\partial{x}_{j}}-\frac{1}{3}\frac{\partial}{\partial{x}_{i}}\left(\frac{\partial{u}_{j}}{\partial{x}_{j}}\right)\right]+\frac{1}{\rho}\left[\frac{\partial{u}_{i}}{\partial{x}_{j}}+\frac{\partial{u}_{j}}{\partial{x}_{i}}-\frac{2}{3}\delta_{ij}\frac{\partial{u}_{k}}{\partial{x}_{k}}\right]\frac{\partial\mu}{\partial{x}_{j}}+f_{i}\end{equation}
+\begin{equation}\frac{\partial\rho{u}_{i}}{\partial{t}}+\rho{u}_{k}\frac{\partial{u}_{i}}{\partial{x}_{k}}+u_{i}\frac{\partial\rho{u}_{k}}{\partial{x}_{k}}=-\frac{\partial{p}}{\partial{x}_{i}}+\mu\left[\frac{\partial^{2}u_{i}}{\partial{x}_{k}\partial{x}_{k}}-\frac{1}{3}\frac{\partial}{\partial{x}_{i}}\left(\frac{\partial{u}_{k}}{\partial{x}_{j}}\right)\right]+\left[\frac{\partial{u}_{i}}{\partial{x}_{k}}+\frac{\partial{u}_{k}}{\partial{x}_{i}}-\frac{2}{3}\delta_{ik}\frac{\partial{u}_{j}}{\partial{x}_{k}}\right]\frac{\partial\mu}{\partial{x}_{j}}+\rho{f}_{i}\end{equation}
 
 
 \begin{eqnarray}
@@ -295,9 +294,9 @@ The following cases are currently included in \verb|datclass.F90|:
 \end{eqnarray}
 and
 \begin{eqnarray}
-\frac{\partial{Y}_{\alpha}}{\partial{t}}+u_{i}\frac{{Y}_{\alpha}}{\partial{x}_{i}}=&&\frac{\dot\omega_{\alpha}}{\rho}
-+\frac{1}{\rho}\left[\rho{D}_{\alpha}\frac{\partial^{2}Y_{\alpha}}{\partial{x}_{i}\partial{x}_{i}}+\frac{\partial{\rho{D}}_{\alpha}}{\partial{x}_{i}}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}\right]\\
-&-&\frac{Y_{\alpha}}{\rho}\displaystyle\sum_{\beta}\left[\rho{D}_{\beta}\frac{\partial^{2}Y_{\beta}}{\partial{x}_{i}\partial{x}_{i}}+\frac{\partial\rho{D}_{\beta}}{\partial{x}_{i}}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}\right]-\frac{1}{\rho}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}\displaystyle\sum_{\beta}\rho{D}_{\beta}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}
+\frac{\partial\rho{Y}_{\alpha}}{\partial{t}}+\rho{u}_{i}\frac{{Y}_{\alpha}}{\partial{x}_{i}}+Y_{\alpha}\frac{\partial\rho{u}_{i}}{\partial{x}_{i}}=&&\dot\omega_{\alpha}
++\left[\rho{D}_{\alpha}\frac{\partial^{2}Y_{\alpha}}{\partial{x}_{i}\partial{x}_{i}}+\frac{\partial{\rho{D}}_{\alpha}}{\partial{x}_{i}}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}\right]\\
+&-&Y_{\alpha}\displaystyle\sum_{\beta}\left[\rho{D}_{\beta}\frac{\partial^{2}Y_{\beta}}{\partial{x}_{i}\partial{x}_{i}}+\frac{\partial\rho{D}_{\beta}}{\partial{x}_{i}}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}\right]-\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}\displaystyle\sum_{\beta}\rho{D}_{\beta}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}
 \end{eqnarray}
 
 \bibliographystyle{elsarticle-num-names}

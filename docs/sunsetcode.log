@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.9.9)  29 NOV 2022 16:34
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.9.9)  30 NOV 2022 14:17
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -722,13 +722,13 @@ Class revtex4-1 Info: Taking \maketitle back from hyperref on input line 25.
  [1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}] [2] [3] [4] [5] [6] [7]
  (./sunsetcode.bbl) [8] (./sunsetcode.aux)
 Package rerunfilecheck Info: File `sunsetcode.out' has not changed.
-(rerunfilecheck)             Checksum: 752D587CF3DDBBAADF525169F5F38339;3721.
+(rerunfilecheck)             Checksum: 30C936F2F733610A59A4BBDD92111095;3891.
  ) 
 Here is how much of TeX's memory you used:
- 21947 strings out of 480247
- 405387 string characters out of 5896152
- 699741 words of memory out of 5000000
- 39447 multiletter control sequences out of 15000+600000
+ 21946 strings out of 480247
+ 405402 string characters out of 5896152
+ 698783 words of memory out of 5000000
+ 39446 multiletter control sequences out of 15000+600000
  478998 words of font info for 61 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
  84i,11n,89p,890b,711s stack positions out of 5000i,500n,10000p,200000b,80000s
@@ -752,10 +752,10 @@ exmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/texlive/texmf-di
 st/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/share/texlive/texmf-dist/fon
 ts/type1/public/amsfonts/cm/cmti9.pfb></usr/share/texlive/texmf-dist/fonts/type
 1/public/amsfonts/cm/cmtt10.pfb>
-Output written on sunsetcode.pdf (8 pages, 296598 bytes).
+Output written on sunsetcode.pdf (8 pages, 295543 bytes).
 PDF statistics:
- 319 PDF objects out of 1000 (max. 8388607)
- 264 compressed objects within 3 object streams
+ 322 PDF objects out of 1000 (max. 8388607)
+ 267 compressed objects within 3 object streams
  84 named destinations out of 1000 (max. 500000)
- 165 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 173 words of extra memory for PDF output out of 10000 (max. 10000000)
 

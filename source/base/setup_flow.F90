@@ -97,6 +97,15 @@ contains
 #ifdef mp
      call halo_exchanges_all
 #endif          
+
+     !! Obtain velocity from momentum for mirrors
+     !$omp parallel do
+     do i=npfb+1,np
+        u(i)=rou(i)/ro(i)
+        v(i)=rov(i)/ro(i)
+        w(i)=row(i)/ro(i)                
+     end do
+     !$omp end parallel do
      
      !! Set the initial velocity divergence
      call calc_divergence(u,v,w,divvel(1:npfb))
@@ -483,7 +492,8 @@ contains
         
         !! Error function based progress variable
         c = half*(one + erf((x-flame_location)/flame_thickness))
-        c = exp(-((x-flame_location)/flame_thickness)**two)
+        c = exp(-((x-flame_location)/flame_thickness)**two -((y-0.2d0)/flame_thickness)**two)
+        c = c + exp(-((x-flame_location)/flame_thickness)**two -((y-0.2d0+0.5d0)/flame_thickness)**two)
                 
         !! Temperature profile
         T(i) = T_reactants + (T_products - T_reactants)*c
@@ -516,7 +526,7 @@ contains
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! wall initial conditions
               u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
-              T(i) = T_products !+ half*half*(T_products-T_reactants)
+!              T(i) = T_products !+ half*half*(T_products-T_reactants)
            end if                 
            if(node_type(i).eq.1) then !! inflow initial conditions
               u(i)=u_char                
@@ -540,7 +550,7 @@ contains
      real(rkind) :: Yin_H2,Yin_O2,Yin_N2,Yout_H2O
 
      !! Position and scale     
-     flame_location = zero
+     flame_location = 0.2d0!zero
      flame_thickness = 5.0d-4/L_char !! Scale thickness because position vectors are scaled...
 
      !! Inlet composition

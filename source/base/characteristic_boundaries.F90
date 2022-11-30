@@ -200,8 +200,10 @@ contains
 #ifdef ms
     Lchar(5+1:5+nspec) = zero                                  
 #endif    
+
 #endif
-#endif       
+
+#endif                   
          
 
   end subroutine specify_characteristics_inflow
@@ -229,11 +231,11 @@ contains
 #ifdef isoT
      !! ISOTHERMAL FLOWS, PARTIALLY NON-REFLECTING
      if(u(i).lt.c) then
-        Lchar(1) = (p(i)-p_outflow)*0.278d0*c*(one)/two/L_domain_x &                      !! track p_outflow
-                 - (one-u(i)/c)*half*(v(i)*gradb_p(2) + &
-                                      p(i)*gradb_v(2)-tmpro*c*v(i)*gradb_u(2)) & !!transverse 1 conv. terms
-                 - (one-u(i)/c)*half*(w(i)*gradb_p(3) + &
-                                      p(i)*gradb_w(3)-tmpro*c*w(i)*gradb_u(3))   !! transverse 2 conv. terms
+        Lchar(1) = (p(i)-p_outflow)*outflow_coeff*c*(one)/two/L_domain_x! &                      !! track p_outflow
+                 !- (one-u(i)/c)*half*(v(i)*gradb_p(2) + &
+                 !                     p(i)*gradb_v(2)-tmpro*c*v(i)*gradb_u(2)) & !!transverse 1 conv. terms
+                 !- (one-u(i)/c)*half*(w(i)*gradb_p(3) + &
+                 !                     p(i)*gradb_w(3)-tmpro*c*w(i)*gradb_u(3))   !! transverse 2 conv. terms
      end if
      Lchar(2) = zero   !! No entropy in isothermal flows
      !Lchar(3) is outgoing
@@ -247,17 +249,16 @@ contains
      
         gammagas = cp(i)/(cp(i)-Rgas_mix(i))     
         Lchar(1) = (p(i)-p_outflow)*outflow_coeff*c*(one)/two/L_domain_x &                               !! track p_outflow
-                 - (one-u(i)/c)*half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2) - &
-                                      tmpro*c*v(i)*gradb_u(2)) & !! trans1 conv.
-                 - (one-u(i)/c)*half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3) - &
-                                      tmpro*c*w(i)*gradb_u(3))   !! trasn2 conv.
-     
-       !! Add source terms for reacting flows
 #ifdef react
-        Lchar(1) = Lchar(1) - half*(gammagas-one)*sumoverspecies_homega(j)
+                 - half*(gammagas-one)*sumoverspecies_homega(j) !&
 #endif
+                 !! N.B. It's more stable to just follow Sutherland 2003 and neglect transverse terms
+                 !- (one-u(i)/c)*half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2) - &
+                 !                     tmpro*c*v(i)*gradb_u(2)) & !! trans1 conv.
+                 !- (one-u(i)/c)*half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3) - &
+                 !                     tmpro*c*w(i)*gradb_u(3))   !! trasn2 conv.
+    
       
-if(iRKstep.eq.1.and.j.eq.1) write(711,*) time,p(i)              
      end if
      !Lchar(2) is outgoing
      !Lchar(3) is outgoing
@@ -291,9 +292,9 @@ if(iRKstep.eq.1.and.j.eq.1) write(711,*) time,p(i)
         !! Wall boundaries
         if(node_type(i).eq.0) then
            !! In all cases, velocity on wall is zero
-           u(i) = zero
-           v(i) = zero
-           w(i) = zero
+           rou(i) = zero
+           rov(i) = zero
+           row(i) = zero
 
            !! For isothermal walls, evaluate the energy given the prescribed temperature
 #ifdef wall_isoT        
@@ -304,9 +305,9 @@ if(iRKstep.eq.1.and.j.eq.1) write(711,*) time,p(i)
         else if(node_type(i).eq.1) then 
 #ifdef hardinf
               !! Prescribed velocity for hardinflow
-              u(i)=u_inflow
-              v(i)=zero
-              w(i)=zero        
+              rou(i)=u_inflow*ro(i)
+              rov(i)=zero
+              row(i)=zero        
               
               !! Optional fixed T or fixed ro.
 #endif

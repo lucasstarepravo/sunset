@@ -228,7 +228,7 @@ contains
            rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) + rateYspec(i,ispec)           
                               
            !! Augment the heat release (production rate x enthalpy of formation)
-           heat_release = heat_release - mass_production_rate*coef_h(ispec,polyorder_cp+2)
+           heat_release = heat_release - rateYspec(i,ispec)*coef_h(ispec,polyorder_cp+2)
 
         end do
 alpha_out(i) = heat_release

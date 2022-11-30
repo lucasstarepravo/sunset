@@ -51,7 +51,7 @@ contains
 #ifndef isoT
      allocate(fT_coef_C(polyorder_cp+1),dfT_coef_C(polyorder_cp+1))
      
-     !! Loop over all nodes
+     !! Loop over ALL nodes
      maxiters = 0;sumiters=0
      !$omp parallel do private(fT_coef_C0,fT_coef_C,ispec,iorder,T_tmp,NRiters,fT,dfT,deltaT,dfT_coef_C, &
      !$omp cp_tmp,tmpro) &
@@ -140,7 +140,6 @@ contains
 
         !! Evaluate the pressure        
         p(i) = ro(i)*Rgas_mix(i)*T(i)           
-
      end do
      !$omp end parallel do
      
@@ -155,7 +154,7 @@ contains
      !$omp end parallel do      
      
 #endif     
-          
+        
 
      return
   end subroutine evaluate_temperature_and_pressure
