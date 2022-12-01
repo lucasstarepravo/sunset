@@ -321,8 +321,8 @@ contains
      
      !! Additionally calculate the pressure on outflow boundary nodes, and set P_outflow to the
      !! average of this (it should be uniform along bound)
-     integer(ikind) :: i,ispec,j,nsum
-     real(rkind) :: enthalpy,Rgas_mix_local,p_local,psum,tmpro,cpispec,dummy_real
+     integer(ikind) :: i,ispec,j,nsum_in,nsum_out
+     real(rkind) :: enthalpy,Rgas_mix_local,p_local,psum_in,tmpro,cpispec,dummy_real,psum_out
      
 #ifndef isoT     
      !! Evaluate the energy (roE) and pressure.
@@ -358,31 +358,45 @@ contains
      !$omp end parallel do
           
 
-     !! Pressure on outflow nodes 
-     psum = zero;nsum = 0
+     !! Pressure on inflow and outflow nodes 
+     psum_in = zero;nsum_in = 0
+     psum_out = zero;nsum_out = 0     
      if(nb.ne.0)then
-        !$omp parallel do private(i) reduction(+:psum,nsum)
+        !$omp parallel do private(i) reduction(+:psum_in,psum_out,nsum_in,nsum_out)
         do j=1,nb
            i=boundary_list(j)
+           if(node_type(i).eq.1) then
+                          
+              !! Augment the accumulators for sum of pressure and # inflow nodes
+              psum_in = psum_in + p(i)
+              nsum_in = nsum_in + 1
+           end if
            if(node_type(i).eq.2) then
                           
               !! Augment the accumulators for sum of pressure and # outflow nodes
-              psum = psum + p(i)
-              nsum = nsum + 1
+              psum_out = psum_out + p(i)
+              nsum_out = nsum_out + 1
            end if
         end do
         !$omp end parallel do
         
-        !! Find the average for processors with outflows. Set to zero otherwise
-        if(nsum.ne.0) then
-           P_outflow = psum/dble(nsum)
+        !! Find the average for processors with in/outflows. Set to zero otherwise
+        if(nsum_in.ne.0) then
+           P_inflow = psum_in/dble(nsum_in)
+        else
+           P_inflow = zero
+        end if
+        if(nsum_out.ne.0) then
+           P_outflow = psum_out/dble(nsum_out)
         else
            P_outflow = zero
         end if
         
+
      end if
 #else
      P_outflow = csq*rho_char
+     P_inflow = csq*rho_char
 #endif
 
        

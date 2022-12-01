@@ -36,3 +36,8 @@
 !! Temperature depedence exponent for TDTP
 7.0d-1
 
+!! INFLOWS: non-reflecting (0), hard (1), inout (2)
+0
+
+!! WALLS: adiabatic(0) or isothermal (1)
+0

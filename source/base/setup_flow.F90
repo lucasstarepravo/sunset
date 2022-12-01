@@ -247,6 +247,16 @@ contains
      r_temp_dependence = zero  !! zero it if not required
 #endif 
      
+     !! Read in inflow boundary type
+     read(12,*)
+     read(12,*) inflow_type
+     read(12,*)
+     
+     !! Read in wall boundary type
+     read(12,*)
+     read(12,*) wall_type
+     read(12,*)     
+     
      close(12)
           
      return
@@ -473,7 +483,7 @@ contains
      real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z
 
      !! Position and scale     
-     flame_location = 0.25d0!zero
+     flame_location = zero
      flame_thickness = 5.0d-4/L_char !! Scale thickness because position vectors are scaled...
 
      !! Temperatures
@@ -492,8 +502,7 @@ contains
         
         !! Error function based progress variable
         c = half*(one + erf((x-flame_location)/flame_thickness))
-        c = exp(-((x-flame_location)/flame_thickness)**two -((y-0.2d0)/flame_thickness)**two)
-        c = c + exp(-((x-flame_location)/flame_thickness)**two -((y-0.2d0+0.5d0)/flame_thickness)**two)
+!        c = exp(-((x-flame_location)/flame_thickness)**two)
                 
         !! Temperature profile
         T(i) = T_reactants + (T_products - T_reactants)*c
@@ -513,7 +522,7 @@ contains
         ro(i) = P_flame/(Rmix_local*T(i))
         
         !! Velocity
-        u(i) = u_reactants!*rho_char/ro(i)
+        u(i) = u_reactants*rho_char/ro(i)
         v(i) = zero
         w(i) = zero
                         
@@ -526,10 +535,10 @@ contains
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! wall initial conditions
               u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
-!              T(i) = T_products !+ half*half*(T_products-T_reactants)
+              T(i) = T_products !+ half*half*(T_products-T_reactants)
            end if                 
            if(node_type(i).eq.1) then !! inflow initial conditions
-              u(i)=u_char                
+!              u(i)=u_char                
            end if
            if(node_type(i).eq.2) then !! outflow initial conditions
               !! Do nothing
@@ -550,8 +559,8 @@ contains
      real(rkind) :: Yin_H2,Yin_O2,Yin_N2,Yout_H2O
 
      !! Position and scale     
-     flame_location = 0.2d0!zero
-     flame_thickness = 5.0d-4/L_char !! Scale thickness because position vectors are scaled...
+     flame_location = zero
+     flame_thickness = 2.0d-4/L_char !! Scale thickness because position vectors are scaled...
 
      !! Inlet composition
      Yin_H2 = 0.0283126
@@ -578,6 +587,7 @@ contains
         
         !! Error function based progress variable
         c = half*(one + erf((x-flame_location)/flame_thickness))
+!        c = exp(-((x-flame_location)/flame_thickness)**two)        
         
         !! Temperature profile
         T(i) = T_reactants + (T_products - T_reactants)*c
@@ -613,15 +623,14 @@ contains
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! wall initial conditions
               u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
-              T_bound(j) = T(i)
+              T(i) = T_products
            end if                 
            if(node_type(i).eq.1) then !! inflow initial conditions
-              u(i)=u_char
-              T_bound(j) = T(i) !! Inflow temperature is T_cold
+!              u(i)=u_char
            end if
            if(node_type(i).eq.2) then !! outflow initial conditions
-              T_bound(j) = T(i)  !! Outflow temperature is T_hot
            end if
+           T_bound(j) = T(i)
         end do
      end if
  
@@ -704,15 +713,13 @@ contains
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! wall initial conditions
               u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
-              T_bound(j) = T(i)
            end if                 
            if(node_type(i).eq.1) then !! inflow initial conditions
               u(i)=u_char
-              T_bound(j) = T(i) !! Inflow temperature is T_cold
            end if
            if(node_type(i).eq.2) then !! outflow initial conditions
-              T_bound(j) = T(i)  !! Outflow temperature is T_hot
            end if
+           T_bound(j) = T(i)           
         end do
      end if
  

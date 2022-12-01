@@ -172,7 +172,7 @@ contains
               dutdt = -yn*gradu(i,2)+xn*gradv(i,2) !! Transverse derivative of transverse velocity...
               
 
-              rhs_ro(i) = - ro(i)*dutdt - gradw(i,3)
+              rhs_ro(i) = - ro(i)*dutdt - ro(i)*gradw(i,3)
            else !! In x-y coords for inflow, outflow
               rhs_ro(i) = -v(i)*gradro(i,2) - ro(i)*gradv(i,2) - w(i)*gradro(i,3) - ro(i)*gradw(i,3)
            end if         
@@ -722,16 +722,26 @@ contains
        i=boundary_list(j)  
        
        !! WALL BOUNDARY 
-       if(node_type(i).eq.0) then      
-          call specify_characteristics_wall(j,L(j,:),gradv(i,:),gradw(i,:))
-
+       if(node_type(i).eq.0) then  
+          if(wall_type.eq.1) then    
+             call specify_characteristics_isothermal_wall(j,L(j,:))
+          else
+             call specify_characteristics_adiabatic_wall(j,L(j,:))
+          end if
+          
        !! INFLOW BOUNDARY
        else if(node_type(i).eq.1) then 
-          call specify_characteristics_inflow(j,L(j,:),gradro(i,:),gradp(i,:),gradu(i,:),gradv(i,:),gradw(i,:))       
+          if(inflow_type.eq.1) then  !! Hard inflow
+             call specify_characteristics_hard_inflow(j,L(j,:))       
+          else if(inflow_type.eq.2) then !! Pressure-tracking Inflow-outflow
+             call specify_characteristics_inflow_outflow(j,L(j,:),gradro(i,:),gradp(i,:),gradu(i,:),gradv(i,:),gradw(i,:))
+          else           
+             call specify_characteristics_soft_inflow(j,L(j,:),gradro(i,:),gradp(i,:),gradu(i,:),gradv(i,:),gradw(i,:))       
+          endif
  
        !! OUTFLOW BOUNDARY 
        else if(node_type(i).eq.2) then   
-          call specify_characteristics_outflow(j,L(j,:),gradp(i,:),gradu(i,:),gradv(i,:),gradw(i,:))       
+          call specify_characteristics_outflow(j,L(j,:))       
        end if          
     end do
     !$omp end parallel do

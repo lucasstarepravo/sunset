@@ -200,7 +200,7 @@ endif
        divphi(i) = divphi(i) + divtmp
     end do
     !$OMP END PARALLEL DO  
-#endif     
+#endif   
     
     !! Profiling
     segment_tend = omp_get_wtime()

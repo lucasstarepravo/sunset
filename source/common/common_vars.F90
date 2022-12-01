@@ -121,8 +121,9 @@ module common_vars
   integer(ikind),dimension(:),allocatable :: fd_parent !! pointer to the boundary node which is parent 
   
   !! Characteristic BC bits
+  integer(ikind) :: inflow_type,wall_type
   real(rkind),dimension(:),allocatable :: T_bound
-  real(rkind) :: p_outflow   !! Desired pressure on outflow boundary
+  real(rkind) :: p_outflow,p_inflow   !! Desired pressure on outflow boundary (and inflow if required...)
   real(rkind),dimension(:),allocatable :: sumoverspecies_homega
   real(rkind),dimension(:,:),allocatable :: reaction_rate_bound 
   

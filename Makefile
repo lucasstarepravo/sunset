@@ -6,10 +6,8 @@
 # thermo     Isothermal (0) or thermal (1) flow                                        (default: 1)
 # react      Reacting (1) or inert (0) flow                                            (default: 0)
 # restart    Start from initial conditions (0) or restart file (1)                     (default: 0)
-# hardinf    Non-reflecting inflow (0) or hard inflow (1)                              (default: 0)
 # multispec  Single (0) or multispecies (1) flow                                       (default: 0)
 # mpi        Shared only (0) or distributed-shared (1) acceleration                    (default: 0)          
-# wisot      Adiabatic/prescribed heat flux (0) or isothermal (1) walls                (default: 0)
 # dim3       Two (0) or three (1) dimensional simulation                               (default: 0)
 # pgrad      Drive the flow with a pressure gradient and P.I.D control                 (default: 0)
 # tdtp       Temperature dependent transport properties (1) or constant (0)            (default: 0)
@@ -21,7 +19,7 @@
 # make thermo=0 dim3=X mpi=X pgrad=X
 #
 # For standard combustion problems, react=1 will overwrite any thermo, tdtp and multispec flags:
-# make react=1 dim3=X mpi=X yout=X wisot=X hardinf=X     <---------- standard combustion make
+# make react=1 dim3=X mpi=X yout=X      <---------- standard combustion make
 #
 # For thermal flows with real gas properties:
 # make thermo=1 dim3=X mpi=X pgrad=X tdtp=1
@@ -75,19 +73,9 @@ ifeq ($(restart), 1)
 FFLAGS += -Drestart
 endif
 
-# Inflow boundary types
-ifeq ($(hardinf), 1)
-FFLAGS += -Dhardinf
-endif
-
 # Multiprocessor? (use mpi?)
 ifeq ($(mpi),1)
 FFLAGS += -Dmp
-endif
-
-# Wall boundary types
-ifneq ($(wisot),0)
-FFLAGS += -Dwall_isoT
 endif
 
 # Three dimensional?

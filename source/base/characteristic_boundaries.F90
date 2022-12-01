@@ -4,7 +4,8 @@ module characteristic_boundaries
   !! 
   !! Author             |Date             |Contributions
   !! --------------------------------------------------------------------------
-  !! JRCK               |2021 onwards     |Main developer                     
+  !! JRCK               |2021 onwards     |Main developer    
+  !! JRCK               |Nov 2022         |Including combustion terms                 
   !!
   !! ----------------------------------------------------------------------------------------------
   !! This module contains routines which take in characteristic waves and some
@@ -12,9 +13,8 @@ module characteristic_boundaries
 
     
   !! Boundary framework follows a mixture of:: 
-  !! Sutherland & Kennedy (2003)  <--------- probably most useful ref
-  !! Yoo & Im (2007)              <--------- probably the formulation most closely followed...
-  !! Coussement et al. (2012)   
+  !! SK03: Sutherland & Kennedy (2003) 
+  !! YI07: Yoo & Im (2007)             
   
   !! 
   use kind_parameters
@@ -24,12 +24,11 @@ module characteristic_boundaries
   implicit none
 contains
 !! ------------------------------------------------------------------------------------------------
-  subroutine specify_characteristics_wall(j,Lchar,gradb_v,gradb_w)
+  subroutine specify_characteristics_isothermal_wall(j,Lchar)
      integer(ikind),intent(in) :: j
      real(rkind),dimension(:),intent(inout) :: Lchar
-     real(rkind),dimension(:),intent(in) :: gradb_v,gradb_w
      integer(ikind) :: i,ispec
-     real(rkind) :: tmpro,c,gammagasm1,psource,Ysource
+     real(rkind) :: tmpro,c,gammagasm1,Ysource
      
      !! Index of this boundary node
      i = boundary_list(j)
@@ -37,39 +36,36 @@ contains
      !! Store the density
      tmpro = ro(i)
 
-     !! Store the sound speed
-#ifndef isoT       
-     c=evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
-#else
-     c=sqrt(csq)
-#endif 
-
-     !! ISOTHERMAL FLOWS
 #ifdef isoT
+     !! ISOTHERMAL FLOWS 
+     c=sqrt(csq)
+
      !Lchar(1) is outgoing, and so is unchanged
-     Lchar(2) = zero !! as there is no entropy wave
-     Lchar(3) = zero
-     Lchar(4) = zero
+     !Lchar(2) = zero !! as there is no entropy wave
+     !Lchar(3) = zero and unchanged
+     !Lchar(4) = zero and unchanged
+     
+     !! Acoustic reflection
      Lchar(5)= Lchar(1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro) 
 #ifdef ms     
-     Lchar(5+1:5+nspec) = zero
+     !Lchar(5+1:5+nspec) = zero and unchanged
 #endif     
-#else            
 
-#ifdef wall_isoT
-     !! THERMAL FLOWS, ISOTHERMAL WALLS
+#else            
+     !! THERMAL FLOWS
+
+     c=evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i))      
      gammagasm1 = Rgas_mix(i)/(cp(i)-Rgas_mix(i))
+
      !Lchar(1) is outgoing, and so is unchanged    
      !Lchar(3) is zero, and unchanged
      !Lchar(4) is zero, and unchanged
      Lchar(5)= Lchar(1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro)
      
-     !! Pressure source term:
-     psource = - half*gammagasm1*sumoverspecies_homega(j)
-     
-     !! Loop over species
+     !! Y source terms if any
+     Ysource = zero     
 #ifdef react
-     Ysource = zero
+     !! Loop over species and build source terms
      do ispec = 1,nspec
         !Lchar(5+ispec) is zero (hopefully!) and unchanged
         Ysource = Ysource + one_over_molar_mass(ispec)* &
@@ -77,33 +73,131 @@ contains
                             Lchar(5+ispec))
      end do
      Ysource = Ysource*Rgas_universal/Rgas_mix(i)                                       
-#else
-     psource = zero;ysource=zero
 #endif     
+   
      Lchar(2) = gammagasm1*(Lchar(1)+Lchar(5))/c/c &
-              + tmpro*psource/p(i) &            !! Pressure source terms
-              + tmpro*Ysource         !! species source terms
-              !+ additional dT/dt source terms TBC
-                           
-#else          
-     !! THERMAL FLOWS, ADIABATIC WALLS (imposed heat flux)
-     !Lchar(1) is outgoing, and so is unchanged    
-     !Lchar(2) is zero, and unchanged
-     !Lchar(3) is zero, and unchanged
-     !Lchar(4) is zero, and unchanged
-     Lchar(5)= Lchar(1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro)
-#ifdef ms     
-     !Lchar(5+1:5+nspec) is zero, and unchanged
+#ifdef react
+              + tmpro*gammagasm1*sumoverspecies_homega(j)/p(i) &              
 #endif     
-#endif                             
+              + tmpro*Ysource         !! species source terms
+              ! + (ro/T)*dT/dt
+                           
 #endif          
 
-  end subroutine specify_characteristics_wall
+  end subroutine specify_characteristics_isothermal_wall
+!! ------------------------------------------------------------------------------------------------  
+  subroutine specify_characteristics_adiabatic_wall(j,Lchar)
+     integer(ikind),intent(in) :: j
+     real(rkind),dimension(:),intent(inout) :: Lchar
+     integer(ikind) :: i,ispec
+     real(rkind) :: tmpro,c,gammagasm1,psource,Ysource
+
+#ifdef isoT
+     !! If this subroutine is called when running isothermal flows, it throws up an error
+     write(6,*) "Compiled for isothermal flows, but requested adiabatic"
+     write(6,*) "wall boundaries in control.in. Please change to "
+     write(6,*) "isothermal walls. Stopping."     
+#endif          
+
+     !! Index of this boundary node
+     i = boundary_list(j)
+
+     !! Store the density
+     tmpro = ro(i)
+
+     !! Store the sound speed
+     c=evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
+ 
+      
+     !! THERMAL FLOWS, ADIABATIC WALLS (imposed heat flux)
+     !Lchar(1) is outgoing, and so is unchanged    
+     !Lchar(2) is zero, and unchanged - no entropy input
+     !Lchar(3) is zero, and unchanged 
+     !Lchar(4) is zero, and unchanged
+    
+     !! Acoustic reflections    
+     Lchar(5)= Lchar(1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro)
+#ifdef ms     
+     !Lchar(5+1:5+nspec) is zero, and unchanged (no surface reactions)
+#endif     
+
+  end subroutine specify_characteristics_adiabatic_wall  
 !! ------------------------------------------------------------------------------------------------
-  subroutine specify_characteristics_inflow(j,Lchar,gradb_ro,gradb_p,gradb_u,gradb_v,gradb_w)
+  subroutine specify_characteristics_soft_inflow(j,Lchar,gradb_ro,gradb_p,gradb_u,gradb_v,gradb_w)
+     !! Specify characteristic waves for a (partially) non-reflecting inflow boundary.
+     !! Follows something between YI07 and SK03 in that we start from SK03, and add the transverse
+     !! terms as in YI07, but not the viscous terms.
      integer(ikind),intent(in) :: j
      real(rkind),dimension(:),intent(inout) :: Lchar
      real(rkind),dimension(:),intent(in) :: gradb_ro,gradb_p,gradb_u,gradb_v,gradb_w
+     integer(ikind) :: i,ispec
+     real(rkind) :: tmpro,c,gammagas
+     
+     !! Index of this boundary node
+     i = boundary_list(j)
+
+     !! Store the density
+     tmpro = ro(i)
+
+#ifdef isoT   
+     !! ISOTHERMAL FLOWS
+     c=sqrt(csq)     
+     
+     !Lchar(1) is outgoing, so doesn't require modification
+     Lchar(2) = zero
+     Lchar(3) = v(i)*0.278d0*c/L_domain_x &        !! track v=zero
+              - v(i)*gradb_v(2) - w(i)*gradb_v(3) - gradb_p(2)/ro(i) !! transverse terms
+     Lchar(4) = w(i)*0.278d0*c/L_domain_x &        !! track w=zero
+              + rhs_row(i)                           !! rhs_w contains transverse and visc terms needed
+     Lchar(5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &     !! Track u_inflow
+              - half*(v(i)*gradb_p(2)+p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2)) &    !! transverse 1 conv. terms
+              - half*(w(i)*gradb_p(3)+p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))      !! transverse 2 conv. terms 
+#ifdef ms
+     Lchar(5+1:5+nspec) = zero
+#endif     
+
+         
+#else
+     !! THERMAL FLOWS    
+     c=evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
+     gammagas = cp(i)/(cp(i)-Rgas_mix(i))
+
+     !Lchar(1) is outgoing, don't modify
+     Lchar(2) = (T_bound(j)-T(i))*c*0.278d0/L_domain_x/gammagas &  !! Track T_bound(j)
+#ifdef react
+              + (gammagas-one)*sumoverspecies_homega(j)/c/c &     !! Source terms
+#endif
+              - (v(i)*gradb_ro(2) + tmpro*gradb_v(2) + &                !! Transverse terms
+                 v(i)*gradb_p(2)/c/c + gammagas*p(i)*gradb_v(2)/c/c) &
+              - (w(i)*gradb_ro(3) + tmpro*gradb_w(3) + &
+                 w(i)*gradb_p(3)/c/c + gammagas*p(i)*gradb_w(3)/c/c)
+               
+     Lchar(3) = v(i)*0.278d0*c/L_domain_x &        !! track v=zero
+              - v(i)*gradb_v(2) - w(i)*gradb_v(3) - gradb_p(2)/ro(i) !! transverse terms
+     Lchar(4) = w(i)*0.278d0*c/L_domain_x &        !! track w=zero
+              - v(i)*gradb_w(2) - w(i)*gradb_w(3) - gradb_p(3)/ro(i) !! transverse terms
+
+     Lchar(5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &      !! Track u_inflow
+#ifdef react
+              - half*(gammagas-one)*sumoverspecies_homega(j) &                 !! Source terms
+#endif
+              - half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2))  & !! transverse 1 conv. terms
+              - half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))    !! transverse 2 conv. terms  
+             
+#ifdef ms
+     !! TBC, include tracking, transverse and source terms for flame-inflow interactions
+     Lchar(5+1:5+nspec) = zero !! At present just assume inflow is far enough from flame...
+#endif    
+
+#endif                   
+         
+
+  end subroutine specify_characteristics_soft_inflow
+!! ------------------------------------------------------------------------------------------------  
+  subroutine specify_characteristics_hard_inflow(j,Lchar)
+     !! Specifies characteristics for hard-inflows with prescribed temperature.
+     integer(ikind),intent(in) :: j
+     real(rkind),dimension(:),intent(inout) :: Lchar
      integer(ikind) :: i,ispec
      real(rkind) :: tmpro,c,gammagasm1,gammagas
      
@@ -113,105 +207,153 @@ contains
      !! Store the density
      tmpro = ro(i)
 
-     !! Store the sound speed
-#ifndef isoT       
-     c=evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
-#else
-     c=sqrt(csq)
-#endif 
-
 #ifdef isoT
-   
-#ifndef hardinf
-     !! ISOTHERMAL FLOWS, PARTIALLY NON-REFLECTING
+     !! ISOTHERMAL FLOWS
+     c=sqrt(csq)
      !Lchar(1) is outgoing, so doesn't require modification
-     Lchar(2) = zero
-     Lchar(3) = v(i)*0.278d0*c/L_domain_x &        !! track v=zero
-              + rhs_rov(i)                           !! rhs_v contains transverse and visc terms needed
-     Lchar(4) = w(i)*0.278d0*c/L_domain_x &        !! track w=zero
-              + rhs_row(i)                           !! rhs_w contains transverse and visc terms needed
-     Lchar(5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &     !! Track u_inflow
-              - half*(v(i)*gradb_p(2)+p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2)) &    !! transverse 1 conv. terms
-              - half*(w(i)*gradb_p(3)+p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))      !! transverse 2 conv. terms 
-#ifdef ms
-     Lchar(5+1:5+nspec) = zero
-#endif     
-#else
-     !! ISOTHERMAL FLOWS, HARD INFLOW
-     !Lchar(1) is outgoing, so doesn't require modification
-     Lchar(2) = zero
-     Lchar(3) = zero        
+     Lchar(2) = zero  !! No entropy for isothermal flows
+     Lchar(3) = zero  !! v,w are prescribed
      Lchar(4) = zero
      Lchar(5) = Lchar(1)   !! Acoustically reflecting
 #ifdef ms
-     Lchar(5+1:5+nspec) = zero          
+     Lchar(5+1:5+nspec) = zero ! presume no inflow composition variation         
 #endif     
-#endif
          
 #else
+     !! THERMAL FLOWS, prescribed inflow temperature
+     c=evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
+     gammagas = cp(i)/(cp(i)-Rgas_mix(i))     
 
+     !Lchar(1) is outgoing, so doesn't require modification
 
-#ifndef hardinf
-    !! THERMAL FLOWS, PARTIALLY NON-REFLECTING
-    gammagas = cp(i)/(cp(i)-Rgas_mix(i))
-    gammagasm1 = gammagas - one
-    Lchar(2) = (T_bound(j)-T(i))*c*0.278d0/L_domain_x/gammagas &  !! Track T_bound(j)
-             - (v(i)*gradb_ro(2) + tmpro*gradb_v(2) + &
-                v(i)*gradb_p(2)/c/c + gammagas*p(i)*gradb_v(2)/c/c) &
-             - (w(i)*gradb_ro(3) + tmpro*gradb_w(3) + &
-                w(i)*gradb_p(3)/c/c + gammagas*p(i)*gradb_w(3)/c/c)
-             !! + visc + source terms TBC
-    Lchar(3) = v(i)*0.278d0*c/L_domain_x &        !! track v=zero
-             + rhs_rov(i)                           !! rhs_v contains transverse and visc terms needed
-    Lchar(4) = w(i)*0.278d0*c/L_domain_x &        !! track w=zero
-             + rhs_row(i)                           !! rhs_w contains transverse and visc terms needed
+     !! Acoustically reflecting
+     Lchar(5) = Lchar(1) !! - ro*c*du/dt
 
-    Lchar(5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &      !! Track u_inflow
-             - half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2))  & !! transverse 1 conv. terms
-             - half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))    !! transverse 2 conv. terms  
-
-    !! Add source terms for chemical reactions
-#ifdef react
-    Lchar(2) = Lchar(2) + (gammagas-one)*sumoverspecies_homega(j)/c/c
-    Lchar(5) = Lchar(5) - half*(gammagas-one)*sumoverspecies_homega(j)
-#endif
-             
-#ifdef ms
-    Lchar(5+1:5+nspec) = zero                 
-#endif    
-#else
-    !! THERMAL FLOWS, HARD INFLOW 
-    !Lchar(1) is outgoing, so doesn't require modification
-    Lchar(5) = Lchar(1)
-    Lchar(3) = zero        
-    Lchar(4) = zero
+     !! v and w are prescribed
+     Lchar(3) = zero
+     Lchar(4) = zero
     
-    !! Fixed temperature option       
-!    Lchar(2) = gammagasm1*(Lchar(1)+Lchar(5))/c/c &
-!             - gammagasm1*tmpro*gradb_v(2) &   !! trans 1 term
-!             - gammagasm1*tmpro*gradb_w(3)     !! Trans 2 term 
-             !+dT/dy term?
+     !! Fixed temperature option       
+     Lchar(2) = (gammagas-one)*(Lchar(1)+Lchar(5))/c/c &
+#ifdef react
+              - tmpro*(gammagas-one)*sumoverspecies_homega(j)/p(i) !&
+#endif     
+!              - gammagasm1*tmpro*gradb_v(2) &   !! trans 1 term
+!              - gammagasm1*tmpro*gradb_w(3)     !! Trans 2 term 
+              ! + (ro/T)*dT/dt
+              ! + sumoveralpha(dY/dt) terms
              
-    !! Fixed density (and hence mass flux) option             
-    Lchar(2) = -Lchar(1)/c/c &
-               -v(i)*gradb_ro(2) - tmpro*gradb_v(2) &  !! trans 1 term
-               -w(i)*gradb_ro(3) - tmpro*gradb_w(3)    !! trans 2 term
-
+     !! Fixed density (and hence mass flux) option             
+!     Lchar(2) = - (Lchar(1)+Lchar(5))/c/c !&
+!                - v(i)*gradb_ro(2) - tmpro*gradb_v(2) &  !! trans 1 term
+!                - w(i)*gradb_ro(3) - tmpro*gradb_w(3) &   !! trans 2 term
+!                + (gammagas-one)*sumoverspecies_homega(j)/c/c
+                !-dro/dt
 #ifdef ms
-    Lchar(5+1:5+nspec) = zero                                  
+     do ispec=1,nspec
+        Lchar(5+1:5+nspec) = zero! reaction_rate_bound(j,ispec)
+                           ! - dY(ispec)/dt
+     end do
 #endif    
 
-#endif
 
 #endif                   
          
 
-  end subroutine specify_characteristics_inflow
+  end subroutine specify_characteristics_hard_inflow  
+!! ------------------------------------------------------------------------------------------------  
+  subroutine specify_characteristics_inflow_outflow(j,Lchar,gradb_ro,gradb_p,gradb_u,gradb_v,gradb_w)
+     !! Specify characteristic waves for a (partially) non-reflecting inflow boundary.
+     !! Follows something between YI07 and SK03 in that we start from SK03, and add the transverse
+     !! terms as in YI07, but not the viscous terms.
+     integer(ikind),intent(in) :: j
+     real(rkind),dimension(:),intent(in) :: gradb_ro,gradb_p,gradb_u,gradb_v,gradb_w     
+     real(rkind),dimension(:),intent(inout) :: Lchar
+     integer(ikind) :: i,ispec
+     real(rkind) :: tmpro,c,gammagas
+     
+     !! Index of this boundary node
+     i = boundary_list(j)
+
+     !! Store the density
+     tmpro = ro(i)
+
+#ifdef isoT   
+     !! ISOTHERMAL FLOWS
+     c=sqrt(csq)     
+
+     if(u(i).gt.zero) then !! Inflow options
+    
+        !Lchar(1) is outgoing, so doesn't require modification
+        Lchar(2) = zero
+        Lchar(3) = v(i)*0.278d0*c/L_domain_x &      !! track v=zero
+        Lchar(4) = w(i)*0.278d0*c/L_domain_x       !! track w=zero
+        Lchar(5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x     !! Track u_inflow
+#ifdef ms
+        Lchar(5+1:5+nspec) = zero
+#endif     
+     else               !! Outflow options
+        !Lchar(1) is outgoing, unchanged
+        Lchar(2) = zero   !! No entropy in isothermal flows
+        !Lchar(3) is outgoing
+        !Lchar(4) is outgoing
+        Lchar(5) (p(i)-p_inflow)*outflow_coeff*c*(one)/two/L_domain_x     !! track p_outflow
+        !Lchar(5+1:5+nspec) is outgoing     
+     end if        
+#else
+     !! THERMAL FLOWS    
+     c=evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
+     gammagas = cp(i)/(cp(i)-Rgas_mix(i))
+
+     if(u(i).gt.zero) then !! inflow options
+        !Lchar(1) is outgoing, don't modify
+        Lchar(2) = (T_bound(j)-T(i))*c*0.278d0/L_domain_x/gammagas &  !! Track T_bound(j)
+#ifdef react
+                 + (gammagas-one)*sumoverspecies_homega(j)/c/c &     !! Source terms
+#endif
+                 - (v(i)*gradb_ro(2) + tmpro*gradb_v(2) + &                !! Transverse terms
+                    v(i)*gradb_p(2)/c/c + gammagas*p(i)*gradb_v(2)/c/c) &
+                 - (w(i)*gradb_ro(3) + tmpro*gradb_w(3) + &
+                    w(i)*gradb_p(3)/c/c + gammagas*p(i)*gradb_w(3)/c/c)
+               
+        Lchar(3) = v(i)*0.278d0*c/L_domain_x &        !! track v=zero
+                 - v(i)*gradb_v(2) - w(i)*gradb_v(3) - gradb_p(2)/ro(i) !! transverse terms
+        Lchar(4) = w(i)*0.278d0*c/L_domain_x &        !! track w=zero
+                 - v(i)*gradb_w(2) - w(i)*gradb_w(3) - gradb_p(3)/ro(i) !! transverse terms
+
+        Lchar(5) = (p(i)-P_inflow)*outflow_coeff*c*(one)/two/L_domain_x &      !! Track p_inflow
+#ifdef react
+                 - half*(gammagas-one)*sumoverspecies_homega(j) !&                 !! Source terms
+#endif
+!                 - half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2))  & !! transverse 1 conv. terms
+!                 - half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))    !! transverse 2 conv. terms  
+             
+#ifdef ms
+        !! TBC, include tracking, transverse and source terms for flame-inflow interactions
+        Lchar(5+1:5+nspec) = zero !! At present just assume inflow is far enough from flame...
+#endif    
+
+     else        !! Outflow options
+        !Lchar(1) is outgoing
+        !Lchar(2) is outgoing
+        !Lchar(3) is outgoing
+        !Lchar(4) is outgoing
+        !Lchar(5+1:5+nspec) is outgoing 
+        Lchar(5) = (p(i)-p_inflow)*outflow_coeff*c*(one)/two/L_domain_x &        !! track p_outflow
+#ifdef react
+                 - half*(gammagas-one)*sumoverspecies_homega(j) &
+#endif
+                 + zero !! Neglecting transverse terms
+     end if
+#endif      
+             
+         
+
+  end subroutine specify_characteristics_inflow_outflow
 !! ------------------------------------------------------------------------------------------------
-  subroutine specify_characteristics_outflow(j,Lchar,gradb_p,gradb_u,gradb_v,gradb_w)
+  subroutine specify_characteristics_outflow(j,Lchar)
      integer(ikind),intent(in) :: j
      real(rkind),dimension(:),intent(inout) :: Lchar
-     real(rkind),dimension(:),intent(in) :: gradb_p,gradb_u,gradb_v,gradb_w
      integer(ikind) :: i,ispec
      real(rkind) :: tmpro,c,gammagasm1,gammagas
      
@@ -250,21 +392,22 @@ contains
         gammagas = cp(i)/(cp(i)-Rgas_mix(i))     
         Lchar(1) = (p(i)-p_outflow)*outflow_coeff*c*(one)/two/L_domain_x &                               !! track p_outflow
 #ifdef react
-                 - half*(gammagas-one)*sumoverspecies_homega(j) !&
+                 - half*(gammagas-one)*sumoverspecies_homega(j) &
 #endif
                  !! N.B. It's more stable to just follow Sutherland 2003 and neglect transverse terms
-                 !- (one-u(i)/c)*half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2) - &
+                 + zero!- (one-u(i)/c)*half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2) - &
                  !                     tmpro*c*v(i)*gradb_u(2)) & !! trans1 conv.
                  !- (one-u(i)/c)*half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3) - &
                  !                     tmpro*c*w(i)*gradb_u(3))   !! trasn2 conv.
     
       
-     end if
+
      !Lchar(2) is outgoing
      !Lchar(3) is outgoing
      !Lchar(4) is outgoing
      !Lchar(5) is outgoing
      !Lchar(5+1:5+nspec) is outgoing          
+     end if
 #endif            
 
      !! Sometimes we have a little inflow at an outflow boundary. In this case, set Lchar(3)=Lchar(4)=zero
@@ -274,7 +417,7 @@ contains
         Lchar(3)=zero !! no incoming shear if outflow velocity is zero...
         Lchar(4)=zero
 #ifdef ms
-        Lchar(6:5+nspec)=zero !! No incoming composition waves??
+        Lchar(5+1:5+nspec)=zero !! No incoming composition waves??
 #endif        
      end if   
          
@@ -297,20 +440,23 @@ contains
            row(i) = zero
 
            !! For isothermal walls, evaluate the energy given the prescribed temperature
-#ifdef wall_isoT        
-           call set_energy_on_bound(i,T_bound(j))        
-#endif           
+           if(wall_type.eq.1) then
+              call set_energy_on_bound(i,T_bound(j))        
+           end if
         
         !! Inflow boundaries
         else if(node_type(i).eq.1) then 
-#ifdef hardinf
-              !! Prescribed velocity for hardinflow
+           if(inflow_type.eq.1) then !! Hard inflow
+              !! Prescribed velocity               
               rou(i)=u_inflow*ro(i)
               rov(i)=zero
               row(i)=zero        
-              
-              !! Optional fixed T or fixed ro.
-#endif
+
+              ! Prescribed temperature              
+              call set_energy_on_bound(i,T_bound(j))                      
+           endif
+           
+           !! Don't need to do anything for soft inflow or inout
         
         !! Outflow boundaries
         else if(node_type(i).eq.2) then
@@ -319,6 +465,31 @@ contains
         
      end do
      !$omp end parallel do
+     
+     
+     !! For inflow-outflow types, adjust the zero-normal-flux flags dynamically depending on velocity sign
+     if(inflow_type.eq.2) then
+        !$omp parallel do private(i)
+        do j=1,nb
+           i=boundary_list(j)
+           if(node_type(i).eq.1) then  !! It's an inflow-outflow type
+              if(u(i).gt.zero) then     !! Incoming flow, set diffusive flux flags for inflow
+                 znf_mdiff(j) = .false.        
+                 znf_tdiff(j) = .false.
+                 znf_vdiff(j) = .true.     !! No normal viscous diffusion through inflows                
+                 znf_vtdiff(j) = .false.                           
+              else                      !! Outgoing flow, set diffusive flux flags for outflow
+                 znf_mdiff(j) = .true.      !! No mass diffusion through outflow (N.B. not imposed...)
+                 znf_tdiff(j) = .true.      !! No thermal diffusion through outflow
+                 znf_vdiff(j) = .false.      
+                 znf_vtdiff(j) = .true.      !! No tangential viscous diffusion through outflow       
+              end if
+           end if
+        end do
+        !$omp end parallel do     
+     endif
+       
+     
   
   
      return
