@@ -24,6 +24,8 @@ module common_parameter
   real(rkind), parameter :: half = 0.5d0
   real(rkind), parameter :: oosix = 1.0d0/6.0d0
   real(rkind), parameter :: verysmall = 1.0d-30
+  real(rkind), parameter :: verylarge = 1.0d30
+  real(rkind), parameter :: quitesmall = 1.0d-12
   
   !! Physical constants ---------------------------------------------------------------------------
   real(rkind), parameter :: Rgas_universal = 8.3142d3         !! Universal gas constant  

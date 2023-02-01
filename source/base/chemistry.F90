@@ -233,6 +233,8 @@ contains
         end do
 alpha_out(i) = heat_release
 
+        !! Store the heat release rate
+        hrr(i) = heat_release
 
      end do
      !$omp end parallel do     

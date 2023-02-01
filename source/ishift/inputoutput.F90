@@ -188,18 +188,15 @@ write(6,*) "Shifting iteration",ll,"of ",kk
         call iteratively_shift(10)
         call iteratively_shift(10)
         call iteratively_shift(10)                   
-     
-        !! Output post-shift distribution
-!        do i=1,npfb
-!           write(31,*) rp(i,:)
-!        end do
+
         write(6,*) "After iterative shifting:",nb,npfb,np
      
      end if
-        !! Output post-shift distribution
-        do i=1,npfb
-           write(31,*) rp(i,:)
-        end do
+
+     !! Output post-shift distribution
+!     do i=1,npfb
+ !       write(31,*) rp(i,:)
+  !   end do
 
 
                     
@@ -208,6 +205,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
 !! ------------------------------------------------------------------------------------------------  
   subroutine output_newnodes
      integer(ikind) :: i,n,j
+     real(rkind) :: max_x,min_x,max_y,min_y,max_s,block_size_x,block_size_y
      
      n= npfb - 4*nb
      open(212,file='../../IPART')
@@ -221,11 +219,35 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      do j=1,nprocsZ
         do i=1,nprocs
            write(212,*) (j-1)*n + nstart(i),(j-1)*n + nend(i)
+           
+           !! Check scales of this processor block. 
+           !! N.B. this is not valid for the cyclic blocks at the start of each column!!
+           max_x = maxval(x(nstart(i):nend(i)))
+           min_x = minval(x(nstart(i):nend(i)))
+           max_y = maxval(y(nstart(i):nend(i)))
+           min_y = minval(y(nstart(i):nend(i)))
+           max_s = maxval(ds(nstart(i):nend(i)))
+
+           !! Block dimensions normalised by max stencil size
+           block_size_x = (max_x-min_x)/(two*hovs*max_s)
+           block_size_y = (max_y-min_y)/(two*hovs*max_s)
+
+           if(block_size_x.le.two.or.block_size_y.le.two) then
+              write(6,*) "WARNING: blocks may be too thin for resolution on processor",i
+              write(6,*) "Block sizes x,y:",block_size_x,block_size_y
+           end if
+           if(block_size_x.le.one.or.block_size_y.le.one) then
+              write(6,*) "ERROR: blocks definitely too thin for resolution on processor",i
+              write(6,*) "Block sizes x,y:",block_size_x,block_size_y
+              stop
+           end if
+
+           
         end do
      end do
      deallocate(nstart,nend)
      
-     do j=1,nprocsZ
+     do j=1,nprocsZ       
         do i=1,n
            write(212,*) x(i),y(i),nt(i),xn(i),yn(i),ds(i)
         end do
@@ -268,6 +290,9 @@ write(6,*) "Shifting iteration",ll,"of ",kk
   end subroutine remove_fd_nodes  
 !! ------------------------------------------------------------------------------------------------
   subroutine rearrange_nodes
+     !! Re-arranges nodes in order of increasing x, then for each band in x, re-arranges in order 
+     !! of increasing y, but allowing for periodics...
+  
      integer(ikind) :: kk,nband,nptmp,nl_ini,nl_end,ii,nblock,ll,nl_end_column
      integer(ikind) :: nshift
    

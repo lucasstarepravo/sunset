@@ -19,8 +19,9 @@ module common_vars
   real(rkind) :: L_char,U_char          !! read from file
   real(rkind) :: u_inflow,Lz,Time_char  !! build from L_char,U_char
   real(rkind), dimension(dims) :: grav !! Gravity    
-  real(rkind) :: rho_char,T_ref,visc_ref,p_ref
+  real(rkind) :: rho_char,T_ref,visc_ref,p_ref,phi_in
   real(rkind) :: Pr,Ma,Re,Mdiff_ref
+  integer(ikind) :: mix_av_flag
 #ifdef isoT
   real(rkind) :: csq
 #endif  
@@ -35,7 +36,7 @@ module common_vars
   integer(ikind) :: nspec
      
   !! Secondary fluid quantities
-  real(rkind), dimension(:), allocatable, target :: p,T,u,v,w
+  real(rkind), dimension(:), allocatable, target :: p,T,u,v,w,hrr
   real(rkind), dimension(:), allocatable :: divvel  
   
   !! Transport properties
@@ -47,6 +48,11 @@ module common_vars
   real(rkind), dimension(:,:),allocatable :: coef_cp,coef_h,coef_dcpdT,coef_gibbs !! indexing: ispec,j-exponent
   integer(ikind) :: polyorder_cp,ncoefs_cp  !! polynomial order,number of coefs
   real(rkind) :: T_low,T_high
+  
+  !! Transport for mixture-average transport
+  real(rkind),dimension(:,:),allocatable :: mxav_coef_visc,mxav_coef_lambda
+  real(rkind),dimension(:,:,:),allocatable :: mxav_coef_Diff,mxav_coef_thta  
+  real(rkind),dimension(:,:),allocatable :: mxav_visc_combo1,mxav_visc_combo2
   
   !! Velocity gradients  
   real(rkind),dimension(:,:),allocatable :: gradu,gradv,gradw

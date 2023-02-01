@@ -35,15 +35,16 @@ contains
      allocate(T(np));T=T_ref
      allocate(p(np));p=zero
      allocate(u(np),v(np),w(np));u=zero;v=zero;w=zero
-     allocate(alpha_out(np));alpha_out = zero     
+     allocate(alpha_out(np));alpha_out = zero   
+     allocate(hrr(npfb));hrr = zero !! Array for heat release rate  
      
      !! Transport properties
-     allocate(visc(npfb));visc = visc_ref
+     allocate(visc(np));visc = visc_ref
 #ifndef isoT
-     allocate(lambda_th(npfb))
+     allocate(lambda_th(np))
 #endif
 #ifdef ms     
-     allocate(roMdiff(npfb,nspec))
+     allocate(roMdiff(np,nspec))
 #endif     
      allocate(cp(np),Rgas_mix(np))
      
@@ -203,6 +204,11 @@ contains
      read(12,*) rho_char
      read(12,*)
      
+     !! Inflow equivalence ratio
+     read(12,*) 
+     read(12,*) phi_in
+     read(12,*) 
+     
      !! Reference temp
      read(12,*)
      read(12,*) T_ref
@@ -222,6 +228,11 @@ contains
      read(12,*)
      read(12,*) Pr
      read(12,*) 
+     
+     !! Diffusion flag (1 gives mixture averaging)
+     read(12,*)
+     read(12,*) mix_av_flag
+     read(12,*)
      
      !! Mach number (only used for isothermal flows)
      read(12,*)
@@ -255,7 +266,7 @@ contains
      !! Read in wall boundary type
      read(12,*)
      read(12,*) wall_type
-     read(12,*)     
+!     read(12,*)     
      
      close(12)
           
@@ -483,7 +494,7 @@ contains
      real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z
 
      !! Position and scale     
-     flame_location = zero
+     flame_location = -0.0d0
      flame_thickness = 5.0d-4/L_char !! Scale thickness because position vectors are scaled...
 
      !! Temperatures
@@ -502,7 +513,7 @@ contains
         
         !! Error function based progress variable
         c = half*(one + erf((x-flame_location)/flame_thickness))
-!        c = exp(-((x-flame_location)/flame_thickness)**two)
+!        c = exp(-((x-flame_location)/flame_thickness)**two - (y/flame_thickness)**two)
                 
         !! Temperature profile
         T(i) = T_reactants + (T_products - T_reactants)*c
@@ -517,14 +528,14 @@ contains
            Rmix_local = Rmix_local + Yspec(i,ispec)*one_over_molar_mass(ispec)
         end do
         Rmix_local = Rmix_local*Rgas_universal
-        
+               
         !! Density
-        ro(i) = P_flame/(Rmix_local*T(i))
-        
+        ro(i) = P_flame/(Rmix_local*T(i))   
+               
         !! Velocity
         u(i) = u_reactants*rho_char/ro(i)
         v(i) = zero
-        w(i) = zero
+        w(i) = zero    
                         
      end do
      !$omp end parallel do
@@ -535,7 +546,7 @@ contains
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! wall initial conditions
               u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
-              T(i) = T_products !+ half*half*(T_products-T_reactants)
+              T(i) = T_reactants !+ half*half*(T_products-T_reactants)              
            end if                 
            if(node_type(i).eq.1) then !! inflow initial conditions
 !              u(i)=u_char                
@@ -557,15 +568,20 @@ contains
      real(rkind) :: T_reactants,T_products
      real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z
      real(rkind) :: Yin_H2,Yin_O2,Yin_N2,Yout_H2O
+     real(rkind) :: o2n2_ratio,h2o2_stoichiometric,h2o2_ratio
 
      !! Position and scale     
      flame_location = zero
-     flame_thickness = 2.0d-4/L_char !! Scale thickness because position vectors are scaled...
+     flame_thickness = 5.0d-4/L_char !! Scale thickness because position vectors are scaled...
+   
+     !! Determine inlet composition
+     o2n2_ratio = one*molar_mass(2)/(3.76d0*molar_mass(9))
+     h2o2_stoichiometric = two*molar_mass(1)/(one*molar_mass(2))
+     h2o2_ratio = h2o2_stoichiometric*phi_in
 
-     !! Inlet composition
-     Yin_H2 = 0.0283126
-     Yin_O2 = 0.226501
-     Yin_N2 = 0.745187
+     Yin_O2 = one/(one + h2o2_ratio + one/o2n2_ratio)
+     Yin_H2 = Yin_O2*h2o2_ratio
+     Yin_N2 = one - Yin_H2 - Yin_O2     
      
      !! Outlet composition
      Yout_H2O = one - Yin_N2     
@@ -646,19 +662,25 @@ contains
      real(rkind) :: T_reactants,T_products
      real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z
      real(rkind) :: Yin_CH4,Yin_O2,Yin_N2,Yout_H2O,Yout_CO2
+     real(rkind) :: o2n2_ratio,ch4o2_ratio,ch4o2_stoichiometric,co2h2o_ratio
 
      !! Position and scale     
      flame_location = zero
      flame_thickness = 5.0d-4/L_char !! Scale thickness because position vectors are scaled...
 
-     !! Inlet composition
-     Yin_CH4 = 0.055046
-     Yin_O2 = 0.22018
+     !! Determine inlet composition
+     o2n2_ratio = one*molar_mass(2)/(3.76d0*molar_mass(16))
+     ch4o2_stoichiometric = one*molar_mass(1)/(two*molar_mass(2))
+     ch4o2_ratio = ch4o2_stoichiometric*phi_in
+          
+     Yin_O2 = one/(one + ch4o2_ratio + one/o2n2_ratio)
+     Yin_CH4 = Yin_O2*ch4o2_ratio
      Yin_N2 = one - Yin_CH4 - Yin_O2
-     
-     !! Outlet composition
-     Yout_CO2 = (one - Yin_N2)*44.0d0/80.0d0
-     Yout_H2O = Yout_CO2*36.0d0/44.0d0
+
+     !! Outlet composition 
+     co2h2o_ratio = one*molar_mass(3)/(two*molar_mass(4))  !! Assume complete combustion??
+     Yout_CO2 = (one - Yin_N2)/(one + one/co2h2o_ratio)
+     Yout_H2O = Yout_CO2/co2h2o_ratio            
 
      !! Temperatures
      T_reactants = 3.0d2
@@ -721,9 +743,7 @@ contains
            end if
            T_bound(j) = T(i)           
         end do
-     end if
- 
-  
+     end if  
   
      return
   end subroutine make_1d_25step_flame  

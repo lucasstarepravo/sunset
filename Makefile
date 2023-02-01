@@ -102,7 +102,7 @@ SRC_DIR  := $(addprefix source/,$(SUB_DIRS))
 #parameters come first, as almost everything depends on them.
 OBJ_FILES := obj/kind_parameters.o obj/common_parameter.o obj/common_vars.o
 OBJ_FILES += obj/rbfs.o obj/mirror_boundaries.o obj/derivatives.o 
-OBJ_FILES += obj/mpi_transfers.o obj/thermodynamics.o
+OBJ_FILES += obj/mpi_transfers.o obj/transport.o obj/thermodynamics.o
 OBJ_FILES += obj/neighbours.o obj/output.o obj/statistics.o 
 OBJ_FILES += obj/setup_domain.o obj/setup_flow.o
 OBJ_FILES += obj/labf.o obj/fd.o obj/chemistry.o

@@ -126,8 +126,9 @@ contains
            amatx(:,:) = amatx(:,:) + amaty(:,:)   
         end do   
 
+        !! for rows 1,2,3 & 4, drop to 6th order
 #if ORDER>=7
-        if(node_type(i).lt.0)then !! for rows 1,2,3 & 4, drop to 6th order
+        if(node_type(i).lt.0)then 
            do i1=1,nsizeG
               amatx(i1,28:nsizeG)=zero        
            end do
@@ -141,8 +142,10 @@ contains
       
         !! Copy LHS for hyperviscosity
         amathyp = amatx
+
+        !! for rows 1 & 2, drop gradients to 4th order
 #if ORDER>=5              
-        if(node_type(i).eq.-1.or.node_type(i).eq.-2) then !! for for rows 1 & 2, drop gradients to 4th order
+        if(node_type(i).eq.-1.or.node_type(i).eq.-2) then 
             do i1=1,nsizeG
               amatx(i1,15:nsizeG)=zero        
            end do
@@ -607,7 +610,8 @@ contains
         end if     
      end do
      
-     !! Outflow boundaries: reverse first derivative weights
+     !! Outflow boundaries: reverse first derivative weights, because they have been calculated in norm-tang frame,
+     !! but we want them in x-y frame.
      do jj=1,nb
         i=boundary_list(jj)
         if(node_type(i).eq.2) then

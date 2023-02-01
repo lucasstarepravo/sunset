@@ -50,11 +50,14 @@ contains
      !! Time, total energy within domain.
      open(unit=197,file='data_out/statistics/energy_sum.out')  
      
-     !! Time, error in species conservation, total mass of each species in domain
-     open(unit=199,file='data_out/statistics/species.out')
-
      !! Time, enstrophy
      open(unit=198,file='data_out/statistics/enstrophy.out')
+
+     !! Time, error in species conservation, total mass of each species in domain
+     open(unit=199,file='data_out/statistics/species.out')
+     
+     !! Time, heat release rate
+     open(unit=200,file='data_out/statistics/heat_release_rate.out')
 
      return     
   end subroutine open_stats_files
@@ -63,7 +66,7 @@ contains
      !! This routine controls the statistics calculation and output routines.
      integer(ikind) :: i
      real(rkind) :: tot_mass,tot_vol,tmpro,dVi,tot_mass_tmp,tot_vol_tmp,tot_roE,tot_roE_tmp
-     integer(ikind),parameter :: istats_freq = 100
+     integer(ikind),parameter :: istats_freq = 10
      
      
      !! Evaluate the mean velocity and adjust pressure gradient if required
@@ -90,6 +93,9 @@ contains
 
         !! Check the conservation of the species equations
         call species_check
+        
+        !! Check heat release
+        call heat_release_rate
      endif
 
      return
@@ -261,6 +267,48 @@ contains
      
      return
   end subroutine velocity_control   
+!! ------------------------------------------------------------------------------------------------  
+  subroutine heat_release_rate
+     !! This subroutine calculates the total heat release rate integrated over the domain
+     integer(ikind) :: i
+     real(rkind) :: tot_hrr,tot_vol,tmpro,dVi,tot_hrr_tmp,tot_vol_tmp
+#ifdef react    
+   
+     tot_hrr = zero;tot_vol = zero;
+     !$omp parallel do private(tmpro,dVi) reduction(+:tot_hrr,tot_vol)
+     do i=1,npfb
+!        tmpro = ro(i)
+        dVi = s(i)*s(i) !! assume square nodes for now...
+#ifdef dim3
+        dVi = dVi*dz
+#endif        
+        tot_hrr = tot_hrr + hrr(i)*dVi
+        tot_vol = tot_vol + dVi
+     end do
+     !$omp end parallel do
+     
+#ifdef mp
+     tot_hrr_tmp = tot_hrr;tot_vol_tmp = tot_vol
+     call MPI_ALLREDUCE(tot_hrr_tmp,tot_hrr,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(tot_vol_tmp,tot_vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
+#endif     
+     !! Mean heat release averaged over volume::
+     tot_hrr = tot_hrr/tot_vol
+        
+#ifdef mp
+     if(iproc.eq.0)then
+        write(200,*) time/Time_char,tot_hrr
+        flush(200)
+     end if
+#else
+     write(200,*) time/Time_char,tot_hrr
+     flush(200)
+#endif
+
+#endif
+
+     return
+  end subroutine heat_release_rate 
 !! ------------------------------------------------------------------------------------------------
   subroutine mass_and_energy_check
      !! This subroutine calculates the mean density and total energy in the domain.

@@ -22,6 +22,7 @@ module rhs
   use common_vars
   use derivatives
   use thermodynamics
+  use transport
   use characteristic_boundaries
   use chemistry
   implicit none
@@ -122,7 +123,7 @@ contains
      end if
           
      !! If we want to calculate total dissipation rate
-     if(.true..and.iRKstep.eq.1) then
+     if(.false..and.iRKstep.eq.1) then
         call check_enstrophy
      end if    
      
@@ -189,10 +190,11 @@ contains
      real(rkind),dimension(:,:,:),allocatable :: gradYspec
      real(rkind),dimension(:,:),allocatable :: grad2Yspec
      integer(ikind) :: i,j,ispec
-     real(rkind),dimension(dims) :: tmp_vec,gradroMdiff,grad_enthalpy,roDgradY
+     real(rkind),dimension(dims) :: tmp_vec,grad_enthalpy,roDgradY
      real(rkind) :: tmp_scal,lapYspec_tmp,tmpY,divroDgradY,enthalpy,dcpdT,cpispec,tmpro
      real(rkind),dimension(:,:),allocatable :: speciessum_roDgradY,speciessum_hgradY
      real(rkind),dimension(:),allocatable :: speciessum_divroDgradY,speciessum_hY
+     real(rkind),dimension(:,:),allocatable :: gradroMdiff
 
      !! Allocate space for gradients and stores
      allocate(Y_thisspec(np));Y_thisspec = zero
@@ -201,13 +203,13 @@ contains
      allocate(gradcp(npfb,dims));gradcp = zero
 #endif     
 #ifdef ms     
-
      allocate(gradYspec(npfb,dims,nspec))
      allocate(lapYspec(npfb))
      allocate(speciessum_divroDgradY(npfb));speciessum_divroDgradY = zero
      allocate(speciessum_roDgradY(npfb,dims));speciessum_roDgradY = zero
      allocate(speciessum_hY(npfb));speciessum_hY = zero
      allocate(speciessum_hgradY(npfb,dims));speciessum_hgradY = zero
+     allocate(gradroMdiff(npfb,dims))
      
      !! Loop over all species
      do ispec=1,nspec
@@ -222,9 +224,24 @@ contains
         !! Calculate gradient and Laplacian for Yspec for this species     
         call calc_gradient(Y_thisspec,gradYspec(:,:,ispec))
         call calc_laplacian(Y_thisspec,lapYspec)
+
+        !! Diffusivity gradients
+        if(mix_av_flag.eq.1) then
+           call calc_gradient(roMdiff(:,ispec),gradroMdiff)
+        else
+#ifndef isoT
+           !$omp parallel do
+           do i=1,npfb
+              gradroMdiff(i,:) = r_temp_dependence*roMdiff(i,ispec)*gradT(i,:)/T(i)
+           end do
+           !$omp end parallel do
+#else
+           gradroMdiff(:,:) = zero
+#endif           
+        end if
              
       
-        !$omp parallel do private(i,tmp_vec,tmp_scal,tmpY,gradroMdiff,divroDgradY,enthalpy,grad_enthalpy, &
+        !$omp parallel do private(i,tmp_vec,tmp_scal,tmpY,divroDgradY,enthalpy,grad_enthalpy, &
         !$omp dcpdT,cpispec,tmpro)
         do j=1,npfb-nb
            i=internal_list(j)
@@ -235,15 +252,10 @@ contains
            tmp_vec(1) = u(i);tmp_vec(2) = v(i);tmp_vec(3) = w(i)  !! holds (u,v,w)
            tmp_scal = ro(i)*dot_product(tmp_vec,gradYspec(i,:,ispec)) - Y_thisspec(i)*rhs_ro(i)
          
-           !! Molecular diffusion
-#ifndef isoT           
-           gradroMdiff(:) = r_temp_dependence*roMdiff(i,ispec)*gradT(i,:)/T(i)
-#else
-           gradroMdiff(:) = zero           
-#endif           
+           !! Molecular diffusion terms
            !!divroDgradY = ro*D*lapY + grad(ro*D)*gradY
            divroDgradY = roMdiff(i,ispec)*lapYspec(i) &
-                      + dot_product(gradYspec(i,:,ispec),gradroMdiff(:))
+                      + dot_product(gradYspec(i,:,ispec),gradroMdiff(i,:))
            
            
            !! Sum roDgradY and div(roDgradY) over species
@@ -283,7 +295,7 @@ contains
            allocate(grad2Yspec(nb,dims))
            call calc_grad2bound(Yspec(:,ispec),grad2Yspec)
            !$omp parallel do private(i,xn,yn,un,ut,dutdt,lapYspec_tmp,tmpY,roDgradY &
-           !$omp ,gradroMdiff,divroDgradY,enthalpy,grad_enthalpy,tmpro,cpispec,dcpdT,tmp_vec,tmp_scal)
+           !$omp ,divroDgradY,enthalpy,grad_enthalpy,tmpro,cpispec,dcpdT,tmp_vec,tmp_scal)
            do j=1,nb
               i=boundary_list(j)
               tmpro = one/ro(i)  !! tmpro contains 1/ro
@@ -291,14 +303,7 @@ contains
               !! Convective term: ro*u.gradY + Y(div.(ro*u))
               tmp_vec(1) = zero;tmp_vec(2) = v(i);tmp_vec(3) = w(i)  !! holds (0,v,w)
               tmp_scal = ro(i)*dot_product(tmp_vec,gradYspec(i,:,ispec)) - Y_thisspec(i)*rhs_ro(i)              
-              
-              !! Evaluate gradient of molecular diffusivity              
-#ifndef isoT                 
-              gradroMdiff(:) = r_temp_dependence*roMdiff(i,ispec)*gradT(i,:)/T(i)
-#else
-              gradroMdiff(:) = zero
-#endif                              
-                           
+                                                               
               !! roDgradY  
               roDgradY(:) = roMdiff(i,ispec)*gradYspec(i,:,ispec)                
                            
@@ -307,12 +312,12 @@ contains
               if(znf_mdiff(j)) then
                  lapYspec_tmp = grad2Yspec(j,2) + grad2Yspec(j,3) !! Transverse terms only
                  divroDgradY = roMdiff(i,ispec)*lapYspec_tmp &
-                            + dot_product(gradYspec(i,2:3,ispec),gradroMdiff(2:3))
+                            + dot_product(gradYspec(i,2:3,ispec),gradroMdiff(i,2:3))
                  roDgradY(1) = zero !! zero normal contribution on walls                                         
               else
                  lapYspec_tmp = grad2Yspec(j,1) + grad2Yspec(j,2) + grad2Yspec(j,3)
                  divroDgradY = roMdiff(i,ispec)*lapYspec_tmp &                            
-                            + dot_product(gradYspec(i,:,ispec),gradroMdiff(:))               
+                            + dot_product(gradYspec(i,:,ispec),gradroMdiff(i,:))               
               endif
               
               !! Sum roDgradY and div(roDgradY) over species
@@ -360,6 +365,7 @@ contains
      
      !! Deallocate any stores no longer required    
      deallocate(lapYspec,Y_thisspec)
+     deallocate(gradroMdiff)     
  
      !! Run through species again and finalise rhs and diffusion store for energy
      !$omp parallel do private(enthalpy,grad_enthalpy,tmpro,ispec)
@@ -400,11 +406,13 @@ contains
   subroutine calc_rhs_rovel
      !! Construct the RHS for u-equation
      integer(ikind) :: i,j
-     real(rkind),dimension(dims) :: tmp_vec,gradvisc
+     real(rkind),dimension(dims) :: tmp_vec
      real(rkind) :: tmp_scal_u,tmp_scal_v,tmp_scal_w,f_visc_u,f_visc_v,f_visc_w
      real(rkind) :: tmpro,body_force_u,body_force_v,body_force_w,one_over_ro
      real(rkind) :: c
      real(rkind),dimension(:,:),allocatable :: grad2uvec,grad2ucross
+     
+     real(rkind),dimension(:,:),allocatable :: gradvisc
 
      
      !! Gradient of velocity divergence
@@ -436,9 +444,22 @@ contains
      !$omp end parallel do
 #endif                           
          
+     !! Evaluate the viscosity gradient (different methods depending on whether mixture averaged)
+#ifdef tdtp     
+     allocate(gradvisc(npfb,dims))
+     if(mix_av_flag.eq.1) then
+        call calc_gradient(visc,gradvisc)         
+     else
+        !$omp parallel do
+        do i=1,npfb
+           gradvisc(i,:) = r_temp_dependence*visc(i)*gradT(i,:)/T(i)
+        end do
+     end if
+#endif     
+         
      !! Build RHS for internal nodes
      !$omp parallel do private(i,tmp_vec,tmp_scal_u,tmp_scal_v,tmp_scal_w,f_visc_u,f_visc_v,f_visc_w,tmpro &
-     !$omp ,body_force_u,body_force_v,body_force_w,gradvisc)
+     !$omp ,body_force_u,body_force_v,body_force_w)
      do j=1,npfb-nb
         i=internal_list(j)
         tmp_vec(1) = u(i);tmp_vec(2) = v(i);tmp_vec(3) = w(i) !! tmp_vec holds (u,v,w) for node i
@@ -453,16 +474,16 @@ contains
         
         !! Viscous forces due to non-uniform viscosity
 #ifdef tdtp
-        gradvisc(:) = r_temp_dependence*visc(i)*gradT(i,:)/T(i)
-        f_visc_u = f_visc_u + gradvisc(1)*(fourthirds*gradu(i,1) - twothirds*(gradv(i,2)+gradw(i,3))) &
-                            + gradvisc(2)*(gradu(i,2)+gradv(i,1)) &
-                            + gradvisc(3)*(gradu(i,3)+gradw(i,1))
-        f_visc_v = f_visc_v + gradvisc(1)*(gradu(i,2)+gradv(i,1)) &
-                            + gradvisc(2)*(fourthirds*gradv(i,2) - twothirds*(gradu(i,1)+gradw(i,3))) &
-                            + gradvisc(3)*(gradv(i,3)+gradw(i,2))
-        f_visc_w = f_visc_w + gradvisc(1)*(gradu(i,3)+gradw(i,1)) &
-                            + gradvisc(2)*(gradv(i,3)+gradw(i,2)) &
-                            + gradvisc(3)*(fourthirds*gradw(i,3) - twothirds*(gradu(i,1)+gradv(i,2))) 
+!        gradvisc(:) = r_temp_dependence*visc(i)*gradT(i,:)/T(i)
+        f_visc_u = f_visc_u + gradvisc(i,1)*(fourthirds*gradu(i,1) - twothirds*(gradv(i,2)+gradw(i,3))) &
+                            + gradvisc(i,2)*(gradu(i,2)+gradv(i,1)) &
+                            + gradvisc(i,3)*(gradu(i,3)+gradw(i,1))
+        f_visc_v = f_visc_v + gradvisc(i,1)*(gradu(i,2)+gradv(i,1)) &
+                            + gradvisc(i,2)*(fourthirds*gradv(i,2) - twothirds*(gradu(i,1)+gradw(i,3))) &
+                            + gradvisc(i,3)*(gradv(i,3)+gradw(i,2))
+        f_visc_w = f_visc_w + gradvisc(i,1)*(gradu(i,3)+gradw(i,1)) &
+                            + gradvisc(i,2)*(gradv(i,3)+gradw(i,2)) &
+                            + gradvisc(i,3)*(fourthirds*gradw(i,3) - twothirds*(gradu(i,1)+gradv(i,2))) 
 #endif        
       
         !! Local density 
@@ -501,7 +522,7 @@ contains
    
      
         !$omp parallel do private(i,tmpro,c,xn,yn,un,ut,f_visc_u,f_visc_v,body_force_u,body_force_v &
-        !$omp ,dpdn,dundn,dutdn,gradvisc,f_visc_w,tmp_vec,tmp_scal_u,tmp_scal_v,tmp_scal_w)
+        !$omp ,dpdn,dundn,dutdn,f_visc_w,tmp_vec,tmp_scal_u,tmp_scal_v,tmp_scal_w)
         do j=1,nb
            i=boundary_list(j)
            tmpro = ro(i)
@@ -554,23 +575,23 @@ contains
               f_visc_w = visc(i)*(lapw(i) + onethird*graddivvel(i,3))
 #ifdef tdtp
               !! non-uniform viscosity terms. 
-              gradvisc(:) = r_temp_dependence*visc(i)*gradT(i,:)/T(i)
-              f_visc_u = f_visc_u + gradvisc(1)*(fourthirds*gradu(i,1) - twothirds*(gradv(i,2)+gradw(i,3))) &
-                                  + gradvisc(2)*(gradu(i,2)+gradv(i,1)) &
-                                  + gradvisc(3)*(gradu(i,3)+gradw(i,1))
-              f_visc_v = f_visc_v + gradvisc(1)*(gradu(i,2)+gradv(i,1)) &
-                                  + gradvisc(2)*(fourthirds*gradv(i,2) - twothirds*(gradu(i,1)+gradw(i,3))) &
-                                  + gradvisc(3)*(gradv(i,3)+gradw(i,2))
-              f_visc_w = f_visc_w + gradvisc(1)*(gradu(i,3)+gradw(i,1)) &
-                                  + gradvisc(2)*(gradv(i,3)+gradw(i,2)) &
-                                  + gradvisc(3)*(fourthirds*gradw(i,3) - twothirds*(gradu(i,1)+gradv(i,2)))     
+!              gradvisc(:) = r_temp_dependence*visc(i)*gradT(i,:)/T(i)
+              f_visc_u = f_visc_u + gradvisc(i,1)*(fourthirds*gradu(i,1) - twothirds*(gradv(i,2)+gradw(i,3))) &
+                                  + gradvisc(i,2)*(gradu(i,2)+gradv(i,1)) &
+                                  + gradvisc(i,3)*(gradu(i,3)+gradw(i,1))
+              f_visc_v = f_visc_v + gradvisc(i,1)*(gradu(i,2)+gradv(i,1)) &
+                                  + gradvisc(i,2)*(fourthirds*gradv(i,2) - twothirds*(gradu(i,1)+gradw(i,3))) &
+                                  + gradvisc(i,3)*(gradv(i,3)+gradw(i,2))
+              f_visc_w = f_visc_w + gradvisc(i,1)*(gradu(i,3)+gradw(i,1)) &
+                                  + gradvisc(i,2)*(gradv(i,3)+gradw(i,2)) &
+                                  + gradvisc(i,3)*(fourthirds*gradw(i,3) - twothirds*(gradu(i,1)+gradv(i,2)))     
 #endif 
               
               !! Zero normal flux normal stress divergence
               if(znf_vdiff(j)) then
                  !! dtau_nn/dn = 0
                  f_visc_u = f_visc_u + visc(i)*(twothirds*graddivvel(i,1) - two*grad2uvec(j,1))       
-                 f_visc_u = f_visc_u - gradvisc(1)*(fourthirds*gradu(i,1) - twothirds*(gradv(i,2)+gradw(i,3)))
+                 f_visc_u = f_visc_u - gradvisc(i,1)*(fourthirds*gradu(i,1) - twothirds*(gradv(i,2)+gradw(i,3)))
               endif
 
               if(znf_vtdiff(j))then
@@ -580,8 +601,8 @@ contains
 
                  !! zero non-uniform viscosity contribution to dtau_jn/dn for j=2,3 
 #ifdef tdtp
-                 f_visc_v = f_visc_v - gradvisc(1)*(gradu(i,2)+gradv(i,1)) 
-                 f_visc_w = f_visc_w - gradvisc(1)*(gradu(i,3)+gradw(i,1)) 
+                 f_visc_v = f_visc_v - gradvisc(i,1)*(gradu(i,2)+gradv(i,1)) 
+                 f_visc_w = f_visc_w - gradvisc(i,1)*(gradu(i,3)+gradw(i,1)) 
 #endif 
               end if
      
@@ -608,6 +629,9 @@ contains
      !! Deallocate any stores no longer required
      deallocate(lapu,lapv,lapw)
      deallocate(graddivvel) 
+#ifdef tdtp
+     deallocate(gradvisc)
+#endif
 
      return
   end subroutine calc_rhs_rovel
@@ -617,17 +641,29 @@ contains
 #ifndef isoT     
      integer(ikind) :: i,j
      real(rkind) :: tmp_conv,tmp_visc,tmp_p,tmp_E
-     real(rkind),dimension(dims) :: gradlambda
      real(rkind),dimension(:,:),allocatable :: grad2T
      real(rkind),dimension(:),allocatable :: lapT
      real(rkind) :: lapT_tmp
+     real(rkind),dimension(:,:),allocatable :: gradlambda     
          
      !! Allocation and calculation of temperature laplacian     
      allocate(lapT(npfb))
      call calc_laplacian(T,lapT)
      
+     !! Thermal conductivity gradient
+     allocate(gradlambda(npfb,dims))
+     if(mix_av_flag.eq.1)then
+        call calc_gradient(lambda_th,gradlambda)
+     else
+        !$omp parallel do
+        do i=1,npfb
+           gradlambda(i,:) = lambda_th(i)*r_temp_dependence*gradT(i,:)/T(i)  + lambda_th(i)*gradcp(i,:)/cp(i)           
+        end do
+        !$omp end parallel do
+     end if
+     
      !! Build RHS
-     !$omp parallel do private(i,tmp_p,tmp_conv,tmp_visc,tmp_E,gradlambda)
+     !$omp parallel do private(i,tmp_p,tmp_conv,tmp_visc,tmp_E)
      do j=1,npfb-nb
         i=internal_list(j)
 
@@ -649,8 +685,7 @@ contains
         
         !! Thermal diffusion term: div.(lambda*gradT + heating due to molecular diffusion)
         store_diff_E(i) = store_diff_E(i) + lambda_th(i)*lapT(i)  
-        gradlambda(:) = lambda_th(i)*r_temp_dependence*gradT(i,:)/T(i)  + lambda_th(i)*gradcp(i,:)/cp(i)
-        store_diff_E(i) = store_diff_E(i) + dot_product(gradlambda(:),gradT(i,:))
+        store_diff_E(i) = store_diff_E(i) + dot_product(gradlambda(i,:),gradT(i,:))
 
                 
         !! Build final RHS
@@ -663,7 +698,7 @@ contains
      if(nb.ne.0)then
         allocate(grad2T(nb,3))
         call calc_grad2bound(T,grad2T)          
-        !$omp parallel do private(i,tmp_visc,gradlambda,lapT_tmp)
+        !$omp parallel do private(i,tmp_visc,lapT_tmp)
         do j=1,nb
            i=boundary_list(j)
    
@@ -675,19 +710,16 @@ contains
                     + (gradv(i,3)+gradw(i,2))**two         
            store_diff_E(i) = store_diff_E(i) + visc(i)*tmp_visc           
 
-           !! Evaluate thermal conductivity gradient
-           gradlambda(:) = lambda_th(i)*r_temp_dependence*gradT(i,:)/T(i)  + lambda_th(i)*gradcp(i,:)/cp(i)   
-
            !! Evaluate temperature Laplacian and zero parts as required
            if(znf_tdiff(j)) then
               lapT_tmp = grad2T(j,2) + grad2T(j,3)  !! No normal d2T/dn2
-              gradlambda(1) = zero                  !! dlambda/dn=0
+              gradlambda(i,1) = zero                  !! dlambda/dn=0
            else
               lapT_tmp = lapT(i)
            end if                    
            
            !! Add thermal diffusion term: div.(lambda*gradT)              
-           store_diff_E(i) = store_diff_E(i) + lambda_th(i)*lapT_tmp + dot_product(gradlambda(:),gradT(i,:))               
+           store_diff_E(i) = store_diff_E(i) + lambda_th(i)*lapT_tmp + dot_product(gradlambda(i,:),gradT(i,:))               
                      
            !! RHS (visc + cond + transverse + source)
            rhs_roE(i) = - v(i)*gradroE(i,2) - roE(i)*gradv(i,2) - w(i)*gradroE(i,3) - roE(i)*gradw(i,3) &
@@ -699,6 +731,7 @@ contains
      end if
      deallocate(lapT)
      deallocate(gradcp)
+     deallocate(gradlambda)
                
 #else
      rhs_roE(1:npfb) = zero

@@ -17,6 +17,7 @@ program sunset
   use statistics 
   use neighbours
   use labf
+  use transport
   use fd
   use step
 #ifdef mp  
@@ -57,6 +58,7 @@ program sunset
 #ifndef isoT
   call load_chemistry_data
 #endif  
+  if(mix_av_flag.eq.1) call load_transport_file
   call initial_solution
 
   !! Initialise time profiling and output counter...
@@ -76,7 +78,7 @@ program sunset
      if(itime.eq.0.or.time.gt.n_out*dt_out) then 
 !     if(itime.eq.0.or.mod(itime,1).eq.0)then
         n_out = n_out + 1
-        call output_layer(n_out)
+        call output_layer(n_out)        
         call output_laminar_flame_structure(n_out)
      end if        
     
@@ -122,7 +124,7 @@ subroutine deallocate_everything
   deallocate(rou,rov,row,ro,roE,Yspec)
   
   !! Secondary properties & transport vars
-  deallocate(T,p,cp,visc,Rgas_mix,u,v,w)
+  deallocate(T,p,cp,visc,Rgas_mix,u,v,w,hrr)
 #ifndef isoT
   deallocate(lambda_th)
 #endif

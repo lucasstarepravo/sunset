@@ -8,21 +8,13 @@ module thermodynamics
   !!
   !! ----------------------------------------------------------------------------------------------
   !! This module contains routines to calculate thermodynamic properties (e.g. p,T, from ro,u,roE,Y)
-  !! and temperature dependent transport properties (e.g. visc,lambda,D)
   
   !! Various thermodynamic options ::
   !! 1) isoT      - ISOTHERMAL FLOW. Don't solve an energy equation, p=ro*c*c with c a constant. Many
   !!                arrays are not used, and so not allocated.
   !! 2) not(isoT) - THERMAL FLOW: cp is a polynomial function of T (it can be a polynomial of 
   !!                order 0), and T is obtained from ro,u,roE,Y via solution of a non-linear 
-  !!                equation with a Newton-Raphson method. Within thermal framework, we have two 
-  !!                options:
-  !!     a) tdtp       - The temperature dependence of the viscosity, thermal conductivity, and
-  !!                     molecular diffusivity is by a power scaling of the base values of 
-  !!                     (T/T_ref)**r, with r a constant.
-  !!     b) not(tdtp)  - Transport properties independent of temperature, although molecular diffusivity
-  !!                     and thermal conductivity may be non-uniform, as they are functions of 
-  !!                     composition and density.
+  !!                equation with a Newton-Raphson method. 
   
   !! Evaluation of and direct reference to CHEMKIN polynomials (i.e. use of coef_cp,coef_h) should 
   !! only happen within the routines in this module.
@@ -45,7 +37,6 @@ contains
      real(rkind),parameter :: T_tolerance=1.0d-10
      integer(ikind),parameter :: NRiters_max=100
      logical :: keepgoing
-
    
 
 #ifndef isoT
@@ -229,46 +220,6 @@ contains
      
      return
   end subroutine evaluate_gibbs_at_node
-!! ------------------------------------------------------------------------------------------------
-  subroutine evaluate_transport_properties
-     !! Uses temperature, cp and density to evaluate thermal conductivity, viscosity and 
-     !! molecular diffusivity. For isothermal flows, or if not(tdtp), use reference values.
-     integer(ikind) :: ispec,i
-     real(rkind) :: tmp   
-       
-#ifndef isoT     
-     !$omp parallel do private(ispec,tmp)
-     do i=1,npfb
-     
-        !! Viscosity
-#ifdef tdtp
-        visc(i) = visc_ref*(T(i)/T_ref)**r_temp_dependence
-#else
-        visc(i) = visc_ref
-#endif        
-     
-        !! Thermal conductivity
-        lambda_th(i) = cp(i)*visc(i)/Pr
-
-#ifdef ms       
-        !! Molecular diffusivity - actually returning ro*Mdiff
-        tmp = visc(i)/Pr
-        do ispec=1,nspec
-           roMdiff(i,ispec) = tmp*one_over_Lewis_number(ispec)
-        end do        
-#endif        
-   
-     end do
-     !$omp end parallel do
-#else
-     visc(:) = visc_ref
-#ifdef ms
-     roMdiff(:,:) = ro(i)*Mdiff_ref
-#endif     
-#endif     
-  
-     return
-  end subroutine evaluate_transport_properties
 !! ------------------------------------------------------------------------------------------------
   function evaluate_sound_speed_at_node(cp_local,Rgm_local,T_local) result(c)
      !! Sound speed from cp,Rmix and T (or prescribed by csq if isoT)

@@ -3,7 +3,7 @@ program main
   implicit none
 
   integer :: n,i,nthreads,np,npp,ngrab,Nframes,iframe,i_loop_finish,N_start,ii,iii,i_PART_counter
-  integer,parameter :: np_max = 1000010
+  integer,parameter :: np_max = 2100010
   integer, parameter :: i_PART_counter_max=20000
   character chartemp*40, name_orig*40
   character name_vtu*40, name_vtu2*12, name_vtu3*9
@@ -21,12 +21,15 @@ program main
       
   real,allocatable,dimension(:):: xp,zp,up,vp,wp,ro,vort,h,Temp,yp
   real,allocatable,dimension(:,:) :: Yspec
+  integer,allocatable,dimension(:) :: processor,node_type
   real time(i_PART_counter_max), DT(i_PART_counter_max)
   integer np_all(i_PART_counter_max), IT(i_PART_counter_max)
-  integer processor(np_max),node_type(np_max),subset_flag
+  integer subset_flag
   real  DT1(i_PART_counter_max),DT2(i_PART_counter_max)  
   integer :: nprocs,iproc,np_ini,np_end,dummy_int,nspecs
   real :: dummy_real
+  
+  write(6,*) "Hi!"
   
   allocate(xp(np_max))
   allocate(zp(np_max))
@@ -39,6 +42,9 @@ program main
   allocate(vort(np_max))
   allocate(h(np_max))
   allocate(Temp(np_max))
+  
+  allocate(processor(np_max),node_type(np_max))
+  
 
   DQ=CHAR(34)
    

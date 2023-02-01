@@ -431,6 +431,7 @@ contains
 !! ------------------------------------------------------------------------------------------------
   subroutine set_tstep
      use thermodynamics
+     use transport
      integer(ikind) :: i
      real(rkind) :: umag,dt_local
      real(rkind) :: dt_visc,dt_therm,dt_spec  
