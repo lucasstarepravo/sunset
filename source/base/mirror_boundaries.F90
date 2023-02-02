@@ -308,4 +308,34 @@ contains
      return
   end subroutine reapply_mirror_bcs_divvel_only
 !! ------------------------------------------------------------------------------------------------ 
+  subroutine mirror_bcs_transport_only
+     !! Just copy transport properties to mirrors
+     use omp_lib
+     integer(ikind) :: i,j,ispec
+     
+     segment_tstart = omp_get_wtime()
+     
+     !! Update properties in the boundary particles
+     !$OMP PARALLEL DO PRIVATE(i)
+#ifdef mp
+     do j=npfb+1,np_nohalo
+#else
+     do j=npfb+1,np
+#endif
+        i = irelation(j)
+        visc(j) = visc(i)
+        lambda_th(j) = lambda_th(i)
+        do ispec=1,nspec
+           roMdiff(j,ispec) = roMdiff(i,ispec)
+        end do
+        
+     end do
+     !$OMP END PARALLEL DO     
+
+     !! Profiling
+     segment_tend = omp_get_wtime()
+     segment_time_local(2) = segment_time_local(2) + segment_tend - segment_tstart
+     return
+  end subroutine mirror_bcs_transport_only 
+!! ------------------------------------------------------------------------------------------------ 
 end module mirror_boundaries

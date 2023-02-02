@@ -21,8 +21,11 @@ module common_parameter
   real(rkind), parameter :: zero = 0.0d0
   real(rkind), parameter :: one = 1.0d0
   real(rkind), parameter :: two = 2.0d0
-  real(rkind), parameter :: half = 0.5d0
-  real(rkind), parameter :: oosix = 1.0d0/6.0d0
+  real(rkind), parameter :: four = two*two
+  real(rkind), parameter :: half = one/two  
+  real(rkind), parameter :: quarter = half*half  
+  real(rkind), parameter :: six=6.0d0
+  real(rkind), parameter :: oosix = one/six
   real(rkind), parameter :: verysmall = 1.0d-30
   real(rkind), parameter :: verylarge = 1.0d30
   real(rkind), parameter :: quitesmall = 1.0d-12
@@ -32,6 +35,10 @@ module common_parameter
 
   !! (NODE-SET) Discretisation related parameters
   integer(ikind) ,parameter :: dims = 3
+  !! hovs values need changing depending on desired order
+  !!  4: 2.1 & 2.1
+  !!  6,8: 2.7 & 2.4
+  !!  10:  3.1 & 2.4
   real(rkind), parameter :: hovs = 2.7d0   !! stencil scale over discretisation scale (h/s)
   real(rkind), parameter :: hovs_bound = 2.4d0 !! as above, reduced near bounds for stability
   real(rkind), parameter :: ss = 2.0d0       !! Stencil size (radius, in multiples of h)

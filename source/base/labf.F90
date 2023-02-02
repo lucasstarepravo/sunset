@@ -752,7 +752,7 @@ contains
 #elif ORDER==8
      res_tol = 1.0d-4*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 8th order    
 #elif ORDER==10     
-     res_tol = 1.0d-4*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 10th order --> needs tweaking
+     res_tol = 1.0d-4*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 10th order --> needs tweaking 1.0d-4
 #elif ORDER==12
      res_tol = 1.0d-8*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 12th order --> set so no reduction    
 #endif     

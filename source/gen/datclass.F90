@@ -419,7 +419,7 @@ case(5) !! Inflow/outflow tube for simple flames
      ipart = nb   
      
      !! Wall to first growth; region of first growth; region of 2nd growth.
-     b0 = 3.0d0;b1 = 40.0d0;b2 = 50.0d0
+     b0 = 3.0d0;b1 = 50.0d0;b2 = 50.0d0
          
      !! Initialise a line of potential dot points   
      nsearch = ceiling(yb_max-yb_min)/dxmin/2.0d0

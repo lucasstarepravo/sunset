@@ -18,6 +18,9 @@
 !! Characteristic density (rho_char)
 1.0d0
 
+!! Inflow equivalence ratio
+1.0d0
+
 !! Reference temp (for TDTP)
 2.473d-1
 
@@ -29,6 +32,9 @@
 
 !! Prandtl number
 0.71d0
+
+!! Mixture average flag
+1
 
 !! Mach number (only used if isoT)
 0.1d0

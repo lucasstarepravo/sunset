@@ -66,7 +66,7 @@ contains
            call make_1d_25step_flame
         end if
       else
-         call load_flame_file    
+         call load_flame_file    !! Needs fixing to account for primitive to conservative conversions
       end if
 #else
      call hardcode_initial_conditions     

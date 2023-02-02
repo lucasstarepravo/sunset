@@ -51,9 +51,7 @@ module common_vars
   
   !! Transport for mixture-average transport
   real(rkind),dimension(:,:),allocatable :: mxav_coef_visc,mxav_coef_lambda
-  real(rkind),dimension(:,:,:),allocatable :: mxav_coef_Diff,mxav_coef_thta  
-  real(rkind),dimension(:,:),allocatable :: mxav_visc_combo1,mxav_visc_combo2
-  
+  real(rkind),dimension(:,:,:),allocatable :: mxav_coef_Diff  
   !! Velocity gradients  
   real(rkind),dimension(:,:),allocatable :: gradu,gradv,gradw
   
@@ -144,6 +142,7 @@ module common_vars
   real(rkind) :: segment_tstart,segment_tend
   real(rkind),dimension(10) :: segment_time_local,segment_time_global
   real(rkind) :: cputimecheck
+  real(rkind) :: transport_totaltime
   
   !! MPI decomposition related variables
   integer(ikind) :: nprocs,iproc,ierror,iproc_in_sheet  !! processes, this process id, error int,process id in sheet

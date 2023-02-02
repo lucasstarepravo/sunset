@@ -315,6 +315,8 @@ contains
      !! Initialise PID controller variables for <|u|>
      eflow_nm1 = one
      sum_eflow = zero   
+     
+     transport_totaltime=zero
                  
 write(6,*) "sizes",iproc,npfb,np_nohalo,np            
                  
