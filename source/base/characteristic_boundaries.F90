@@ -145,11 +145,11 @@ contains
      
      !Lchar(1) is outgoing, so doesn't require modification
      Lchar(2) = zero
-     Lchar(3) = v(i)*0.278d0*c/L_domain_x &        !! track v=zero
+     Lchar(3) = v(i)*nscbc_coeff*c/L_domain_x &        !! track v=zero
               - v(i)*gradb_v(2) - w(i)*gradb_v(3) - gradb_p(2)/ro(i) !! transverse terms
-     Lchar(4) = w(i)*0.278d0*c/L_domain_x &        !! track w=zero
+     Lchar(4) = w(i)*nscbc_coeff*c/L_domain_x &        !! track w=zero
               + rhs_row(i)                           !! rhs_w contains transverse and visc terms needed
-     Lchar(5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &     !! Track u_inflow
+     Lchar(5) = (u(i)-u_inflow_local(j))*nscbc_coeff*(one-u(i)/c)*c*c*one/L_domain_x &     !! Track u_inflow
               - half*(v(i)*gradb_p(2)+p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2)) &    !! transverse 1 conv. terms
               - half*(w(i)*gradb_p(3)+p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))      !! transverse 2 conv. terms 
 #ifdef ms
@@ -163,7 +163,7 @@ contains
      gammagas = cp(i)/(cp(i)-Rgas_mix(i))
 
      !Lchar(1) is outgoing, don't modify
-     Lchar(2) = (T_bound(j)-T(i))*c*0.278d0/L_domain_x/gammagas &  !! Track T_bound(j)
+     Lchar(2) = (T_bound(j)-T(i))*c*nscbc_coeff/L_domain_x/gammagas &  !! Track T_bound(j)
 #ifdef react
               + (gammagas-one)*sumoverspecies_homega(j)/c/c &     !! Source terms
 #endif
@@ -172,12 +172,12 @@ contains
               - (w(i)*gradb_ro(3) + tmpro*gradb_w(3) + &
                  w(i)*gradb_p(3)/c/c + gammagas*p(i)*gradb_w(3)/c/c)
                
-     Lchar(3) = v(i)*0.278d0*c/L_domain_x &        !! track v=zero
+     Lchar(3) = v(i)*nscbc_coeff*c/L_domain_x &        !! track v=zero
               - v(i)*gradb_v(2) - w(i)*gradb_v(3) - gradb_p(2)/ro(i) !! transverse terms
-     Lchar(4) = w(i)*0.278d0*c/L_domain_x &        !! track w=zero
+     Lchar(4) = w(i)*nscbc_coeff*c/L_domain_x &        !! track w=zero
               - v(i)*gradb_w(2) - w(i)*gradb_w(3) - gradb_p(3)/ro(i) !! transverse terms
 
-     Lchar(5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x &      !! Track u_inflow
+     Lchar(5) = (u(i)-u_inflow_local(j))*nscbc_coeff*(one-u(i)/c)*c*c*one/L_domain_x &      !! Track u_inflow
 #ifdef react
               - half*(gammagas-one)*sumoverspecies_homega(j) &                 !! Source terms
 #endif
@@ -214,7 +214,7 @@ contains
      Lchar(2) = zero  !! No entropy for isothermal flows
      Lchar(3) = zero  !! v,w are prescribed
      Lchar(4) = zero
-     Lchar(5) = Lchar(1)   !! Acoustically reflecting
+     Lchar(5) = Lchar(1)  !-tmpro*c*du_inflowdt !! Acoustically reflecting
 #ifdef ms
      Lchar(5+1:5+nspec) = zero ! presume no inflow composition variation         
 #endif     
@@ -227,7 +227,7 @@ contains
      !Lchar(1) is outgoing, so doesn't require modification
 
      !! Acoustically reflecting
-     Lchar(5) = Lchar(1) !! - ro*c*du/dt
+     Lchar(5) = Lchar(1)  !- tmpro*c*du_inflowdt
 
      !! v and w are prescribed
      Lchar(3) = zero
@@ -286,9 +286,9 @@ contains
     
         !Lchar(1) is outgoing, so doesn't require modification
         Lchar(2) = zero
-        Lchar(3) = v(i)*0.278d0*c/L_domain_x &      !! track v=zero
-        Lchar(4) = w(i)*0.278d0*c/L_domain_x       !! track w=zero
-        Lchar(5) = (u(i)-u_inflow)*0.278d0*(one-u(i)/c)*c*c*one/L_domain_x     !! Track u_inflow
+        Lchar(3) = v(i)*nscbc_coeff*c/L_domain_x &      !! track v=zero
+        Lchar(4) = w(i)*nscbc_coeff*c/L_domain_x       !! track w=zero
+        Lchar(5) = (u(i)-u_inflow_local(j))*nscbc_coeff*(one-u(i)/c)*c*c*one/L_domain_x     !! Track u_inflow
 #ifdef ms
         Lchar(5+1:5+nspec) = zero
 #endif     
@@ -297,7 +297,7 @@ contains
         Lchar(2) = zero   !! No entropy in isothermal flows
         !Lchar(3) is outgoing
         !Lchar(4) is outgoing
-        Lchar(5) (p(i)-p_inflow)*outflow_coeff*c*(one)/two/L_domain_x     !! track p_outflow
+        Lchar(5) (p(i)-p_inflow)*nscbc_coeff*c*(one)/two/L_domain_x     !! track p_outflow
         !Lchar(5+1:5+nspec) is outgoing     
      end if        
 #else
@@ -307,7 +307,7 @@ contains
 
      if(u(i).gt.zero) then !! inflow options
         !Lchar(1) is outgoing, don't modify
-        Lchar(2) = (T_bound(j)-T(i))*c*0.278d0/L_domain_x/gammagas &  !! Track T_bound(j)
+        Lchar(2) = (T_bound(j)-T(i))*c*nscbc_coeff/L_domain_x/gammagas &  !! Track T_bound(j)
 #ifdef react
                  + (gammagas-one)*sumoverspecies_homega(j)/c/c &     !! Source terms
 #endif
@@ -316,12 +316,12 @@ contains
                  - (w(i)*gradb_ro(3) + tmpro*gradb_w(3) + &
                     w(i)*gradb_p(3)/c/c + gammagas*p(i)*gradb_w(3)/c/c)
                
-        Lchar(3) = v(i)*0.278d0*c/L_domain_x &        !! track v=zero
+        Lchar(3) = v(i)*nscbc_coeff*c/L_domain_x &        !! track v=zero
                  - v(i)*gradb_v(2) - w(i)*gradb_v(3) - gradb_p(2)/ro(i) !! transverse terms
-        Lchar(4) = w(i)*0.278d0*c/L_domain_x &        !! track w=zero
+        Lchar(4) = w(i)*nscbc_coeff*c/L_domain_x &        !! track w=zero
                  - v(i)*gradb_w(2) - w(i)*gradb_w(3) - gradb_p(3)/ro(i) !! transverse terms
 
-        Lchar(5) = (p(i)-P_inflow)*outflow_coeff*c*(one)/two/L_domain_x &      !! Track p_inflow
+        Lchar(5) = (p(i)-P_inflow)*nscbc_coeff*c*(one)/two/L_domain_x &      !! Track p_inflow
 #ifdef react
                  - half*(gammagas-one)*sumoverspecies_homega(j) !&                 !! Source terms
 #endif
@@ -339,7 +339,7 @@ contains
         !Lchar(3) is outgoing
         !Lchar(4) is outgoing
         !Lchar(5+1:5+nspec) is outgoing 
-        Lchar(5) = (p(i)-p_inflow)*outflow_coeff*c*(one)/two/L_domain_x &        !! track p_outflow
+        Lchar(5) = (p(i)-p_inflow)*nscbc_coeff*c*(one)/two/L_domain_x &        !! track p_outflow
 #ifdef react
                  - half*(gammagas-one)*sumoverspecies_homega(j) &
 #endif
@@ -373,7 +373,7 @@ contains
 #ifdef isoT
      !! ISOTHERMAL FLOWS, PARTIALLY NON-REFLECTING
      if(u(i).lt.c) then
-        Lchar(1) = (p(i)-p_outflow)*outflow_coeff*c*(one)/two/L_domain_x! &                      !! track p_outflow
+        Lchar(1) = (p(i)-p_outflow)*nscbc_coeff*c*(one)/two/L_domain_x! &                      !! track p_outflow
                  !- (one-u(i)/c)*half*(v(i)*gradb_p(2) + &
                  !                     p(i)*gradb_v(2)-tmpro*c*v(i)*gradb_u(2)) & !!transverse 1 conv. terms
                  !- (one-u(i)/c)*half*(w(i)*gradb_p(3) + &
@@ -390,7 +390,7 @@ contains
      if(u(i).le.c) then !! Subsonic. If supersonic, just use L1 from definition...
      
         gammagas = cp(i)/(cp(i)-Rgas_mix(i))     
-        Lchar(1) = (p(i)-p_outflow)*outflow_coeff*c*(one)/two/L_domain_x &                               !! track p_outflow
+        Lchar(1) = (p(i)-p_outflow)*nscbc_coeff*c*(one)/two/L_domain_x &                               !! track p_outflow
 #ifdef react
                  - half*(gammagas-one)*sumoverspecies_homega(j) &
 #endif
@@ -426,7 +426,8 @@ contains
 !! ------------------------------------------------------------------------------------------------
   subroutine apply_time_dependent_bounds
      integer(ikind) :: i,j
-  
+     
+           
      !! Loop over all boundary nodes
      !$omp parallel do private(i)
      do j=1,nb
@@ -448,7 +449,7 @@ contains
         else if(node_type(i).eq.1) then 
            if(inflow_type.eq.1) then !! Hard inflow
               !! Prescribed velocity               
-              rou(i)=u_inflow*ro(i)
+              rou(i)=u_inflow_local(j)*ro(i)
               rov(i)=zero
               row(i)=zero        
 
@@ -493,6 +494,6 @@ contains
   
   
      return
-  end subroutine apply_time_dependent_bounds
+  end subroutine apply_time_dependent_bounds 
 !! ------------------------------------------------------------------------------------------------  
 end module characteristic_boundaries

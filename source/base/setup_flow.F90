@@ -7,7 +7,8 @@ module setup_flow
   !! JRCK               |2019 onwards     |Main developer                     
   !!
   !! ----------------------------------------------------------------------------------------------
-  !! This module contains routines read in control data, chemistry, and initial conditions
+  !! This module contains routines generate initial conditions, either from restart files or
+  !! analytic forms.
   use kind_parameters
   use common_parameter
   use common_vars
@@ -19,10 +20,11 @@ module setup_flow
 contains
 !! ------------------------------------------------------------------------------------------------
   subroutine initial_solution
+     !! Allocates arrays for primary and secondary properties, and calls routines to populate arrays
+     !! for initial conditions.
      use mirror_boundaries
      use derivatives
      use thermodynamics
-     !! Temporary subroutine whilst developing. Initialises all fields
      integer(ikind) :: i,j,k,ispec
      real(rkind) :: x,y,z,tmp,tmpro     
      
@@ -50,7 +52,8 @@ contains
      
      !! Allocate the boundary temperatures
      if(nb.ne.0) then
-        allocate(T_bound(nb));T_bound = T_ref                 
+        allocate(T_bound(nb));T_bound = T_ref  
+        allocate(u_inflow_local(nb));u_inflow_local = u_char               
      end if
      
      !! =======================================================================
@@ -66,15 +69,16 @@ contains
            call make_1d_25step_flame
         end if
       else
-         call load_flame_file    !! Needs fixing to account for primitive to conservative conversions
+         call load_flame_file
       end if
 #else
      call hardcode_initial_conditions     
 #endif
 
 #else    
-     !! RESTART OPTION. Ask for input number (just hard-coded for now...)
-     call load_restart_file(2)
+     !! RESTART OPTION. 
+     call load_restart_file
+!     call make_ignition_hotspot         
 #endif
      !! =======================================================================
      
@@ -125,362 +129,24 @@ contains
      cputimecheck = zero         
      
      !! Initialise the time-stepping (necessary for PID controlled stepping)
-     dt = 1.0d-9             
-         
+     dt = 1.0d-10
+     
+     !! Initialise the variable which holds inflow velocity - this will need modifying in due course
+     !! as we introduce corners and non-uniform inflows
+     if(nb.ne.0)then
+        !$omp parallel do
+        do j=1,nb
+           i=boundary_list(j)
+           if(node_type(i).eq.1) then !! Inflow node
+              u_inflow_local(j) = u(i)
+           endif
+        end do
+        !$omp end parallel do        
+     end if
+              
      return
   end subroutine initial_solution   
 !! ------------------------------------------------------------------------------------------------
-  subroutine load_control_data_LUonly
-     integer(ikind) :: dummy_int
-     real(rkind) :: dummy_real
-     
-     !! Load data from the control file
-     open(unit=12,file='control.in')
-     read(12,*)                       !! Ignore header and blank line
-     read(12,*)
-
-     !! Length-scale
-     read(12,*)
-     read(12,*) L_char
-     read(12,*)
-     
-     !! Velocity-scale
-     read(12,*) 
-     read(12,*) U_char
-     read(12,*)
-     
-     !! Set inflow velocity, Z-length-scale and characteristic time-scale
-     u_inflow = u_char
-     Lz = 2.0d0*pi*L_char   !! Hard-coded 2pi
-     Time_char = L_char/u_char
-     
-     
-     !! Default set nspec in case of non-multispecies
-     nspec =1
-     close(12)
-          
-     return
-  end subroutine load_control_data_LUonly
-!! ------------------------------------------------------------------------------------------------  
-  subroutine load_control_data_all
-     integer(ikind) :: dummy_int
-     real(rkind) :: dummy_real
-     
-     !! Load data from the control file
-     open(unit=12,file='control.in')
-     read(12,*)                       !! Ignore header and blank line
-     read(12,*)
-
-     !! Length-scale
-     read(12,*)
-     read(12,*) dummy_real
-     read(12,*)
-     
-     !! Velocity-scale
-     read(12,*) 
-     read(12,*) dummy_real
-     read(12,*)
-     
-     !! Start and end time (in multiples of characteristic time)
-     read(12,*)
-     read(12,*) time,time_end
-     read(12,*)
-     time = time*Time_char;time_end = time_end*Time_char
-     itime = 0
-     
-     !! Output frequency (in multiples of characteristic time)
-     read(12,*)
-     read(12,*) dt_out
-     read(12,*)
-     dt_out = dt_out*Time_char
-        
-     !! Gravity?
-     read(12,*)
-     read(12,*) grav(:)
-     read(12,*)
-     
-     !! Characteristic density
-     read(12,*)
-     read(12,*) rho_char
-     read(12,*)
-     
-     !! Inflow equivalence ratio
-     read(12,*) 
-     read(12,*) phi_in
-     read(12,*) 
-     
-     !! Reference temp
-     read(12,*)
-     read(12,*) T_ref
-     read(12,*) 
-     
-     !! Reference viscosity
-     read(12,*)
-     read(12,*) visc_ref
-     read(12,*) 
-     
-     !! Reference pressure
-     read(12,*)
-     read(12,*) p_ref
-     read(12,*) 
-         
-     !! Prandtl number
-     read(12,*)
-     read(12,*) Pr
-     read(12,*) 
-     
-     !! Diffusion flag (1 gives mixture averaging)
-     read(12,*)
-     read(12,*) mix_av_flag
-     read(12,*)
-     
-     !! Mach number (only used for isothermal flows)
-     read(12,*)
-     read(12,*) Ma
-     read(12,*) 
-     
-     !! Set the Reynolds number (never used, just nice to calculate it)
-     Re = rho_char*u_char*L_char/visc_ref
-
-     !! Set a reference molecular diffusivity
-     Mdiff_ref = visc_ref/rho_char/Pr/one   !! the 1 represents Lewis number
-     
-     !! set the sound speed squared
-#ifdef isoT
-     csq = (u_char/Ma)**two
-#endif      
-
-     !! Read in T-exponent for TDTP if required
-     read(12,*)
-     read(12,*) r_temp_dependence
-     read(12,*)     
-#ifndef tdtp
-     r_temp_dependence = zero  !! zero it if not required
-#endif 
-     
-     !! Read in inflow boundary type
-     read(12,*)
-     read(12,*) inflow_type
-     read(12,*)
-     
-     !! Read in wall boundary type
-     read(12,*)
-     read(12,*) wall_type
-!     read(12,*)     
-     
-     close(12)
-          
-     return
-  end subroutine load_control_data_all
-!! ------------------------------------------------------------------------------------------------  
-  subroutine load_chemistry_data
-     integer(ikind) :: ispec,iorder,istep,dummy_int,jspec
-     real(rkind) :: dummy_real
-     
-     !! Load data from the thermochemistry control file
-     open(unit=12,file='thermochem.in')
-     read(12,*)                       !! Ignore header and blank line
-     read(12,*)
-     
-     !! Number of chemical species
-     read(12,*)
-     read(12,*) nspec
-     read(12,*)
-#ifndef ms
-     nspec = 1  !! If not multispecies, nspec must be 1
-#endif          
-
-     !! This section reads in transport data for all species.
-     
-     !! Number of coefs and order of polynomial for cp(T)
-     read(12,*)
-     read(12,*) ncoefs_cp
-     read(12,*)
-     !! ncoefs = (polyorder + 1) + 1 + 1: terms in polynomial,coef for h, coef for s
-     polyorder_cp = ncoefs_cp - 3
-     
-     !! Temperature limits
-     read(12,*)
-     read(12,*) T_low,T_high
-     read(12,*)
-
-     !! Allocate space for molar mass, Lewis number, and polynomial fitting for cp(T)   
-     allocate(molar_mass(nspec),one_over_Lewis_number(nspec),one_over_molar_mass(nspec))
-     allocate(coef_cp(nspec,ncoefs_cp),coef_h(nspec,ncoefs_cp),coef_dcpdT(nspec,ncoefs_cp))
-     allocate(coef_gibbs(nspec,ncoefs_cp))
-          
-     !! Load molar mass, Lewis, and polynomial fits   
-     read(12,*) !! Read comment line  
-     do ispec = 1,nspec
-        read(12,*) !! Read species identifier comment line
-        read(12,*) molar_mass(ispec)
-        read(12,*) one_over_Lewis_number(ispec)
-        one_over_Lewis_number(ispec) = one/one_over_Lewis_number(ispec)
-        one_over_molar_mass(ispec) = one/molar_mass(ispec)
-
-        read(12,*)  !! Comment line
-        do iorder=1,ncoefs_cp
-           read(12,*) coef_cp(ispec,iorder)
-        end do
-        read(12,*) !! Blank line                            
-                           
-        !! Pre-divide gibbs coefficients (and leave in molar form). Also include log(P_ref/R0)
-        !! and a log(T) term, so result of creating gibbs includes all terms required for
-        !! backwards rate calculation
-        coef_gibbs(ispec,:) = coef_cp(ispec,:)
-        do iorder = 2,polyorder_cp+1
-           coef_gibbs(ispec,iorder) = coef_gibbs(ispec,iorder)/dble(iorder*(iorder-1))
-        end do                           
-        coef_gibbs(ispec,1) = coef_cp(ispec,polyorder_cp+3) &
-                            - coef_cp(ispec,1) &
-                            + log(P_ref/Rgas_universal)
-        coef_gibbs(ispec,polyorder_cp+3) = coef_cp(ispec,1) - one
-                     
-                           
-        !! Convert cp coefficients from molar to mass based
-        coef_cp(ispec,:) = coef_cp(ispec,:)*Rgas_universal*one_over_molar_mass(ispec)
-
-        !! Pre-divide coefs by iorder for h.
-        do iorder = 1,polyorder_cp + 1
-           coef_h(ispec,iorder) = coef_cp(ispec,iorder)/dble(iorder)
-        end do
-        coef_h(ispec,polyorder_cp+2) = coef_cp(ispec,polyorder_cp+2)
-        
-        !! Pre-multiply coefs by iorder-1 for dcp/dT
-        do iorder = 1,polyorder_cp + 1
-           coef_dcpdT(ispec,iorder) = coef_cp(ispec,iorder)*dble(iorder-1)
-        end do
-                
-     end do     
-
-     !! Next section reads in reaction mechanism. 
-     read(12,*) !! Read comment line    
-     
-     !! Number of steps
-     read(12,*)
-     read(12,*) nsteps
-     read(12,*)
-     
-     if(nsteps.ne.0)then
-        !! Number of different third body efficiencies     
-        read(12,*)
-        read(12,*) nthirdbodies
-        read(12,*)
-     end if     
-     
-     !! Space for rate constants and coefficients etc
-     allocate(Arrhenius_coefs(nsteps,3))
-     
-     !! Numbers of r and p, and lists
-     allocate(num_reactants(nsteps),num_products(nsteps))
-     allocate(reactant_list(nsteps,3),product_list(nsteps,3))  !! Limit of 3 reactants and 3 products in any given step
-     allocate(stepspecies_list(nsteps,6)) !! List of all species in reaction (reactants then products)
-     
-     !! Stoichiometric coefficients
-     allocate(nu_dash(nsteps,nspec),nu_ddash(nsteps,nspec),delta_nu(nsteps,nspec)) 
-     nu_dash = zero;nu_ddash = zero;delta_nu = zero
-     
-     !! Flags, efficiencies and coefficients
-     allocate(gibbs_rate_flag(nsteps),lindemann_form_flag(nsteps)) !! Flags for backwards and lindemann
-     allocate(third_body_flag(nsteps))
-     if(nthirdbodies.ne.0) allocate(third_body_efficiencies(nthirdbodies,nspec))
-     allocate(lindemann_coefs(nsteps,4));lindemann_coefs = zero
-    
-     
-     read(12,*) !! Comment line
-     if(nsteps.ne.0)then
-        do istep = 1,nsteps
-           read(12,*) dummy_int  !! Reaction number
-           if(dummy_int.ne.istep) write(6,*) "Warning, error reading reaction mech. Expect seg fault."
-
-           read(12,*) num_reactants(istep)            !! Number of reactants
-           do ispec = 1,num_reactants(istep)  !! Loop over all reactants
-              read(12,*) dummy_int,dummy_real
-              reactant_list(istep,ispec) = dummy_int !! Identity of reactant
-              stepspecies_list(istep,ispec) = dummy_int
-              nu_dash(istep,dummy_int) = dummy_real  !! Stoichiometric coefficient
-           end do
-
-           read(12,*) num_products(istep)            !! Number of products
-           do ispec = 1,num_products(istep)  !! Loop over all products
-              read(12,*) dummy_int,dummy_real
-              product_list(istep,ispec) = dummy_int !! Identity of product
-              stepspecies_list(istep,num_reactants(istep) + ispec) = dummy_int
-              nu_ddash(istep,dummy_int) = dummy_real  !! Stoichiometric coefficient
-           end do
-        
-           !! Calculate deltas
-           delta_nu(istep,:) = nu_ddash(istep,:) - nu_dash(istep,:)
-        
-           !! Coefficients for arrhenius rate constant
-           read(12,*) Arrhenius_coefs(istep,1:3)
-   
-           !! Take logarithm of pre-exponential factor
-           Arrhenius_coefs(istep,1) = log(Arrhenius_coefs(istep,1))
-           Arrhenius_coefs(istep,3) = Arrhenius_coefs(istep,3)/(Rgas_universal)                     
-        
-           !! Gibbs based backwards rate?
-           read(12,*) gibbs_rate_flag(istep)
-           
-           !! Lindemann form?
-           read(12,*) lindemann_form_flag(istep)
-           
-           !! Third bodies?
-           read(12,*) third_body_flag(istep)        
-                 
-           read(12,*) !! Blank line      
-        end do
-
-        !! Lists of third body efficiencies
-        if(nthirdbodies.ne.0) then
-        
-           do istep = 1,nthirdbodies
-              read(12,*) !! Comment line
-              do ispec = 1,nspec
-                 read(12,*) dummy_int,third_body_efficiencies(istep,ispec)     !! List of efficiencies
-              end do
-           end do
-        end if
-        read(12,*) !! Blank line
-     
-        !! Lists of Lindemann coefficients
-        nlindemann = maxval(lindemann_form_flag(1:nsteps))
-        if(nlindemann.ne.0) then
-           read(12,*) !! Comment line
-           do istep = 1,nlindemann
-              read(12,*) dummy_int,lindemann_coefs(istep,1:4)
-              !! Take logarithm of pre-exponential factor etc
-              lindemann_coefs(istep,1) = log(lindemann_coefs(istep,1))
-              lindemann_coefs(istep,3) = lindemann_coefs(istep,3)/(Rgas_universal)
-              lindemann_coefs(istep,4) = log(lindemann_coefs(istep,4))
-           end do         
-        end if
-     
-        !! Build list of species which require gibbs evaluation
-        allocate(gibbs_flag_species(nspec));gibbs_flag_species=0     
-        do istep = 1,nsteps
-           if(gibbs_rate_flag(istep).ne.0) then          !! For gibbs steps
-              do jspec = 1, num_reactants(istep) + num_products(istep)  !! Loop over products and reactants
-                 ispec = stepspecies_list(istep,jspec)              
-                 gibbs_flag_species(ispec) = 1              !! Flag this species as requiring gibbs evaluation
-              end do
-           end if
-        end do
-        !! Count the number of species which require gibbs evaluation
-        num_gibbs_species=0
-        do ispec=1,nspec
-           if(gibbs_flag_species(ispec).ne.0)then
-              num_gibbs_species = num_gibbs_species  + 1           
-              gibbs_flag_species(ispec) = num_gibbs_species  !! Modify flag to become a counter
-           end if
-        end do
-
-     end if  !! End of "only read if not zero step mechanism" if-statement     
-     close(12)               
-
-     
-     return
-  end subroutine load_chemistry_data    
 !! ------------------------------------------------------------------------------------------------
 !! N.B. In the routines below here, we are loading or generating initial conditions on the
 !! primitive variables (ro,u,v,w,T,Y), and hence Yspec holds Y. Everywhere else in the code, 
@@ -491,21 +157,24 @@ contains
      integer(ikind) :: i,ispec,j
      real(rkind) :: flame_location,flame_thickness
      real(rkind) :: T_reactants,T_products
-     real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z
+     real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z,ro_inflow
 
      !! Position and scale     
      flame_location = -0.0d0
-     flame_thickness = 5.0d-4/L_char !! Scale thickness because position vectors are scaled...
+     flame_thickness = 2.0d-4/L_char !! Scale thickness because position vectors are scaled...
 
      !! Temperatures
-     T_reactants = 3.0d2
+     T_reactants = T_ref
      T_products = 2.3d3
+         
+     !! Pressure through flame     
+     P_flame = p_ref
      
-     !! Pressure through flame
-     P_flame = rho_char*Rgas_universal*T_reactants*one_over_molar_mass(1) 
+     !! Inflow density
+     ro_inflow = p_ref/(Rgas_universal*T_reactants*one_over_molar_mass(1))    
      
      !! Inflow speed
-     u_reactants = u_inflow
+     u_reactants = u_char
      
      !$omp parallel do private(x,y,z,c,Rmix_local,ispec)
      do i=1,npfb
@@ -533,7 +202,7 @@ contains
         ro(i) = P_flame/(Rmix_local*T(i))   
                
         !! Velocity
-        u(i) = u_reactants*rho_char/ro(i)
+        u(i) = u_reactants*ro_inflow/ro(i)
         v(i) = zero
         w(i) = zero    
                         
@@ -566,13 +235,13 @@ contains
      integer(ikind) :: i,ispec,j
      real(rkind) :: flame_location,flame_thickness
      real(rkind) :: T_reactants,T_products
-     real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z
+     real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z,ro_inflow
      real(rkind) :: Yin_H2,Yin_O2,Yin_N2,Yout_H2O
      real(rkind) :: o2n2_ratio,h2o2_stoichiometric,h2o2_ratio
 
      !! Position and scale     
-     flame_location = zero
-     flame_thickness = 5.0d-4/L_char !! Scale thickness because position vectors are scaled...
+     flame_location = -0.25d0!zero!-0.27d0
+     flame_thickness = 2.0d-4/L_char !! Scale thickness because position vectors are scaled...
    
      !! Determine inlet composition
      o2n2_ratio = one*molar_mass(2)/(3.76d0*molar_mass(9))
@@ -587,15 +256,18 @@ contains
      Yout_H2O = one - Yin_N2     
 
      !! Temperatures
-     T_reactants = 3.0d2
+     T_reactants = T_ref
      T_products = 2.366d3
      
-     !! Pressure through flame
-     P_flame = rho_char*Rgas_universal*T_reactants* &
-             (Yin_H2*one_over_molar_mass(1) + Yin_O2*one_over_molar_mass(2) + Yin_N2*one_over_molar_mass(9))
-     
+     !! Pressure through flame is reference pressure
+     P_flame = p_ref
+
+     !! Inflow density
+     ro_inflow = p_flame/(Rgas_universal*T_reactants* &
+             (Yin_H2*one_over_molar_mass(1) + Yin_O2*one_over_molar_mass(2) + Yin_N2*one_over_molar_mass(9)))      
+    
      !! Inflow speed
-     u_reactants = u_inflow
+     u_reactants = u_char
      
      !$omp parallel do private(x,y,z,c,Rmix_local,ispec)
      do i=1,npfb
@@ -603,7 +275,10 @@ contains
         
         !! Error function based progress variable
         c = half*(one + erf((x-flame_location)/flame_thickness))
-!        c = exp(-((x-flame_location)/flame_thickness)**two)        
+!        c = exp(-((x-flame_location)/flame_thickness)**two - (y/flame_thickness)**two)        
+!        c = exp(-((x-flame_location)/flame_thickness)**two - ((y-0.05d0)/flame_thickness)**two)    &
+!          + exp(-((x-flame_location)/flame_thickness)**two - ((y+0.05d0)/flame_thickness)**two)        
+!        c = exp(-((x-flame_location)/flame_thickness)**two)
         
         !! Temperature profile
         T(i) = T_reactants + (T_products - T_reactants)*c
@@ -626,7 +301,7 @@ contains
         ro(i) = P_flame/(Rmix_local*T(i))
         
         !! Velocity
-        u(i) = u_reactants*rho_char/ro(i)
+        u(i) = u_reactants*ro_inflow/ro(i)
         v(i) = zero
         w(i) = zero
                         
@@ -639,7 +314,7 @@ contains
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! wall initial conditions
               u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
-              T(i) = T_products
+              T(i) = T_reactants
            end if                 
            if(node_type(i).eq.1) then !! inflow initial conditions
 !              u(i)=u_char
@@ -655,12 +330,60 @@ contains
      return
   end subroutine make_1d_21step_flame
 !! ------------------------------------------------------------------------------------------------  
+  subroutine make_ignition_hotspot
+     !! Make a hot spot for ignition (hard-coded to fit 9spec H2 combustion at present
+     integer(ikind) :: i,ispec,j
+     real(rkind) :: flame_location,flame_thickness
+     real(rkind) :: T_hot
+     real(rkind) :: P_local,c,Rmix_local,x,y,z
+
+     !! Position and scale     
+     flame_location = -0.27d0!zero!-0.27d0
+     flame_thickness = 2.0d-4/L_char !! Scale thickness because position vectors are scaled...
+   
+     !! Temperature peak
+     T_hot = 2.5d3
+     
+     !$omp parallel do private(x,y,z,c,Rmix_local,ispec,P_local)
+     do i=1,npfb
+        x = rp(i,1);y=rp(i,2);z=rp(i,3)
+        
+        !! Gaussian hotspot
+        c = exp(-((x-flame_location)/flame_thickness)**two - (y/flame_thickness)**two)        
+!        c = exp(-((x-flame_location)/flame_thickness)**two)
+        
+               
+        !! Local mixture gas constant
+        Rmix_local = zero
+        do ispec=1,nspec
+           Rmix_local = Rmix_local + Yspec(i,ispec)*one_over_molar_mass(ispec)
+        end do
+        Rmix_local = Rmix_local*Rgas_universal
+        
+        !! Local pressure
+        P_local = ro(i)*Rmix_local*T(i)
+        
+        !! Modify temperature
+        T(i) = T(i)*(one-c) + c*T_hot
+        
+        !! Modify density so pressure is unaffected
+        ro(i) = P_local/(Rmix_local*T(i))
+        
+        !! composition and velocity are not modified
+                        
+     end do
+     !$omp end parallel do 
+  
+  
+     return
+  end subroutine make_ignition_hotspot  
+!! ------------------------------------------------------------------------------------------------  
   subroutine make_1d_25step_flame
      !! Make a 25 step (16 species) CH4-AIR flame. Initial profiles are erf(x').
      integer(ikind) :: i,ispec,j
      real(rkind) :: flame_location,flame_thickness
      real(rkind) :: T_reactants,T_products
-     real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z
+     real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z,ro_inflow
      real(rkind) :: Yin_CH4,Yin_O2,Yin_N2,Yout_H2O,Yout_CO2
      real(rkind) :: o2n2_ratio,ch4o2_ratio,ch4o2_stoichiometric,co2h2o_ratio
 
@@ -683,15 +406,19 @@ contains
      Yout_H2O = Yout_CO2/co2h2o_ratio            
 
      !! Temperatures
-     T_reactants = 3.0d2
-     T_products = 2.3d3
+     T_reactants = T_ref
+     T_products = 2.3d3     
      
-     !! Pressure through flame
-     P_flame = rho_char*Rgas_universal*T_reactants* &
-             (Yin_CH4*one_over_molar_mass(1) + Yin_O2*one_over_molar_mass(2) + Yin_N2*one_over_molar_mass(16))
+     !! Pressure through flame 
+     P_flame = p_ref
+ 
+     !! inflow density
+     ro_inflow = p_flame/(Rgas_universal*T_reactants* &
+             (Yin_CH4*one_over_molar_mass(1) + Yin_O2*one_over_molar_mass(2) + Yin_N2*one_over_molar_mass(16)))
+
      
      !! Inflow speed
-     u_reactants = u_inflow
+     u_reactants = u_char
      
      !$omp parallel do private(x,y,z,c,Rmix_local,ispec)
      do i=1,npfb
@@ -722,7 +449,7 @@ contains
         ro(i) = P_flame/(Rmix_local*T(i))
         
         !! Velocity
-        u(i) = u_reactants*rho_char/ro(i)
+        u(i) = u_reactants*ro_inflow/ro(i)
         v(i) = zero
         w(i) = zero
                         
@@ -761,7 +488,7 @@ contains
      open(unit=19,file='init_flame.in')
      
      !! Specify the flame pressure
-     P_flame = 1.0d5
+     P_flame = p_ref
 
      !! Read file, then close it.     
      !! Format of the file is ro,ro*u,ro*v,ro*w,roE,ro*Y (all ispec) over 1001 evenly spaced steps covering 
@@ -789,7 +516,6 @@ contains
      flamein_roE(nflamein) = flamein_roE(nflamein-1)
      flamein_Y(nflamein,:) = flamein_Y(nflamein-1,:)   
      close(19)
-     
        
      !! Loop through all particles. Find the "cell" the particle resides in. Copy data.     
      !$omp parallel do private(j,x,y,z,c,Rmix_local,ispec,cell_pos)
@@ -810,6 +536,14 @@ contains
         w(i) = flamein_w(j)*(one - cell_pos) + flamein_w(j+1)*cell_pos
         roE(i) = flamein_roE(j)*(one - cell_pos) + flamein_roE(j+1)*cell_pos   
         Yspec(i,:) = flamein_Y(j,:)*(one - cell_pos) + flamein_Y(j+1,:)*cell_pos
+        
+        !! Convert to conservative variables
+        rou(i) = u(i)*ro(i)
+        rov(i) = v(i)*ro(i)
+        row(i) = w(i)*ro(i)
+        do ispec=1,nspec
+           Yspec(i,ispec) = Yspec(i,ispec)*ro(i)
+        end do
 
         !! Temporary assign p and T
         T(i) = T_ref
@@ -828,6 +562,7 @@ contains
         roE(i) = roE(1)
         ro(i) = ro(1)
         u(i) = u(1);v(i) = v(1);w(i) = w(1)
+        rou(i) = rou(1);rov(i)=rov(1);row(i) = row(1)
         Yspec(i,:) = Yspec(1,:)
      end do
      !$omp end parallel do
@@ -852,6 +587,16 @@ contains
            end if
         end do
      end if   
+  
+     !! Return Yspec to primitive form
+     !$omp parallel do private(ispec)
+     do i=1,npfb
+        do ispec=1,nspec
+           Yspec(i,ispec) = Yspec(i,ispec)/ro(i)
+        end do
+     end do
+     !$omp end parallel do
+     
   
      return
   end subroutine load_flame_file
@@ -915,9 +660,8 @@ contains
      return
   end subroutine hardcode_initial_conditions  
 !! ------------------------------------------------------------------------------------------------
-  subroutine load_restart_file(n_restart)
+  subroutine load_restart_file
      !! Load initial conditions from a dump file
-     integer(ikind),intent(in) :: n_restart
      integer(ikind) :: k,i,j
      real(rkind) :: tmp,tmpro
      character(70) :: fname  
@@ -927,25 +671,21 @@ contains
 #else
      k=10000
 #endif     
-     if( n_restart .lt. 10 ) then 
-        write(fname,'(A17,I5,A1,I1)') './data_out/layer_',k,'_',n_restart
-     else if( n_restart .lt. 100 ) then 
-        write(fname,'(A17,I5,A1,I2)') './data_out/layer_',k,'_',n_restart        
-     else if( n_restart .lt. 1000 ) then
-        write(fname,'(A17,I5,A1,I3)') './data_out/layer_',k,'_',n_restart        
-     else
-        write(fname,'(A17,I5,A1,I4)') './data_out/layer_',k,'_',n_restart        
-     end if 
+
+     !! Construct the file name:
+     write(fname,'(A16,I5)') './restart/layer_',k
+
      !! Open the file
      open(14,file=fname)
      read(14,*) k
      if(k.ne.npfb) write(6,*) "WARNING, expecting problem in restart"
+
      !! Load the initial conditions
      do i=1,npfb
 #ifdef dim3
-        read(14,*) tmp,tmp,tmp,tmp,h(i),k,tmpro,u(i),v(i),w(i),tmp,T(i),Yspec(i,1:nspec)
+        read(14,*) tmp,tmp,tmp,tmp,h(i),k,tmpro,u(i),v(i),w(i),tmp,T(i),hrr(i),Yspec(i,1:nspec)
 #else
-        read(14,*) tmp,tmp,tmp,h(i),k,tmpro,u(i),v(i),tmp,T(i),Yspec(i,1:nspec)
+        read(14,*) tmp,tmp,tmp,h(i),k,tmpro,u(i),v(i),tmp,T(i),hrr(i),Yspec(i,1:nspec)
 #endif        
         if(k.ne.node_type(i)) then
            write(6,*) "ERROR: Problem in restart file. STOPPING."

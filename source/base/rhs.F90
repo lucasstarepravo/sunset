@@ -12,7 +12,7 @@ module rhs
   !! calls to specific thermodynamics routines.
   
   !! Although separate subroutines, they must be called in correct order, as they rely
-  !! on each other (e.g. divvel calculated in calc_rhs_ro, also used in calc_rhs_rovel)
+  !! on each other
   
   !! We use the lists internal_list and boundary_list to loop through internal and boundary
   !! nodes respectively. The L arrays for boundaries run from 1 to nb, and so use index j
@@ -57,13 +57,7 @@ contains
      !! Control routine for calculating right hand sides. Does thermodynamic evaluations, finds
      !! gradients, and then calls property-specific RHS routines
      integer(ikind) :: k,i
-     real(rkind) :: segment_tstart_rhs,segment_tend_rhs,segment_tstart_subtract,segment_tend_subtract
-         
-     !! Profiling
-     segment_tstart_rhs = omp_get_wtime()     
-     segment_tstart_subtract = segment_time_local(4) + segment_time_local(5) &
-                             + segment_time_local(7) + segment_time_local(6)
-  
+          
      !! Some initial allocation of space for boundaries
 #ifndef ms
      if(nb.ne.0) allocate(L(nb,5)) 
@@ -111,7 +105,8 @@ contains
 
      !! Calculate chemical production rates and add these to rhs of species equation
 #ifdef react     
-     call calculate_chemical_production_rate 
+     call calculate_chemical_production_rate
+!     call calculate_chemical_production_rate_dummy      
 #endif     
 
      !! Evaluate RHS for boundaries
@@ -134,13 +129,6 @@ contains
      deallocate(gradT)
 #endif     
   
-     !! Profiling - time spent doign RHS minus time spent doing gradients for RHS
-     segment_tend_rhs = omp_get_wtime()
-     segment_tend_subtract = segment_time_local(4) + segment_time_local(5) &
-                           + segment_time_local(7) + segment_time_local(6)    
-     segment_time_local(8) = segment_time_local(8) + segment_tend_rhs - segment_tstart_rhs
-     segment_time_local(8) = segment_time_local(8) + segment_tstart_subtract - segment_tend_subtract
-
      return
   end subroutine calc_all_rhs
 !! ------------------------------------------------------------------------------------------------
@@ -156,7 +144,6 @@ contains
         i=internal_list(j)
         tmp_vec(1) = u(i);tmp_vec(2) = v(i);tmp_vec(3)= w(i)
         tmp_scal = dot_product(tmp_vec,gradro(i,:))
-!        divvel(i) = gradu(i,1) + gradv(i,2) + gradw(i,3)
 
         rhs_ro(i) = -ro(i)*divvel(i) - tmp_scal  
      end do
@@ -203,8 +190,8 @@ contains
      allocate(gradcp(npfb,dims));gradcp = zero
 #endif     
 #ifdef ms     
-     allocate(gradYspec(npfb,dims,nspec))
-     allocate(lapYspec(npfb))
+     allocate(gradYspec(npfb,dims,nspec));gradYspec=zero
+     allocate(lapYspec(npfb));lapYspec=zero
      allocate(speciessum_divroDgradY(npfb));speciessum_divroDgradY = zero
      allocate(speciessum_roDgradY(npfb,dims));speciessum_roDgradY = zero
      allocate(speciessum_hY(npfb));speciessum_hY = zero
@@ -292,7 +279,7 @@ contains
 
         !! Make L5+ispec and boundary RHS
         if(nb.ne.0)then
-           allocate(grad2Yspec(nb,dims))
+           allocate(grad2Yspec(nb,dims));grad2Yspec=zero
            call calc_grad2bound(Yspec(:,ispec),grad2Yspec)
            !$omp parallel do private(i,xn,yn,un,ut,dutdt,lapYspec_tmp,tmpY,roDgradY &
            !$omp ,divroDgradY,enthalpy,grad_enthalpy,tmpro,cpispec,dcpdT,tmp_vec,tmp_scal)
@@ -352,7 +339,7 @@ contains
               rhs_Yspec(i,ispec) = -tmp_scal + divroDgradY
 
               !! Build the characteristic
-              L(j,5+ispec) = u(i)*gradYspec(i,1,ispec)    !! (u(i)=zero if WALL)
+              L(j,5+ispec) = u(i)*gradYspec(i,1,ispec)    !! (u(i)=zero if WALL)                         
               
            end do
            !$omp end parallel do 
@@ -376,8 +363,8 @@ contains
            !! Add the diffusion correction term to the rhs
            rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) &
                               - tmpro*Yspec(i,ispec)*speciessum_divroDgradY(i) &  !! Y*sum(divroDgradY)
-                              - dot_product(gradYspec(i,:,ispec),speciessum_roDgradY(i,:))  !! gradY.sum(roDgradY)
-           
+                              - dot_product(gradYspec(i,:,ispec),speciessum_roDgradY(i,:))  !! gradY.sum(roDgradY)           
+
         end do
         !! Additional terms for energy equation
 #ifndef isoT                                     
@@ -410,10 +397,8 @@ contains
      real(rkind) :: tmp_scal_u,tmp_scal_v,tmp_scal_w,f_visc_u,f_visc_v,f_visc_w
      real(rkind) :: tmpro,body_force_u,body_force_v,body_force_w,one_over_ro
      real(rkind) :: c
-     real(rkind),dimension(:,:),allocatable :: grad2uvec,grad2ucross
-     
+     real(rkind),dimension(:,:),allocatable :: grad2uvec,grad2ucross    
      real(rkind),dimension(:,:),allocatable :: gradvisc
-
      
      !! Gradient of velocity divergence
      allocate(graddivvel(npfb,dims));graddivvel=zero

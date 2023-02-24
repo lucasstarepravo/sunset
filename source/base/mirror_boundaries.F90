@@ -22,8 +22,11 @@ module mirror_boundaries
   !! 2 = outflow
   !! -1,-2,-3,-4 are fluid rows near boundary
   !! 999 = regular fluid
-
+  
   !! mirror/ghost takes copy of parent node_type
+
+  !! TO BE COMPLETED: ybcond=3 and xbcond=1 or 2 for CORNERS. At present, ybcond=3 (no-slip)
+  !! only works with xbcond=0.
 
   public :: create_mirror_particles,reapply_mirror_bcs,reapply_mirror_bcs_divvel_only
 contains
@@ -100,6 +103,11 @@ contains
              k = npfb + imp
              irelation(k)=i;vrelation(k)=3
              rp(k,1) = rp(i,1);rp(k,2)= two*ymin - rp(i,2);rp(k,3)=rp(i,3)
+          else if(ybcond_noMPI.eq.3)then ! No-slip
+             imp = imp + 1
+             k = npfb + imp
+             irelation(k)=i;vrelation(k)=4
+             rp(k,1) = rp(i,1);rp(k,2)= two*ymin - rp(i,2);rp(k,3)=rp(i,3)
           end if
        end if   
        
@@ -114,8 +122,14 @@ contains
              k = npfb + imp
              irelation(k)=i;vrelation(k)=3
              rp(k,1) = rp(i,1);rp(k,2)= two*ymax - rp(i,2);rp(k,3)=rp(i,3)
+          else if(ybcond_noMPI.eq.3)then ! No-slip
+             imp = imp + 1
+             k = npfb + imp
+             irelation(k)=i;vrelation(k)=4
+             rp(k,1) = rp(i,1);rp(k,2)= two*ymax - rp(i,2);rp(k,3)=rp(i,3)       
           end if
-       end if                
+       end if           
+            
        !! CORNER BOUNDARIES
        rcorn = (/xmin,ymin,zero/)
        cdist = sqrt(dot_product(rcorn-rp(i,:),rcorn-rp(i,:)))
@@ -218,6 +232,7 @@ contains
 #ifdef dim3
        zlayer_index_global(i) = zlayer_index_global(irelation(i)) !! Copy the global z-layer index
 #endif       
+       rnorm(i,:) = rnorm(irelation(i),:)
     end do   
 
 #ifdef mp    

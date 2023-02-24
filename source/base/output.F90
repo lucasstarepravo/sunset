@@ -29,7 +29,7 @@ contains
      real(rkind),dimension(:),allocatable :: maxphi,minphi
      integer(ikind) :: n_threads_global
      real(rkind) :: t_per_dt_global,t_last_x_global,t_run_global
-     real(rkind) :: cput,cput_global
+     real(rkind) :: cput,cput_global,store1
      
      allocate(maxphi(6+nspec),minphi(6+nspec))
      
@@ -83,17 +83,20 @@ contains
            write(6,*) "run-time/itime=",t_per_dt_global,"Moving avg=",t_last_X_global/dble(scr_freq)
 
            !! Profiling
+           store1 = segment_time_global(10) - sum(segment_time_global(1:9))
            write(6,*) "  "
            write(6,*) "Profiling:::"
-           write(6,*) "MPI transfers             :",segment_time_global(1)/sum(segment_time_global(1:8))
-           write(6,*) "Mirror boundaries         :",segment_time_global(2)/sum(segment_time_global(1:8))
-           write(6,*) "Filtering                 :",segment_time_global(3)/sum(segment_time_global(1:8))
-           write(6,*) "Gradients                 :",segment_time_global(4)/sum(segment_time_global(1:8))
-           write(6,*) "Laplacians                :",segment_time_global(5)/sum(segment_time_global(1:8))
-           write(6,*) "Chemistry                 :",segment_time_global(6)/sum(segment_time_global(1:8))
-           write(6,*) "Boundary 2nd derivatives  :",segment_time_global(7)/sum(segment_time_global(1:8))
-           write(6,*) "RHS building              :",segment_time_global(8)/sum(segment_time_global(1:8))           
-           write(6,'(/,/,A)') "  "
+           write(6,*) "MPI transfers             :",segment_time_global(1)/segment_time_global(10)
+           write(6,*) "Mirror boundaries         :",segment_time_global(2)/segment_time_global(10)
+           write(6,*) "Filtering                 :",segment_time_global(3)/segment_time_global(10)
+           write(6,*) "Gradients                 :",segment_time_global(4)/segment_time_global(10)
+           write(6,*) "Laplacians                :",segment_time_global(5)/segment_time_global(10)
+           write(6,*) "Chemistry                 :",segment_time_global(6)/segment_time_global(10)
+           write(6,*) "Boundary 2nd derivatives  :",segment_time_global(7)/segment_time_global(10)
+           write(6,*) "Transport                 :",segment_time_global(8)/segment_time_global(10)
+           write(6,*) "Thermo                    :",segment_time_global(9)/segment_time_global(10)           
+           write(6,*) "Other                     :",store1/segment_time_global(10)       
+           write(6,'(A)') "  "
                                          
         end if
 
@@ -112,16 +115,19 @@ contains
         t_last_X = 0.0d0
         
         !! Profiling
+        store1 = segment_time_local(10) - sum(segment_time_local(1:9))        
         write(6,*) "  "
         write(6,*) "Profiling:::"
-        write(6,*) "MPI transfers             :",segment_time_local(1)/sum(segment_time_local(1:8))
-        write(6,*) "Mirror boundaries         :",segment_time_local(2)/sum(segment_time_local(1:8))
-        write(6,*) "Filtering                 :",segment_time_local(3)/sum(segment_time_local(1:8))
-        write(6,*) "Gradients                 :",segment_time_local(4)/sum(segment_time_local(1:8))
-        write(6,*) "Laplacians                :",segment_time_local(5)/sum(segment_time_local(1:8))
-        write(6,*) "Chemistry                 :",segment_time_local(6)/sum(segment_time_local(1:8))
-        write(6,*) "Boundary 2nd derivatives  :",segment_time_local(7)/sum(segment_time_local(1:8))
-        write(6,*) "RHS building              :",segment_time_local(8)/sum(segment_time_local(1:8))        
+        write(6,*) "MPI transfers             :",segment_time_local(1)/segment_time_local(10)
+        write(6,*) "Mirror boundaries         :",segment_time_local(2)/segment_time_local(10)
+        write(6,*) "Filtering                 :",segment_time_local(3)/segment_time_local(10)
+        write(6,*) "Gradients                 :",segment_time_local(4)/segment_time_local(10)
+        write(6,*) "Laplacians                :",segment_time_local(5)/segment_time_local(10)
+        write(6,*) "Chemistry                 :",segment_time_local(6)/segment_time_local(10)
+        write(6,*) "Boundary 2nd derivatives  :",segment_time_local(7)/segment_time_local(10)
+        write(6,*) "Transport                 :",segment_time_local(8)/segment_time_local(10)        
+        write(6,*) "Thermo                    :",segment_time_local(9)/segment_time_local(10)                
+        write(6,*) "Other                     :",store1/segment_time_local(10)        
         write(6,'(/,/,/,A)') "  "                  
 #endif          
      
@@ -137,7 +143,7 @@ contains
      !! Can be converted to vtk and read into paraview.
      use derivatives
      integer(ikind),intent(in) :: n_out
-     integer(ikind) :: i,j,k,np_out_local,dimsout,nspec_out,nprocsout
+     integer(ikind) :: i,j,k,np_out_local,dimsout,nspec_out,nprocsout,iflag
      character(70) :: fname
      real(rkind),dimension(:),allocatable :: vort,testout
      real(rkind),dimension(:,:),allocatable :: testoutv
@@ -210,10 +216,9 @@ contains
         np_out_local = npfb_layer 
         
         !! Number of species out
-        nspec_out = 1
-#ifdef output_composition
+!        nspec_out = 1
         nspec_out = nspec 
-#endif                
+         
         
         !! Write the main dump files
         open(unit = 20,file=fname)  
@@ -228,14 +233,17 @@ contains
  
            !! Pass something to tmpVort (we use vorticity to output other things sometimes during
            !! debugging...)
-           tmpVort = alpha_out(i)!vort(i)
+           tmpVort =  vort(i)           
+           
+           !! Pass heat release rate to alpha_out?
+           alpha_out(i) = hrr(i)
 
 #ifdef dim3
            write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),h(i),node_type(i),ro(i), &
-                       u(i),v(i),w(i),tmpVort,tmpT,Yspec(i,1:nspec_out)*tmpro       
+                       u(i),v(i),w(i),tmpVort,tmpT,alpha_out(i),Yspec(i,1:nspec_out)*tmpro       
 #else
            write(20,*) rp(i,1),rp(i,2),s(i),h(i),node_type(i),ro(i),u(i),v(i),tmpVort, &
-                       tmpT,Yspec(i,1:nspec_out)*tmpro
+                       tmpT,alpha_out(i),Yspec(i,1:nspec_out)*tmpro
 #endif
         end do
 
@@ -261,14 +269,13 @@ contains
      flush(21)
 #endif     
 
-
      return
   end subroutine output_layer
 !! ------------------------------------------------------------------------------------------------
   subroutine output_laminar_flame_structure(n_out)
      !! Output data for a laminar 1D flame profile.
      integer(ikind),intent(in) :: n_out !! Number of output file
-#ifdef output_composition     
+#ifdef output_flame     
      integer(ikind) :: i,j,k
      real(rkind) :: x,y,tmpro
      character(70) :: fname

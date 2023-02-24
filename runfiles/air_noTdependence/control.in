@@ -15,9 +15,6 @@
 !! Gravity vector (grav)
 0.0d0 0.0d0 0.0d0
 
-!! Characteristic density (rho_char)
-1.0d0
-
 !! Inflow equivalence ratio
 1.0d0
 
@@ -42,10 +39,12 @@
 !! Temperature depedence exponent for TDTP
 0.0d0
 
-!! non-reflecting (0) or hard with specified T (1) inflow
+!! INFLOWS type (non-reflecting (0), hard (1), inout (2))
 0
 
 !! adiabatic(0) or isothermal (1) wall boundaries
 0
+
+
 
 

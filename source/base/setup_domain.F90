@@ -176,8 +176,14 @@ contains
      !! Set the spatial limits of this processor block
      XL_thisproc = minval(rp(1:npfb,1))
      XR_thisproc = maxval(rp(1:npfb,1))    
-     YU_thisproc = maxval(rp(floor(0.75*npfb):npfb,2))  !! Adjustments for cyclical columns. 
-     YD_thisproc = minval(rp(1:floor(0.25*npfb),2))       !! Should be oK given node ordering
+     if(iprocY.eq.0.and.nprocsY.gt.1) then
+        YU_thisproc = maxval(rp(floor(0.55*npfb):npfb,2))  !! Adjustments for cyclical columns. 
+        YD_thisproc = minval(rp(1:floor(0.45*npfb),2))       !! Should be oK given node ordering
+     else
+        YU_thisproc = maxval(rp(1:npfb,2))
+        YD_thisproc = minval(rp(1:npfb,2))
+     end if
+
      
 !write(6,*) "iproc",iproc,"YU,YD",YU_thisproc,YD_thisproc
      
@@ -220,34 +226,7 @@ contains
            
      write(6,*) "Proc",iproc,"with",nb,npfb,np_nohalo,np
      call MPI_BARRIER( MPI_COMM_WORLD, ierror)    
-
-     !! Refine halos: compile lists of halo nodes which are used, and send them back to originator
-     !! processors, then re-build halos
-     call find_neighbours
-     call refine_halos
-
-     !! Shrink arrays to fit number of nodes
-     call reduce_arrays
-
-     deallocate(ij_link,ij_count)
-     
-     !! Transfer discretisation properties   
-     call halo_exchange(h)
-     call halo_exchange(s)
-     call halo_exchange_int(node_type)    
-     call halo_exchange(rnorm(:,1))
-     call halo_exchange(rnorm(:,2)) 
-#ifdef dim3
-     !! Transfer information about z-layer
-     call halo_exchange_int(zlayer_index_global)     
-     call halo_exchange_int(ilayer_index)
-     ilayer_index(npfb+1:nrecstart(2+2*nprocsY+1)-1)=0 !! Zero out local mirrors and UDLR halo nodes
-#endif
-     
-#else
-     np_nohalo = np  
-#endif     
-     
+    
      !! Build link lists for boundary and internal nodes
      if(nb.ne.0) then
         allocate(boundary_list(nb));boundary_list=0
@@ -290,7 +269,42 @@ contains
               znf_vtdiff(j) = .true.      !! No tangential viscous diffusion through outflow                            
            end if     
         end do
-     end if          
+     end if               
+     
+     !! Find neighbours (ready for stencil adaptation)
+     call find_neighbours     
+     
+     return
+  end subroutine build_domain
+!! ------------------------------------------------------------------------------------------------
+  subroutine refine_and_finalise_domain    
+     use mirror_boundaries
+     integer(ikind) i,j,ii,jj
+     
+     call refine_halos
+
+     !! Shrink arrays to fit number of nodes
+     call reduce_arrays
+
+     deallocate(ij_link,ij_count)
+     
+     !! Transfer discretisation properties   
+     call halo_exchange(h)
+     call halo_exchange(s)
+     call halo_exchange_int(node_type)    
+     call halo_exchange(rnorm(:,1))
+     call halo_exchange(rnorm(:,2)) 
+#ifdef dim3
+     !! Transfer information about z-layer
+     call halo_exchange_int(zlayer_index_global)     
+     call halo_exchange_int(ilayer_index)
+     ilayer_index(npfb+1:nrecstart(2+2*nprocsY+1)-1)=0 !! Zero out local mirrors and UDLR halo nodes
+#endif
+     
+#else
+     np_nohalo = np  
+#endif     
+     
 
      !! Set the global number of boundary nodes
 #ifdef mp
@@ -321,7 +335,7 @@ contains
 write(6,*) "sizes",iproc,npfb,np_nohalo,np            
                  
      return
-  end subroutine build_domain
+  end subroutine refine_and_finalise_domain
 !! ------------------------------------------------------------------------------------------------
   subroutine build_3rd_dimension
      integer(ikind) :: nm,i,k,iz,ilayerm1

@@ -49,11 +49,12 @@ contains
      real(rkind),dimension(:),allocatable :: rou_reg1,rov_reg1,row_reg1,ro_reg1,roE_reg1
      real(rkind),dimension(:,:),allocatable :: Yspec_reg1
      real(rkind),dimension(3) :: RKa
-     real(rkind),dimension(4) :: RKb
+     real(rkind),dimension(4) :: RKb,RKc
          
      !! Set RKa,RKb with dt (avoids multiplying by dt on per-node basis)
      RKa(:) = dt*rk3_4s_2r_a(:)
      RKb(:) = dt*rk3_4s_2r_b(:)
+     RKc(:) = dt*rk3_4s_2r_c(:)     
 
      allocate(rou_reg1(npfb),rov_reg1(npfb),ro_reg1(npfb),roE_reg1(npfb),row_reg1(npfb))
      allocate(rhs_rou(npfb),rhs_rov(npfb),rhs_ro(npfb),rhs_roE(npfb),rhs_row(npfb))
@@ -75,6 +76,10 @@ contains
 
      do k=1,3
         iRKstep = iRKstep + 1
+        
+        !! Set the intermediate time
+        time = time0 + RKc(iRKstep)         
+        
         !! Calculate the RHS
         call calc_all_rhs
      
@@ -129,6 +134,11 @@ contains
      !! Final substep: returns solution straight to ro,u,v,E (register 2)
      !! and doesn't update S
      iRKstep = iRKstep + 1
+     
+     !! Set the intermediate time
+     time = time0 + RKc(iRKstep)      
+     
+     !! Build the right hand side
      call calc_all_rhs  
      
      !$omp parallel do private(ispec)
@@ -152,9 +162,6 @@ contains
      !! Deallocation
      deallocate(rou_reg1,rov_reg1,row_reg1,ro_reg1,roE_reg1,Yspec_reg1)
      deallocate(rhs_rou,rhs_rov,rhs_row,rhs_ro,rhs_roE,rhs_Yspec)     
-
-     !! Set the new time   
-     time = time0 + dt
      
      !! Apply BCs and update halos
      call apply_time_dependent_bounds     
@@ -217,7 +224,7 @@ contains
      real(rkind),dimension(:),allocatable :: e_acc_ro,e_acc_rou,e_acc_rov,e_acc_E,e_acc_row
      real(rkind),dimension(:,:),allocatable :: Yspec_reg1,e_acc_Yspec
      real(rkind),dimension(3) :: RKa
-     real(rkind),dimension(4) :: RKb,RKbmbh
+     real(rkind),dimension(4) :: RKb,RKbmbh,RKc
      
      !! Push the max error storage back one
      emax_nm1 = emax_n;emax_n=emax_np1
@@ -226,6 +233,7 @@ contains
      RKa(:) = dt*rk3_4s_2r_a(:)
      RKb(:) = dt*rk3_4s_2r_b(:)
      RKbmbh(:) = dt*rk3_4s_2r_bmbh(:)
+     RKc(:) = dt*rk3_4s_2r_c(:)
 
      allocate(rou_reg1(npfb),rov_reg1(npfb),ro_reg1(npfb),roE_reg1(npfb),row_reg1(npfb))
      allocate(rhs_rou(npfb),rhs_rov(npfb),rhs_ro(npfb),rhs_roE(npfb),rhs_row(npfb))
@@ -246,14 +254,15 @@ contains
      !! Temporary storage of time
      time0=time
      iRKstep = 0
-
+     
      do k=1,3
         iRKstep = iRKstep + 1
-        !! Calculate the RHS        
-        call calc_all_rhs      
 
         !! Set the intermediate time
-!        time = time0 + RK_c(k)*dt        
+        time = time0 + RKc(iRKstep)
+
+        !! Calculate the RHS        
+        call calc_all_rhs      
 
         !! Set w_i and new u,v
         !$omp parallel do private(ispec)
@@ -321,13 +330,18 @@ contains
      !! Final substep: returns solution straight to ro,u,v,E (register 2)
      !! and doesn't update S
      iRKstep = iRKstep + 1
+
+     !! Set the intermediate time
+     time = time0 + RKc(iRKstep)     
+     
+     !! Build the right hand sides
      call calc_all_rhs    
      
      enrm_ro=zero;enrm_rou=zero;enrm_rov=zero;enrm_E=zero;enrm_Yspec=zero;enrm_row=zero
      !$omp parallel do private(ispec) reduction(max:enrm_ro,enrm_rou,enrm_rov,enrm_E,enrm_Yspec,enrm_row)
      do i=1,npfb
      
-        !! Final values of prim vars
+        !! Final values of conservative variables
         ro(i) = ro_reg1(i) + RKb(4)*rhs_ro(i)
         rou(i) = rou_reg1(i) + RKb(4)*rhs_rou(i)
         rov(i) = rov_reg1(i) + RKb(4)*rhs_rov(i)
@@ -378,6 +392,7 @@ contains
                                    abs(e_acc_Yspec(i,ispec))/(abs(Yspec(i,ispec)) + eY_norm))
         end do
 #endif
+
      end do
      !$omp end parallel do  
 
@@ -401,10 +416,7 @@ contains
                             ) &
                         ), &
                     1.0d-16)
-
-     !! Set the new time   
-     time = time0 + dt
-     
+    
      !! Apply BCs and update halos
      call apply_time_dependent_bounds     
      call reapply_mirror_bcs
@@ -488,7 +500,7 @@ contains
      dt_cfl = one*dt_cfl*L_char
      dt_visc = 0.3d0*dt_visc*L_char*L_char
      dt_therm = 0.3d0*dt_therm*L_char*L_char
-     dt_spec = 1.5d0*dt_spec*L_char*L_char
+     dt_spec = two*dt_spec*L_char*L_char
                            
      !! Find smallest node spacing
      smin = minval(s(1:npfb))*L_char
@@ -514,7 +526,7 @@ contains
      call MPI_ALLREDUCE(dt_local,dt,1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
      if(iproc.eq.0) then
         write(192,*) time,dt,one
-        flush(192)
+        flush(192)        
      end if
 #endif     
 #else
@@ -549,13 +561,17 @@ contains
      facA = pid_a*log(pid_tol/emax_np1)
      facB = pid_b*log(emax_n/pid_tol)
      facC = pid_c*log(pid_tol/emax_nm1)
-         
+      
      !! Combined factor
      dtfactor = pid_k*exp(facA+facB+facC)
-     
+          
      !! Suppress big changes in time step (especially increases). N.B. this significantly reduces
      !! the stiffness of the PID system, and seems faster so far.
-     dtfactor = one + one*atan((dtfactor-one)/one)
+!     dtfactor = one + one*atan((dtfactor-one)/one)
+
+     !! Alternative approach is impose hard limits on dtfactor
+     dtfactor = max(half,dtfactor)
+     dtfactor = min(1.1d0,dtfactor)         
        
      !! Set time new step
      dt = dt*dtfactor

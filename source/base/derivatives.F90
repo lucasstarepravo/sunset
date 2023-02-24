@@ -29,9 +29,6 @@ contains
     real(rkind),dimension(dims) :: gradtmp
     real(rkind) :: gradztmp
     
-real(rkind),dimension(:),allocatable :: ftest
-real(rkind) :: x,y,gradnorm,gradtang,error_n,error_t,wn
-    
     segment_tstart = omp_get_wtime()     
     
     !$OMP PARALLEL DO PRIVATE(j,k,gradtmp)
@@ -62,58 +59,6 @@ real(rkind) :: x,y,gradnorm,gradtang,error_n,error_t,wn
     !! Or set to zero if 2D simulations
     gradphi(:,3) = zero    
 #endif    
-
-
-!!=====================================================================
-if(.false.)then
-!! Test of gradient operators on curved boundaries
-    !! Initialise test
-    allocate(ftest(np))
-    wn = 16.0d0
-    do i=1,np
-       x=rp(i,1)*L_char;y=rp(i,2)*L_char
-       ftest(i) = cos(wn*pi*x/L_char)*cos(wn*pi*y/L_char)
-    end do
-
-    !! Evaluate gradient
-    !$OMP PARALLEL DO PRIVATE(j,k,gradtmp)
-    do i=1,npfb
-       gradtmp=zero
-       do k=1,ij_count(i)
-          j = ij_link(k,i) 
-          gradtmp(1:2) = gradtmp(1:2) + ftest(j)*ij_w_grad(:,k,i)
-       end do
-       gradphi(i,1:2) = gradtmp(1:2) - ftest(i)*ij_w_grad_sum(:,i)                                         
-    end do
-    !$OMP END PARALLEL DO
-    
-    !! Loop over boundaries and determine error
-    do j=1,nb
-       i=boundary_list(j)
-       if(node_type(i).eq.0)then
-          x=rp(i,1)*L_char;y=rp(i,2)*L_char        
-          !! Gradient (in x-y frame)
-          gradtmp(1) = -(wn*pi/L_char)*sin(wn*pi*x/L_char)*cos(wn*pi*y/L_char)
-          gradtmp(2) = -(wn*pi/L_char)*cos(wn*pi*x/L_char)*sin(wn*pi*y/L_char)          
-       
-          !! Boundary oriented gradient::
-          gradnorm = rnorm(i,1)*gradtmp(1) + rnorm(i,2)*gradtmp(2)
-          gradtang = -rnorm(i,2)*gradtmp(1) + rnorm(i,1)*gradtmp(2)
-          
-          error_n = (gradphi(i,1)-gradnorm)/max(abs(gradnorm),verysmall)
-          error_t = (gradphi(i,2)-gradtang)/max(abs(gradtang),verysmall)
-
-!write(6,*) gradphi(i,1),gradnorm,gradphi(i,2),gradtang
-write(6,*) error_n,error_t
-       end if
-    end do
- 
-    deallocate(ftest)    
-  
-  stop
-endif  
-
-!!=====================================================================
 
 
     !! Profiling

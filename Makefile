@@ -11,7 +11,7 @@
 # dim3       Two (0) or three (1) dimensional simulation                               (default: 0)
 # pgrad      Drive the flow with a pressure gradient and P.I.D control                 (default: 0)
 # tdtp       Temperature dependent transport properties (1) or constant (0)            (default: 0)
-# yout       Output the complete composition (1) or don't (0)                          (default: 1)
+# flout      Output the flame structure (1) or don't (0)                               (default: 0)
 # -------------------------------------------------------------------------------------------------
 #
 # EXAMPLE USAGE:
@@ -19,13 +19,13 @@
 # make thermo=0 dim3=X mpi=X pgrad=X
 #
 # For standard combustion problems, react=1 will overwrite any thermo, tdtp and multispec flags:
-# make react=1 dim3=X mpi=X yout=X      <---------- standard combustion make
+# make react=1 dim3=X mpi=X flout=X      <---------- standard combustion make
 #
 # For thermal flows with real gas properties:
 # make thermo=1 dim3=X mpi=X pgrad=X tdtp=1
 #
 # For thermal flows with fixed cp, visc, lambda, use a runfile w/ zero temp dependence, and
-# make thermo=1 react=0 multispec=0 dim3=X mpi=X pgrad=X yout=0
+# make thermo=1 react=0 multispec=0 dim3=X mpi=X pgrad=X flout=0
 
 #
 # Choose compiler depending on whether mpi
@@ -89,9 +89,10 @@ FFLAGS += -Dpgrad
 endif
 
 # Output full chemical composition?
-ifneq ($(yout),0)
-FFLAGS += -Doutput_composition
+ifeq ($(flout),1)
+FFLAGS += -Doutput_flame
 endif
+
 LDFLAGS := -fopenmp -m64 -lopenblas 
 
 # Identify directories
@@ -104,7 +105,7 @@ OBJ_FILES := obj/kind_parameters.o obj/common_parameter.o obj/common_vars.o
 OBJ_FILES += obj/rbfs.o obj/mirror_boundaries.o obj/derivatives.o 
 OBJ_FILES += obj/mpi_transfers.o obj/transport.o obj/thermodynamics.o
 OBJ_FILES += obj/neighbours.o obj/output.o obj/statistics.o 
-OBJ_FILES += obj/setup_domain.o obj/setup_flow.o
+OBJ_FILES += obj/load_data.o obj/setup_domain.o obj/setup_flow.o
 OBJ_FILES += obj/labf.o obj/fd.o obj/chemistry.o
 OBJ_FILES += obj/characteristic_boundaries.o obj/rhs.o
 OBJ_FILES += obj/step.o

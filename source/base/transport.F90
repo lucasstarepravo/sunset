@@ -14,13 +14,11 @@ module transport
   !!        1) isoT         - isothermal flows, viscosity and molecular diffusivity are set 
   !!                              as constant based on reference values.
   !!        2) not(isoT)    - thermal flows, viscosity, molecular diffusivity and thermal
-  !!                          conductivity are dependent on temperature and composition, and
-  !!                 a) 
+  !!                          conductivity are dependent on temperature, and if mixture-averaged
+  !!                          transport is turned on, also on composition.
   !!
-  !!
-  !!
-  !!
-  !! N.B. Currently hard-coded with visc, lambda and D given by 4 polynomial coefficients.
+  !! N.B. Currently hard-coded with visc, lambda and D given by 4 polynomial coefficients - need 
+  !! to check the reference for these. Took them from Senga+.
 
   use kind_parameters
   use common_parameter
@@ -31,80 +29,14 @@ module transport
 
 contains
 !! ------------------------------------------------------------------------------------------------
-  subroutine load_transport_file
-     !! Subroutine loads the transport file transport.in and prepares the coefficients for mixture
-     !! average transport properties
-     integer(ikind) :: i,j,ispec,jspec
-     real(rkind) :: store1
-     
-     open(unit=13,file='transport.in')     
-     
-     !! Read header
-     read(13,*)
-     read(13,*)
-     
-     !! Reference temperature
-     read(13,*)
-     read(13,*) T_ref
-     read(13,*)
-     
-     !! Reference pressure
-     read(13,*)
-     read(13,*) p_ref
-     read(13,*)
-     
-     !! Polynomial coefficients for viscosity
-     read(13,*)
-     allocate(mxav_coef_visc(nspec,4))
-     do ispec=1,nspec
-        read(13,*) i,mxav_coef_visc(ispec,1),mxav_coef_visc(ispec,2),mxav_coef_visc(ispec,3),mxav_coef_visc(ispec,4)
-     end do
-     read(13,*)
-              
-     !! Polynomial coefficients for thermal conductivity
-     read(13,*)
-     allocate(mxav_coef_lambda(nspec,4))
-     do ispec=1,nspec
-        read(13,*) i,mxav_coef_lambda(ispec,1),mxav_coef_lambda(ispec,2), &
-                     mxav_coef_lambda(ispec,3),mxav_coef_lambda(ispec,4)
-     end do
-     read(13,*)
-     
-     !! Polynomial coefficients for molecular diffusivity
-     read(13,*)
-     allocate(mxav_coef_Diff(nspec,nspec,4));mxav_coef_Diff=zero
-     do ispec=1,nspec
-        do jspec=1,ispec
-           read(13,*) i,j,mxav_coef_Diff(ispec,jspec,1),mxav_coef_Diff(ispec,jspec,2), &
-                          mxav_coef_Diff(ispec,jspec,3),mxav_coef_Diff(ispec,jspec,4)
-        end do
-     end do
-     read(13,*)
-     
-     !! Copy triangle matrix to symmetric matrix
-     do ispec=1,nspec
-        do jspec=1,ispec
-           mxav_coef_Diff(jspec,ispec,1) = mxav_coef_Diff(ispec,jspec,1)
-           mxav_coef_Diff(jspec,ispec,2) = mxav_coef_Diff(ispec,jspec,2)
-           mxav_coef_Diff(jspec,ispec,3) = mxav_coef_Diff(ispec,jspec,3)
-           mxav_coef_Diff(jspec,ispec,4) = mxav_coef_Diff(ispec,jspec,4)                                 
-        end do
-     end do
-           
-     
-    
-  
-     return
-  end subroutine load_transport_file
-!! ------------------------------------------------------------------------------------------------
   subroutine evaluate_transport_properties
      use mirror_boundaries
      !! Uses temperature, cp and density to evaluate thermal conductivity, viscosity and 
      !! molecular diffusivity. For isothermal flows, or if not(tdtp), use reference values.
      integer(ikind) :: ispec,i,j
      real(rkind) :: tmp
-!     real(rkind) :: wtime1,wtime2
-! wtime1=omp_get_wtime()             
+     real(rkind) :: wtime1,wtime2
+     segment_tstart=omp_get_wtime()             
        
 #ifndef isoT     
      if(mix_av_flag.eq.0) then
@@ -153,20 +85,19 @@ contains
         end do
         !$omp end parallel do     
 #endif   
- 
      
      end if
 #else
      visc(:) = visc_ref
 #ifdef ms
-     roMdiff(:,:) = ro(i)*Mdiff_ref
+     roMdiff(:,:) = visc_ref/Pr/one !! reference diffusivity with Le=one
 #endif     
 #endif     
 
-! wtime2=omp_get_wtime()        
-! wtime2 = wtime2 - wtime1
-! transport_totaltime = transport_totaltime + wtime2 
-! write(6,*) itime,iproc,transport_totaltime/dble(max(itime,1))  
+     !! Profiling
+     segment_tend = omp_get_wtime()
+     segment_time_local(8) = segment_time_local(8) + segment_tend - segment_tstart  
+  
      return
   end subroutine evaluate_transport_properties
 !! ------------------------------------------------------------------------------------------------  
@@ -180,40 +111,39 @@ contains
      !!    b) Powers of visc and lambda required for combination rules are done in log-space.
      !!    c) We store one over species_diffusivity from the polynomials, which replaces a number
      !!       of divisions by multiplications in the combo rule.
-     !!
-     !!
-     !!
+     !!    d) Eliminated density from the formulation.
+     !!    e) Replace sum of X for jspec!=ispec with one-Y(ispec)
      !!
      integer(ikind),intent(in) :: inode
-     integer(ikind) :: ispec,icoef,jspec  
-     real(rkind) :: logT,logvisc,tmpro,loglambda,oomolar_mass_mix,logdiff,logp
+     integer(ikind) :: ispec,jspec 
+     real(rkind) :: logT,roo_molar_mass_mix,logp,tmpro
      real(rkind),dimension(nspec_max) :: species_visc,Xspec,species_lambda
      real(rkind),dimension(nspec_max,nspec_max) :: oospecies_diff
      real(rkind) :: store1,store2,store3
-     real(rkind) :: logT2,logT3
-          
-     !! Density
-     tmpro = ro(inode)
-              
+     real(rkind) :: logT2,logT3   
+                        
      !! Logarithm of temperature ratio
-     logT = log(T(inode)/T_ref)
+     logT = log(T(inode)/T_ref_mxav)
+
+     !! Powers of logT
+     logT2=logT*logT
+     logT3=logT2*logT
+     
+     !! Store the local density
+     tmpro = ro(inode)
      
      !! log of Pressure ratio (relative to reference)
-     logp = log(p_ref/p(inode))
+     logp = log(p_ref_mxav/p(inode))
      
-     !! Loop over all species and evaluate viscosity, thermal conductivity, mixture mol mass, and Xspec
-     oomolar_mass_mix = zero
+     !! Loop over all species and evaluate viscosity, thermal conductivity, diffusivity,
+     !! ro/mixture mol mass, and Xspec
+     roo_molar_mass_mix = zero
      do ispec=1,nspec
 
-        !! Build Xspec and mixture molar mass
-        Xspec(ispec) = Yspec(inode,ispec)*one_over_molar_mass(ispec)/tmpro
-        oomolar_mass_mix = oomolar_mass_mix + Xspec(ispec)
+        !! Build Xspec and density over mixture molar mass
+        Xspec(ispec) = Yspec(inode,ispec)*one_over_molar_mass(ispec)
+        roo_molar_mass_mix = roo_molar_mass_mix + Xspec(ispec)
 
-        !! Powers of logT
-        logT2=logT*logT
-        logT3=logT2*logT
-
-        !! Is this faster?        
         !! Evaluate logarithm of species viscosity
         species_visc(ispec) = mxav_coef_visc(ispec,1) + logT*mxav_coef_visc(ispec,2) &
                             + logT2*mxav_coef_visc(ispec,3) + logT3*mxav_coef_visc(ispec,4) 
@@ -222,20 +152,22 @@ contains
         species_lambda(ispec) = mxav_coef_lambda(ispec,1) + logT*mxav_coef_lambda(ispec,2) &
                               + logT2*mxav_coef_lambda(ispec,3) + logT3*mxav_coef_lambda(ispec,4) 
 
-        !! Evaluate species diffusivity (actually one over species diffusivity)
+        !! Evaluate species diffusivity (actually one over species diffusivity) for lower
+        !! triangle, then copy across
         do jspec=1,ispec
-           logdiff = logp +mxav_coef_diff(ispec,jspec,1) + logT*mxav_coef_diff(ispec,jspec,2) &
-                   + logT2*mxav_coef_diff(ispec,jspec,3) + logT3*mxav_coef_diff(ispec,jspec,4) 
-           oospecies_diff(ispec,jspec) = exp(-logdiff)
+           store1 = -logp - mxav_coef_diff(ispec,jspec,1) - logT*mxav_coef_diff(ispec,jspec,2) &
+                   - logT2*mxav_coef_diff(ispec,jspec,3) - logT3*mxav_coef_diff(ispec,jspec,4) 
+           oospecies_diff(ispec,jspec) = exp(store1)
            oospecies_diff(jspec,ispec) = oospecies_diff(ispec,jspec) !! Copy to upper triangle        
         end do
         
      end do
-     
-     !! Finalise Xspec     
-     Xspec(1:nspec) = Xspec(1:nspec)/oomolar_mass_mix
+   
+     !! Finalise Xspec  
+     Xspec(1:nspec) = Xspec(1:nspec)/roo_molar_mass_mix
 
-     !! Combination rule for viscosity (E&G order 6)
+     !! ---------------------------------------------------------------------------------
+     !! Combination rule for viscosity (E&G order 6) ====================================
      store1=zero 
      do ispec=1,nspec
         store2 = exp(six*species_visc(ispec))
@@ -243,7 +175,8 @@ contains
      end do
      visc(inode) = store1**oosix
      
-     !! Combination rule for thermal conductivity (E&G order 1/4)
+     !! ---------------------------------------------------------------------------------     
+     !! Combination rule for thermal conductivity (E&G order 1/4) =======================
      store1=zero 
      do ispec=1,nspec
         store2 = exp(quarter*species_lambda(ispec))
@@ -251,20 +184,21 @@ contains
      end do
      lambda_th(inode) = store1*store1*store1*store1  !! Power of 4 explicit
 
-     !! Combination rule for molecular diffusivity (Hirschfelder & Curtiss rule)
+     !! ---------------------------------------------------------------------------------
+     !! Combination rule for molecular diffusivity (Hirschfelder & Curtiss rule) ========
      do ispec = 1,nspec
         !! Initialise with the ispec-ispec contribution subtracted
         store3 = Xspec(ispec) + quitesmall
-        store1 = -store3*molar_mass(ispec) 
         store2 = -store3*oospecies_diff(ispec,ispec)
+                
         do jspec = 1,nspec
            store3 = Xspec(jspec) + quitesmall
-           store1 = store1 + store3*molar_mass(jspec)
            store2 = store2 + store3*oospecies_diff(ispec,jspec)
         end do
-        roMdiff(inode,ispec) = tmpro*store1*oomolar_mass_mix/store2
+        roMdiff(inode,ispec) = (tmpro-Yspec(inode,ispec))/store2
      end do
-                    
+
      return
   end subroutine evaluate_mixture_average_transport_at_node
+!! ------------------------------------------------------------------------------------------------    
 end module transport

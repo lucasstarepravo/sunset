@@ -82,8 +82,9 @@ contains
      allocate(bvecx(nsizeG),bvecy(nsizeG),bvecxx(nsizeG),bvecxy(nsizeG),bvecyy(nsizeG),bvechyp(nsizeG))
      allocate(gvec(nsizeG),xvec(nsizeG));gvec=zero;xvec=zero
 
-     !! No parallelism for individual linear system solving...
-!     call openblas_set_num_threads(1)
+     !! No parallelism for individual linear system solving (have to set this on CSF/HPC-pool, but not on
+     !! local workstation.... ???
+     call openblas_set_num_threads(1)
 
 
      !$OMP PARALLEL DO PRIVATE(i,nsize,amatx,k,j,rij,rad,qq,x,y,xx,yy, &
@@ -606,7 +607,7 @@ contains
                  tmp_t = tmp_t + ij_wb_grad2(2,k,jj)*tmp_n
               end if
            end do
-           ooRcurve(jj) = sqrt(-tmp_t)  !! 1/radius of curvature...  
+           ooRcurve(jj) = sqrt(-tmp_t)  !! 1/radius of curvature...         
         end if     
      end do
      
@@ -626,9 +627,9 @@ contains
            do k=1,ij_count(i)  !! Will result in Laplacian being correct... (but d2/dn2 incorrect)
 !              ij_wb_grad2(1,k,jj) = ij_wb_grad2(1,k,jj) + ij_w_grad(1,k,i)*ooRcurve(jj)
               ij_wb_grad2(2,k,jj) = ij_wb_grad2(2,k,jj) + ij_w_grad(1,k,i)*ooRcurve(jj)                
-              ij_w_lap(k,i) = ij_wb_grad2(1,k,jj) + ij_wb_grad2(2,k,jj)
-           end do
-        end if
+              ij_w_lap(k,i) = ij_wb_grad2(1,k,jj) + ij_wb_grad2(2,k,jj)              
+           end do                 
+        end if                      
      end do
 
      !! First row: map gradients onto x-y frame

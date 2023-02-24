@@ -53,7 +53,7 @@ contains
      !! Time, enstrophy
      open(unit=198,file='data_out/statistics/enstrophy.out')
 
-     !! Time, error in species conservation, total mass of each species in domain
+     !! Time, L2 error in mass fraction sum, total mass of each species in domain
      open(unit=199,file='data_out/statistics/species.out')
      
      !! Time, heat release rate
@@ -83,7 +83,7 @@ contains
         call mass_and_energy_check
      
         !! Error evaluation for Taylor Green vortices?
-        call error_TG
+!        call error_TG
 
         !! Calculate the lift and drag on all solid obstacles
 !        call liftdrag
@@ -271,29 +271,31 @@ contains
   subroutine heat_release_rate
      !! This subroutine calculates the total heat release rate integrated over the domain
      integer(ikind) :: i
-     real(rkind) :: tot_hrr,tot_vol,tmpro,dVi,tot_hrr_tmp,tot_vol_tmp
+     real(rkind) :: tot_hrr,dVi,tot_hrr_tmp,tot_vol_tmp
 #ifdef react    
    
-     tot_hrr = zero;tot_vol = zero;
-     !$omp parallel do private(tmpro,dVi) reduction(+:tot_hrr,tot_vol)
+     tot_hrr = zero
+     !$omp parallel do private(dVi) reduction(+:tot_hrr)
      do i=1,npfb
-!        tmpro = ro(i)
         dVi = s(i)*s(i) !! assume square nodes for now...
 #ifdef dim3
         dVi = dVi*dz
 #endif        
         tot_hrr = tot_hrr + hrr(i)*dVi
-        tot_vol = tot_vol + dVi
      end do
      !$omp end parallel do
      
 #ifdef mp
-     tot_hrr_tmp = tot_hrr;tot_vol_tmp = tot_vol
+     tot_hrr_tmp = tot_hrr
      call MPI_ALLREDUCE(tot_hrr_tmp,tot_hrr,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(tot_vol_tmp,tot_vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
 #endif     
-     !! Mean heat release averaged over volume::
-     tot_hrr = tot_hrr/tot_vol
+
+     !! Scale by length-scale squared or cubed
+#ifdef dim3
+     tot_hrr = tot_hrr*L_char**3.0d0
+#else
+     tot_hrr = tot_hrr*L_char**two
+#endif     
         
 #ifdef mp
      if(iproc.eq.0)then
@@ -311,7 +313,7 @@ contains
   end subroutine heat_release_rate 
 !! ------------------------------------------------------------------------------------------------
   subroutine mass_and_energy_check
-     !! This subroutine calculates the mean density and total energy in the domain.
+     !! This subroutine calculates the total mass and total energy in the domain.
      integer(ikind) :: i
      real(rkind) :: tot_mass,tot_vol,tmpro,dVi,tot_mass_tmp,tot_vol_tmp,tot_roE,tot_roE_tmp
     
@@ -332,25 +334,33 @@ contains
      end do
      !$omp end parallel do
      
+     !! Scale to make dimensional
+#ifdef dim3
+     tot_mass = tot_mass*L_char**3.0d0
+     tot_vol = tot_vol*L_char**3.0d0
+     tot_roE = tot_roE*L_char**3.0d0          
+#else
+     tot_mass = tot_mass*L_char**two
+     tot_vol = tot_vol*L_char**two
+     tot_roE = tot_roE*L_char**two          
+#endif     
+     
 #ifdef mp
      tot_mass_tmp = tot_mass;tot_vol_tmp = tot_vol;tot_roE_tmp = tot_roE
      call MPI_ALLREDUCE(tot_mass_tmp,tot_mass,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
      call MPI_ALLREDUCE(tot_vol_tmp,tot_vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
      call MPI_ALLREDUCE(tot_roE_tmp,tot_roE,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
 #endif     
-     
-     !! Relative difference in mass from I.C.s
-     tot_mass = (tot_mass-rho_char*tot_vol)/(rho_char*tot_vol)  
-         
+              
 #ifdef mp
      if(iproc.eq.0)then
-        write(193,*) time/Time_char,tot_mass
+        write(193,*) time/Time_char,tot_mass,tot_vol
         flush(193)
         write(197,*) time/Time_char,tot_roE
         flush(197)
      end if
 #else
-     write(193,*) time/Time_char,tot_mass
+     write(193,*) time/Time_char,tot_mass,tot_vol
      flush(193)
      write(197,*) time/Time_char,tot_roE
      flush(197)
@@ -362,7 +372,7 @@ contains
   subroutine species_check
      !! This subroutine calculates total quantity of each species in the domain
      integer(ikind) :: i,ispec
-     real(rkind) :: tot_vol,dVi,tot_vol_tmp,tmpY,sumY,tot_error,tot_error_tmp
+     real(rkind) :: dVi,tmpY,sumY,tot_error,tot_error_tmp,tmpro
      real(rkind),dimension(:),allocatable :: tot_Yspec,tot_Yspec_tmp
 #ifdef ms     
      
@@ -370,51 +380,59 @@ contains
      allocate(tot_Yspec(nspec),tot_Yspec_tmp(nspec))   
      tot_Yspec = zero     
      tot_error = zero
-     tot_vol = zero
-     !$omp parallel do private(dVi,ispec,tmpY,sumY) reduction(+:tot_Yspec,tot_error,tot_vol)
+     !$omp parallel do private(tmpro,dVi,ispec,tmpY,sumY) reduction(+:tot_Yspec,tot_error)
      do i=1,npfb
-        dVi = s(i)*s(i)*L_char*L_char !! assume square nodes for now...
+        !! Extract one/ro
+        tmpro = one/ro(i)
+     
+        !! size of volume element
+        dVi = s(i)*s(i) !! assume square nodes for now...
 #ifdef dim3
-        dVi = dVi*dz*L_char
+        dVi = dVi*dz
 #endif        
-        !! The total volume of the domain
-        tot_vol = tot_vol + dVi
-        
+
+        !! Sum over all species
         sumY = -one
         do ispec=1,nspec
+           
            tmpY = Yspec(i,ispec)
-           !! Total mass of species in domain
+           
+           !! Total mass of species in domain - integral of roY dV
            tot_Yspec(ispec) = tot_Yspec(ispec) + dVi*tmpY
            
-           sumY = sumY + tmpY
+           !! 1- sum_over_species(Y)
+           sumY = sumY + tmpY*tmpro
         end do
         
-        !! Error in sumY
+        !! L2 error in sumY
         tot_error = tot_error + sumY*sumY
      end do
      !$omp end parallel do
      
+     !! Rescale integral quantities to be dimensional
+#ifdef dim3
+     tot_error = tot_error*L_char**3.0d0
+     tot_Yspec = tot_Yspec*L_char**3.0d0
+#else
+     tot_error = tot_error*L_char**two
+     tot_Yspec = tot_Yspec*L_char**two
+#endif     
+     
 #ifdef mp
      tot_Yspec_tmp = tot_Yspec
      tot_error_tmp = tot_error
-     tot_vol_tmp = tot_vol
      call MPI_ALLREDUCE(tot_Yspec_tmp,tot_Yspec,nspec,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
      call MPI_ALLREDUCE(tot_error_tmp,tot_error,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(tot_vol_tmp,tot_vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)    
      
      !! L2 norm for error           
      tot_error = sqrt(tot_error/dble(npfb_global))
-     
-     !! Normalise mass of species by volume
-     tot_Yspec = tot_Yspec/tot_vol
-     
+          
      if(iproc.eq.0)then
         write(199,*) time/Time_char,tot_error,tot_Yspec(:)
         flush(199)
      end if
 #else
      !! Normalise mass of species by volume
-     tot_Yspec = tot_Yspec/tot_vol
      write(199,*) time/Time_char,sqrt(tot_error/dble(npfb)),tot_Yspec(:)
      flush(199)
 #endif
@@ -429,14 +447,13 @@ contains
      !! Umax=1, unit width domain...
      !! N.B. This routine needs updating for multi-processor simulations
      integer(ikind) :: i,j,jj
-     real(rkind) :: y,uexact,local_error,sum_e,sum_exact,tot_vol,dVi
+     real(rkind) :: y,uexact,local_error,sum_e,sum_exact,dVi
      real(rkind) :: N,X1,X2,y1
        
      sum_e = zero
      sum_exact = zero
-     tot_vol = zero
      !$omp parallel do private(y,uexact,local_error,dVi,j,jj,N,X1,X2,y1) &
-     !$omp reduction(+:sum_e,sum_exact,tot_vol)
+     !$omp reduction(+:sum_e,sum_exact)
      do i=1,npfb
         y = rp(i,2)
         uexact = (half-y)*(half+y)*4.0d0
@@ -455,7 +472,6 @@ contains
         local_error = u(i)-uexact
         sum_e = sum_e + local_error**two
         sum_exact = sum_exact + uexact**two
-        tot_vol = tot_vol + dVi
      end do
      !$omp end parallel do
      sum_e = dsqrt(sum_e/sum_exact)
@@ -466,7 +482,7 @@ contains
   end subroutine poiseuille_l2norm  
 !! ------------------------------------------------------------------------------------------------
   subroutine error_TG
-    !! N.B. This routine needs updating for multiprocessor simulations
+    !! Error relative to analytic solution for 2D Taylor-Green vortex decay
     implicit none
     integer(ikind) :: i
     real(rkind) :: u_exact,v_exact,x,y,expo
@@ -477,7 +493,7 @@ contains
     do i=1,npfb
        x=rp(i,1)
        y=rp(i,2)
-       expo = exp(-8.0d0*pi*pi*time/time_char/Re)
+       expo = exp(-8.0d0*pi*pi*time/time_char/200.0d0)   !! Hard-coded for Re=200. Need to modify.
        u_exact = -expo*cos(2.0*pi*x)*sin(2.0*pi*y)
        v_exact = expo*sin(2.0*pi*x)*cos(2.0*pi*y)
        U_ex = dsqrt(u_exact**2. + v_exact**2.)
@@ -510,6 +526,7 @@ contains
 !! ------------------------------------------------------------------------------------------------    
   subroutine check_enstrophy
      !! Evaluate volume averaged enstrophy and also the volume averaged kinetic energy
+     !! This routine is designed specifically for 3D Taylor-Green vortex tests.
      integer(ikind) :: i
      real(rkind) :: srtnorm,sum_enstrophy,vol_i,sum_vol,sum_ke
      real(rkind) :: sum_enstrophy_local,sum_vol_local,sum_ke_local

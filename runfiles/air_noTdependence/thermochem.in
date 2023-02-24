@@ -9,6 +9,9 @@
 !! Temperature limits
 1.0d0 1.0d5
 
+!! Gibbs reference pressure
+1.0d5
+
 !! Molar mass, Lewis number and polynomial fit of each species ------------------------------------
 !! Species 1 - Air without temperature dependence
 2.884d1

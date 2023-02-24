@@ -128,7 +128,9 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      open(13,file='../gen/IPART')
      read(13,*) nb,npfb,dummy      !! dummy is largest s(i) in domain...
      read(13,*) xmin,xmax,ymin,ymax
-     read(13,*) xbcond,ybcond
+     read(13,*) xbcond,ybcond     
+     !! For the purposes of shifting, ybcond=3 (no-slip) is the same as ybcond=2 (symmetry)
+     
      !! Calculate some useful constants
      smax = dummy;h0 = hovs_local*dummy;sup_size = ss*h0;h2=h0*h0;h3=h2*h0
         
@@ -233,14 +235,16 @@ write(6,*) "Shifting iteration",ll,"of ",kk
            block_size_y = (max_y-min_y)/(two*hovs*max_s)
 
            if(block_size_x.le.two.or.block_size_y.le.two) then
-              write(6,*) "WARNING: blocks may be too thin for resolution on processor",i
-              write(6,*) "Block sizes x,y:",block_size_x,block_size_y
+              if(block_size_x.le.one.or.block_size_y.le.one) then
+                 write(6,*) "ERROR: blocks definitely too thin for resolution on processor",i
+                 write(6,*) "Block sizes x,y:",block_size_x,block_size_y
+!                 stop
+              else
+                 write(6,*) "WARNING: blocks *nearly* to thin for resolution on processor",i
+                 write(6,*) "Block sizes x,y:",block_size_x,block_size_y                   
+              end if
            end if
-           if(block_size_x.le.one.or.block_size_y.le.one) then
-              write(6,*) "ERROR: blocks definitely too thin for resolution on processor",i
-              write(6,*) "Block sizes x,y:",block_size_x,block_size_y
-              stop
-           end if
+
 
            
         end do

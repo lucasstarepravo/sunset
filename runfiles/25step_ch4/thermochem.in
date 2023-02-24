@@ -9,6 +9,9 @@
 !! Temperature limits
 3.0d2 3.0d3
 
+!! Gibbs reference pressure
+1.0d5
+
 !! Molar mass, Lewis number and polynomial fit of each species ------------------------------------
  !! Species 1 - CH4
 1.6000d+01

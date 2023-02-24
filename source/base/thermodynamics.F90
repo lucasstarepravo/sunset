@@ -21,6 +21,7 @@ module thermodynamics
   use kind_parameters
   use common_parameter
   use common_vars
+  use omp_lib
   implicit none
 
 
@@ -38,6 +39,7 @@ contains
      integer(ikind),parameter :: NRiters_max=100
      logical :: keepgoing
    
+     segment_tstart = omp_get_wtime()   
 
 #ifndef isoT
      allocate(fT_coef_C(polyorder_cp+1),dfT_coef_C(polyorder_cp+1))
@@ -146,7 +148,10 @@ contains
      
 #endif     
         
-
+     !! Profiling
+     segment_tend = omp_get_wtime()
+     segment_time_local(9) = segment_time_local(9) + segment_tend - segment_tstart  
+       
      return
   end subroutine evaluate_temperature_and_pressure
 !! ------------------------------------------------------------------------------------------------
@@ -157,6 +162,8 @@ contains
      real(rkind),intent(in) :: Temp
      real(rkind),intent(out) :: enthalpy,cpispec,dcpdT
      integer(ikind) :: iorder
+     
+!     segment_tstart = omp_get_wtime()        
      
      !! Enthalpy and cp
      enthalpy = Temp*coef_h(ispec,polyorder_cp+1)    
@@ -178,6 +185,10 @@ contains
         dcpdT = dcpdT*Temp + coef_dcpdT(ispec,iorder)
         
      end do
+
+     !! Profiling
+!     segment_tend = omp_get_wtime()
+!     segment_time_local(9) = segment_time_local(9) + segment_tend - segment_tstart                        
                       
      return
   end subroutine evaluate_enthalpy_at_node
@@ -190,6 +201,8 @@ contains
      real(rkind),intent(out) :: enthalpy
      integer(ikind) :: iorder
      
+!     segment_tstart = omp_get_wtime()             
+     
      !! Enthalpy only
      enthalpy = Temp*coef_h(ispec,polyorder_cp+1)        
      do iorder=polyorder_cp,1,-1
@@ -197,6 +210,9 @@ contains
      end do    
      enthalpy = enthalpy + coef_h(ispec,polyorder_cp+2)
     
+     !! Profiling
+!     segment_tend = omp_get_wtime()
+!     segment_time_local(9) = segment_time_local(9) + segment_tend - segment_tstart                
                  
      return
   end subroutine evaluate_enthalpy_only_at_node  

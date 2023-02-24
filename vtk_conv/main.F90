@@ -20,6 +20,7 @@ program main
   real :: dr
       
   real,allocatable,dimension(:):: xp,zp,up,vp,wp,ro,vort,h,Temp,yp
+  real,allocatable,dimension(:):: alpha
   real,allocatable,dimension(:,:) :: Yspec
   integer,allocatable,dimension(:) :: processor,node_type
   real time(i_PART_counter_max), DT(i_PART_counter_max)
@@ -42,6 +43,7 @@ program main
   allocate(vort(np_max))
   allocate(h(np_max))
   allocate(Temp(np_max))
+  allocate(alpha(np_max))
   
   allocate(processor(np_max),node_type(np_max))
   
@@ -137,7 +139,7 @@ program main
               do i=np_ini,np_end
                  read(ifi,*,end=300) xp(i),yp(i),zp(i),h(i),dummy_real,node_type(i),ro(i), &
                                      up(i),vp(i),wp(i), &
-                                     vort(i),Temp(i),Yspec(i,1:nspecs)
+                                     vort(i),Temp(i),alpha(i),Yspec(i,1:nspecs)
                  processor(i) = iproc
                  npp=npp+1
               enddo
@@ -145,7 +147,7 @@ program main
               do i=np_ini,np_end
                  read(ifi,*,end=300) xp(i),yp(i),h(i),dummy_real,node_type(i),ro(i), &
                                      up(i),vp(i), &
-                                     vort(i),Temp(i),Yspec(i,1:nspecs)
+                                     vort(i),Temp(i),alpha(i),Yspec(i,1:nspecs)
                  processor(i) = iproc
                  npp=npp+1
               enddo
@@ -153,13 +155,13 @@ program main
         else
            if(dim_flag.eq.1) then
               do i=np_ini,np_end
-                 read(ifi,*,end=300) xp(i),yp(i),zp(i),dr,dr,di,dr,dr,dr,dr,vort(i),dr,dr,dr
+                 read(ifi,*,end=300) xp(i),yp(i),zp(i),dr,dr,di,dr,dr,dr,dr,vort(i),dr,dr,dr,dr
                  processor(i) = iproc
                  npp=npp+1
               enddo        
            else
               do i=np_ini,np_end
-                 read(ifi,*,end=300) xp(i),yp(i),dr,dr,di,dr,dr,dr,vort(i),dr,dr,dr
+                 read(ifi,*,end=300) xp(i),yp(i),dr,dr,di,dr,dr,dr,vort(i),dr,dr,dr,dr
                  processor(i) = iproc
                  npp=npp+1
               enddo                   
@@ -266,6 +268,16 @@ program main
         enddo
         string3 = '    </DataArray>'
         write(ifo,202) string3
+        
+        !! alpha
+        string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'alpha'//DQ// &
+                  ' format='//DQ//'ascii'//DQ//'>'
+        write(ifo,202)string1
+        do ii=1,np
+           write(ifo,*)alpha(ii)
+        enddo
+        string3 = '    </DataArray>'
+        write(ifo,202) string3        
 
         !! Processor
         string1 = '    <DataArray type='//DQ//'Int32'//DQ//' Name='//DQ//'processor'//DQ//' format='//DQ//'ascii'//DQ//'>'

@@ -44,7 +44,7 @@ module common_parameter
   real(rkind), parameter :: ss = 2.0d0       !! Stencil size (radius, in multiples of h)
   
   !! Boundary condition constants -----------------------------------------------------------------
-  real(rkind), parameter :: outflow_coeff = 2.87d-1
+  real(rkind), parameter :: nscbc_coeff = 2.87d-1
 
   !! Maximum allowable number of species
   integer(ikind), parameter :: nspec_max = 20     
@@ -66,6 +66,11 @@ module common_parameter
   real(rkind),dimension(4),parameter :: rk3_4s_2r_b=(/rk3_4s_2r_b1,rk3_4s_2r_b2,rk3_4s_2r_b3,rk3_4s_2r_b4/)
   real(rkind),dimension(4),parameter :: rk3_4s_2r_bh=(/rk3_4s_2r_bh1,rk3_4s_2r_bh2,rk3_4s_2r_bh3,rk3_4s_2r_bh4/)
   real(rkind),dimension(4),parameter :: rk3_4s_2r_bmbh = rk3_4s_2r_b - rk3_4s_2r_bh
+  real(rkind),parameter :: rk3_4s_2r_c1=zero
+  real(rkind),parameter :: rk3_4s_2r_c2=rk3_4s_2r_a21
+  real(rkind),parameter :: rk3_4s_2r_c3=rk3_4s_2r_a32 + rk3_4s_2r_b1
+  real(rkind),parameter :: rk3_4s_2r_c4=one
+  real(rkind),dimension(4),parameter :: rk3_4s_2r_c=(/rk3_4s_2r_c1,rk3_4s_2r_c2,rk3_4s_2r_c3,rk3_4s_2r_c4/)      
 
   !! Normalisation constants and parameters for PID error estimators (OK for combustion at standard P,T)
   real(rkind), parameter :: ero_norm = 1.0d-10
@@ -74,9 +79,9 @@ module common_parameter
   real(rkind), parameter :: ew_norm = 1.0d-2 !! 1d-2 is better for dealing with initial shocks
   real(rkind), parameter :: eroE_norm = 1.0d-2 
   real(rkind), parameter :: eY_norm = 1.0d-10       
-  real(rkind), parameter :: pid_tol = 1.0d-4        !! Error tolerance
-  real(rkind), parameter :: pid_a=0.7d0/two  !! P-coefficient   ! 0.7
-  real(rkind), parameter :: pid_b=0.4d0/two  !! I-coefficient   ! 0.4
+  real(rkind), parameter :: pid_tol = 1.0d-3        !! Error tolerance
+  real(rkind), parameter :: pid_a=0.49d0/two  !! P-coefficient   ! 0.7
+  real(rkind), parameter :: pid_b=0.34d0/two  !! I-coefficient   ! 0.4
   real(rkind), parameter :: pid_c=0.1d0/two  !! D-coefficient   ! 0.1
   real(rkind), parameter :: pid_k=0.9d0      !! kappa coefficient !0.9
   

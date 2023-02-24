@@ -7,7 +7,7 @@
 2.05d0
 
 !! Start and end time (in multiples of L_char/Uchar)
-0.0d0 1.0d0
+0.0d0 5.0d0
 
 !! Output period (in multiples of L_char/U_char)
 0.001d0
@@ -15,14 +15,11 @@
 !! Gravity vector (grav)
 0.0d0 0.0d0 0.0d0
 
-!! Characteristic density (rho_char)
-0.837900d0
-
 !! Inflow equivalence ratio
 1.0d0
 
 !! Reference temp (for TDTP)
-2.98d2
+3.0d2
 
 !! Reference viscosity (at T_ref)
 1.806d-5
@@ -39,11 +36,13 @@
 !! Mach number (only used if isoT)
 0.02d0
 
-!! Temperature depedence exponent for TDTP
+!! Temperature dependence exponent for TDTP
 7.0d-1
 
-!! INFLOWS: non-reflecting (0), hard (1), inout (2)
-0
+!! INFLOWS type (non-reflecting (0), hard (1), inout (2))
+1
 
 !! WALLS: adiabatic(0) or isothermal (1)
 0
+
+

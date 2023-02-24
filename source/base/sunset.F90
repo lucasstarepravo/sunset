@@ -11,13 +11,13 @@ program sunset
   use kind_parameters
   use common_parameter
   use common_vars
+  use load_data
   use setup_domain
   use setup_flow
   use output
   use statistics 
   use neighbours
   use labf
-  use transport
   use fd
   use step
 #ifdef mp  
@@ -26,6 +26,7 @@ program sunset
   implicit none
 
   integer(ikind) :: n_out,m_out
+  real(rkind) :: segment_tstart_main,segment_tend_main
 
 #ifdef mp  
   call MPI_INIT(ierror)
@@ -36,13 +37,16 @@ program sunset
   call initial_setup  
   call build_domain
 
-  !! Build the neighbour lists
-  call find_neighbours
-
   !! Adapt the stencils by reducing h (only if not restarting)
 #ifndef restart  
   call adapt_stencils
 #endif  
+
+  !! Shrink the halos to fit, and finalise building the domain
+  call refine_and_finalise_domain
+
+  !! Build the neighbour lists
+  call find_neighbours
 
   !! Calculate LABFM and FD weights for all derivatives and filters
   call calc_labf_weights
@@ -68,19 +72,23 @@ program sunset
   !! MAIN TIME LOOP ---------------------------------------------------
   do while (time.le.time_end)
 
-
-     call set_tstep      !! CFL type stability based dt    
-#ifdef react     
-     call set_tstep_PID  !! Error estimation based dt (in addition!)
-#endif     
-
      !! Output, conditionally: at start, subsequently every dt_out
      if(itime.eq.0.or.time.gt.n_out*dt_out) then 
 !     if(itime.eq.0.or.mod(itime,1).eq.0)then
         n_out = n_out + 1
         call output_layer(n_out)        
         call output_laminar_flame_structure(n_out)
-     end if        
+     end if     
+
+     !! Profiling
+     segment_tstart_main = omp_get_wtime()
+
+     !! Adjust the time-step
+     call set_tstep      !! CFL type stability based dt    
+#ifdef react     
+     call set_tstep_PID  !! Error estimation based dt (in addition!)
+#endif     
+ 
     
      !! Perform one time step (with Error estimation if reacting flows)
 #ifndef react
@@ -89,7 +97,9 @@ program sunset
      call step_rk3_4S_2R_EE     
 #endif     
 
-     !! Calculate time-profiling and output to screen
+     !! Profiling and write some things to screen
+     segment_tend_main = omp_get_wtime()
+     segment_time_local(10) = segment_time_local(10) + segment_tend_main - segment_tstart_main
      itime = itime + 1
      call output_to_screen
 
@@ -153,6 +163,8 @@ subroutine deallocate_everything
   !! Transport properties
   if(allocated(molar_mass)) deallocate(molar_mass,one_over_molar_mass)
   if(allocated(one_over_Lewis_number)) deallocate(one_over_Lewis_number)
+  
+  if(mix_av_flag.eq.1) deallocate(mxav_coef_visc,mxav_coef_lambda,mxav_coef_diff)
   
   
   return

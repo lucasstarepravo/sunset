@@ -17,10 +17,10 @@ module common_vars
 
   !! Control parameters 
   real(rkind) :: L_char,U_char          !! read from file
-  real(rkind) :: u_inflow,Lz,Time_char  !! build from L_char,U_char
+  real(rkind) :: Lz,Time_char  !! build from L_char,U_char
   real(rkind), dimension(dims) :: grav !! Gravity    
   real(rkind) :: rho_char,T_ref,visc_ref,p_ref,phi_in
-  real(rkind) :: Pr,Ma,Re,Mdiff_ref
+  real(rkind) :: Pr,Ma
   integer(ikind) :: mix_av_flag
 #ifdef isoT
   real(rkind) :: csq
@@ -39,19 +39,20 @@ module common_vars
   real(rkind), dimension(:), allocatable, target :: p,T,u,v,w,hrr
   real(rkind), dimension(:), allocatable :: divvel  
   
-  !! Transport properties
+  !! Transport and thermodynamic properties
   real(rkind), dimension(:), allocatable :: Rgas_mix,cp,visc,lambda_th
-  real(rkind), dimension(:,:), allocatable :: roMdiff
-  
-  !! Transport properties - arrays covering the species
+  real(rkind), dimension(:,:), allocatable :: roMdiff  
   real(rkind), dimension(:), allocatable :: molar_mass,one_over_Lewis_number,one_over_molar_mass
   real(rkind), dimension(:,:),allocatable :: coef_cp,coef_h,coef_dcpdT,coef_gibbs !! indexing: ispec,j-exponent
   integer(ikind) :: polyorder_cp,ncoefs_cp  !! polynomial order,number of coefs
-  real(rkind) :: T_low,T_high
+  real(rkind) :: T_low,T_high !! Temperature range of cp validity
+  real(rkind) :: p_ref_gibbs !! Reference pressure for gibbs functions
   
   !! Transport for mixture-average transport
+  real(rkind) :: p_ref_mxav,t_ref_mxav
   real(rkind),dimension(:,:),allocatable :: mxav_coef_visc,mxav_coef_lambda
   real(rkind),dimension(:,:,:),allocatable :: mxav_coef_Diff  
+
   !! Velocity gradients  
   real(rkind),dimension(:,:),allocatable :: gradu,gradv,gradw
   
@@ -130,6 +131,7 @@ module common_vars
   real(rkind) :: p_outflow,p_inflow   !! Desired pressure on outflow boundary (and inflow if required...)
   real(rkind),dimension(:),allocatable :: sumoverspecies_homega
   real(rkind),dimension(:,:),allocatable :: reaction_rate_bound 
+  real(rkind),dimension(:),allocatable :: u_inflow_local
   
   !! Flags for flux-zero-ing on boundaries
   logical,dimension(:),allocatable :: znf_mdiff,znf_tdiff,znf_vdiff,znf_vtdiff
