@@ -226,6 +226,7 @@ contains
            
      write(6,*) "Proc",iproc,"with",nb,npfb,np_nohalo,np
      call MPI_BARRIER( MPI_COMM_WORLD, ierror)    
+#endif    
     
      !! Build link lists for boundary and internal nodes
      if(nb.ne.0) then
@@ -281,13 +282,15 @@ contains
      use mirror_boundaries
      integer(ikind) i,j,ii,jj
      
+#ifdef mp     
      call refine_halos
-
+#endif
      !! Shrink arrays to fit number of nodes
      call reduce_arrays
 
      deallocate(ij_link,ij_count)
-     
+   
+#ifdef mp     
      !! Transfer discretisation properties   
      call halo_exchange(h)
      call halo_exchange(s)

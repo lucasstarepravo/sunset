@@ -372,7 +372,7 @@ contains
   subroutine species_check
      !! This subroutine calculates total quantity of each species in the domain
      integer(ikind) :: i,ispec
-     real(rkind) :: dVi,tmpY,sumY,tot_error,tot_error_tmp,tmpro
+     real(rkind) :: dVi,tmpY,sumY,tot_error,tot_error_tmp,tmpro,tot_vol,tot_vol_tmp
      real(rkind),dimension(:),allocatable :: tot_Yspec,tot_Yspec_tmp
 #ifdef ms     
      
@@ -380,7 +380,8 @@ contains
      allocate(tot_Yspec(nspec),tot_Yspec_tmp(nspec))   
      tot_Yspec = zero     
      tot_error = zero
-     !$omp parallel do private(tmpro,dVi,ispec,tmpY,sumY) reduction(+:tot_Yspec,tot_error)
+     tot_vol=zero
+     !$omp parallel do private(tmpro,dVi,ispec,tmpY,sumY) reduction(+:tot_Yspec,tot_error,tot_vol)
      do i=1,npfb
         !! Extract one/ro
         tmpro = one/ro(i)
@@ -404,8 +405,11 @@ contains
            sumY = sumY + tmpY*tmpro
         end do
         
+        !! Volume integral
+        tot_vol = tot_vol + dVi
+        
         !! L2 error in sumY
-        tot_error = tot_error + sumY*sumY
+        tot_error = tot_error + sumY*sumY*dVi
      end do
      !$omp end parallel do
      
@@ -421,11 +425,13 @@ contains
 #ifdef mp
      tot_Yspec_tmp = tot_Yspec
      tot_error_tmp = tot_error
+     tot_vol_tmp = tot_vol
      call MPI_ALLREDUCE(tot_Yspec_tmp,tot_Yspec,nspec,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
      call MPI_ALLREDUCE(tot_error_tmp,tot_error,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(tot_vol_tmp,tot_vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)     
      
      !! L2 norm for error           
-     tot_error = sqrt(tot_error/dble(npfb_global))
+     tot_error = sqrt(tot_error/tot_vol)
           
      if(iproc.eq.0)then
         write(199,*) time/Time_char,tot_error,tot_Yspec(:)
@@ -433,7 +439,7 @@ contains
      end if
 #else
      !! Normalise mass of species by volume
-     write(199,*) time/Time_char,sqrt(tot_error/dble(npfb)),tot_Yspec(:)
+     write(199,*) time/Time_char,sqrt(tot_error/tot_vol),tot_Yspec(:)
      flush(199)
 #endif
 

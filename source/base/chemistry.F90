@@ -41,9 +41,7 @@ contains
      allocate(rateYspec(npfb,nspec));rateYspec = zero
      allocate(rate(npfb));rate=zero
      allocate(third_body_conc(npfb));third_body_conc=one
-     allocate(backward_rate(npfb));backward_rate = zero
-     
-     
+     allocate(backward_rate(npfb));backward_rate = zero        
    
      
      !! Pre-evaluate gibbs functions as required ==============================
@@ -70,15 +68,15 @@ contains
            end if
         end do            
      end if
-     !! =======================================================================
 
-        
+     !! =======================================================================        
      !! Loop over all steps ===================================================
      do istep = 1,nsteps       
 
         !! Forward rate =======================================================
 
         !! Evaluate Arrhenius rate for this step
+        !$omp parallel do private(arrhenius_rate)
         do i=1,npfb        
            arrhenius_rate = arrhenius_coefs(istep,1) &
                           + arrhenius_coefs(istep,2)*log(T(i)) &
@@ -87,6 +85,7 @@ contains
            !! Loop over all reactants and build log of forward rate
            rate(i) = arrhenius_rate
         end do
+        !$omp end parallel do
         !! rate contains ln(k_{f,m})
 
                     
@@ -95,6 +94,7 @@ contains
            ithirdbody = third_body_flag(istep) !! This is the type of third body for step istep
            
            !! Build third-body concentration
+           !$omp parallel do
            do i=1,npfb
               third_body_conc(i) = zero
               do ispec = 1,nspec
@@ -104,6 +104,7 @@ contains
                                       one_over_molar_mass(ispec)
               end do
            end do
+           !$omp end parallel do
         else
            third_body_conc(:) = one
         end if   
@@ -113,6 +114,7 @@ contains
         if(lindemann_form_flag(istep).ne.0) then
            jstep = lindemann_form_flag(istep)  !! This is the jstep-th Lindemann step
 
+           !$omp parallel do private(arrhenius_rate0,p_reduced)
            do i=1,npfb              
               !! Evaluate k0
               arrhenius_rate0 = lindemann_coefs(jstep,1) + &
@@ -129,6 +131,7 @@ contains
               !! Reset third body concentrations here
               third_body_conc(i) = one               
            end do
+           !$omp end parallel do
         end if                     
            
         !! Store log(k_f) for use in any backward steps
@@ -144,6 +147,7 @@ contains
            !! Store nu_dash for this step and species
            nu_dash_local = nu_dash(istep,ispec)
 
+           !$omp parallel do private(logroYovW)
            do i=1,npfb
               
               logroYovW = log(max(Yspec(i,ispec),verysmall)*one_over_molar_mass(ispec))
@@ -151,6 +155,7 @@ contains
               rate(i) = rate(i) + nu_dash_local*logroYovW
 
            end do
+           !$omp end parallel do
         end do        
 
         !! Backward rate ======================================================
@@ -167,10 +172,7 @@ contains
               !! Local delta_nu
               delta_nu_local = delta_nu(istep,ispec)
 
-              do i=1,npfb
-                                 
-                 backward_rate(i) = backward_rate(i) + delta_nu_local*gibbs(i,kspec)
-              end do
+              backward_rate(1:npfb) = backward_rate(1:npfb) + delta_nu_local*gibbs(1:npfb,kspec)              
            end do          
            !! backward_rate contains k_{b,m}
               
@@ -181,12 +183,14 @@ contains
               !! Store nu_ddash for this step and species                 
               nu_ddash_local = nu_ddash(istep,ispec)
 
+              !$omp parallel do private(logroYovW)
               do i=1,npfb                 
 
                  logroYovW = log(max(Yspec(i,ispec),verysmall)*one_over_molar_mass(ispec))
 
                  backward_rate(i) = backward_rate(i) + nu_ddash_local*logroYovW           
               end do
+              !$omp end parallel do
            end do
         else                    
            !! No backward production otherwise       
@@ -195,6 +199,7 @@ contains
 
                 
         !! Net production rate ================================================
+        !$omp parallel do private(net_rate)
         do i=1,npfb         
            !! net
            net_rate = exp(rate(i)) - exp(backward_rate(i))
@@ -202,25 +207,24 @@ contains
            !! Add third body concs
            rate(i) = net_rate*third_body_conc(i)
         end do
+        !$omp end parallel do
        
         !! Loop over all species in this step, and add to the total rate for that species
         do jspec = 1,num_reactants(istep) + num_products(istep)
            ispec = stepspecies_list(istep,jspec)        
- 
-           do i=1,npfb                                                        
-              !! Add net molar production rate for this species
-              rateYspec(i,ispec) = rateYspec(i,ispec) + delta_nu(istep,ispec)*rate(i)
-           end do
+
+           !! Add net molar production rate for this species 
+           rateYspec(1:npfb,ispec) = rateYspec(1:npfb,ispec) + delta_nu(istep,ispec)*rate(1:npfb)           
         end do
               
            
      end do !! End of steps loop ==============================================
-                 
+     !! =======================================================================                 
          
      !! Add rate onto RHS for each node and each species ====================== 
      hrr = zero     
      do ispec = 1,nspec
-        
+        !$omp parallel do
         do i=1,npfb                   
         
            !! Convert from molar to mass production rate
@@ -233,6 +237,8 @@ contains
            hrr(i) = hrr(i) - rateYspec(i,ispec)*coef_h(ispec,polyorder_cp+2)
 
         end do
+        !$omp end parallel do
+        
      end do
 
 
@@ -272,6 +278,7 @@ contains
      !! Profiling
      segment_tend = omp_get_wtime()
      segment_time_local(6) = segment_time_local(6) + segment_tend - segment_tstart  
+
   
      return
   end subroutine calculate_chemical_production_rate  

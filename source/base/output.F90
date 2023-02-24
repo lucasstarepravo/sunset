@@ -128,7 +128,7 @@ contains
         write(6,*) "Transport                 :",segment_time_local(8)/segment_time_local(10)        
         write(6,*) "Thermo                    :",segment_time_local(9)/segment_time_local(10)                
         write(6,*) "Other                     :",store1/segment_time_local(10)        
-        write(6,'(/,/,/,A)') "  "                  
+        write(6,'(/,A)') "  "                  
 #endif          
      
      end if

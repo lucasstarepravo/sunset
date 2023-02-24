@@ -113,7 +113,11 @@ contains
      !$omp end parallel do
      
      !! Set the initial velocity divergence
+#ifdef dim3        
      call calc_divergence(u,v,w,divvel(1:npfb))
+#else
+     call calc_divergence(u,v,divvel(1:npfb))
+#endif        
      
      !! Mirrors and halos for divvel                   
      call reapply_mirror_bcs
@@ -131,8 +135,7 @@ contains
      !! Initialise the time-stepping (necessary for PID controlled stepping)
      dt = 1.0d-10
      
-     !! Initialise the variable which holds inflow velocity - this will need modifying in due course
-     !! as we introduce corners and non-uniform inflows
+     !! Initialise the variable which holds inflow velocity locally
      if(nb.ne.0)then
         !$omp parallel do
         do j=1,nb

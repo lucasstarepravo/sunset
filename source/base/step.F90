@@ -125,7 +125,11 @@ contains
         call get_velocity_from_momentum
         
         !! Velocity divergence
+#ifdef dim3        
         call calc_divergence(u,v,w,divvel(1:npfb))
+#else
+        call calc_divergence(u,v,divvel(1:npfb))
+#endif        
         call reapply_mirror_bcs_divvel_only
         call halo_exchange_divvel
         
@@ -180,7 +184,11 @@ contains
      call get_velocity_from_momentum     
 
      !! Velocity divergence
-     call calc_divergence(u,v,w,divvel(1:npfb))
+#ifdef dim3        
+        call calc_divergence(u,v,w,divvel(1:npfb))
+#else
+        call calc_divergence(u,v,divvel(1:npfb))
+#endif        
      call reapply_mirror_bcs_divvel_only
      call halo_exchange_divvel     
 
@@ -321,7 +329,11 @@ contains
         call get_velocity_from_momentum           
         
         !! Velocity divergence
+#ifdef dim3        
         call calc_divergence(u,v,w,divvel(1:npfb))
+#else
+        call calc_divergence(u,v,divvel(1:npfb))
+#endif        
         call reapply_mirror_bcs_divvel_only
         call halo_exchange_divvel        
         
@@ -342,30 +354,30 @@ contains
      do i=1,npfb
      
         !! Final values of conservative variables
-        ro(i) = ro_reg1(i) + RKb(4)*rhs_ro(i)
-        rou(i) = rou_reg1(i) + RKb(4)*rhs_rou(i)
-        rov(i) = rov_reg1(i) + RKb(4)*rhs_rov(i)
-        row(i) = row_reg1(i) + RKb(4)*rhs_row(i)        
+        ro(i) = ro_reg1(i) + RKb(iRKstep)*rhs_ro(i)
+        rou(i) = rou_reg1(i) + RKb(iRKstep)*rhs_rou(i)
+        rov(i) = rov_reg1(i) + RKb(iRKstep)*rhs_rov(i)
+        row(i) = row_reg1(i) + RKb(iRKstep)*rhs_row(i)        
 #ifndef isoT
-        roE(i) = roE_reg1(i) + RKb(4)*rhs_roE(i)
+        roE(i) = roE_reg1(i) + RKb(iRKstep)*rhs_roE(i)
 #endif
 #ifdef ms 
         do ispec=1,nspec
-           Yspec(i,ispec) = Yspec_reg1(i,ispec) + RKb(4)*rhs_Yspec(i,ispec)
+           Yspec(i,ispec) = Yspec_reg1(i,ispec) + RKb(iRKstep)*rhs_Yspec(i,ispec)
         end do
 #endif        
         
         !! Final error accumulators
-        e_acc_ro(i) = e_acc_ro(i) + RKbmbh(4)*rhs_ro(i)       
-        e_acc_rou(i) = e_acc_rou(i) + RKbmbh(4)*rhs_rou(i)
-        e_acc_rov(i) = e_acc_rov(i) + RKbmbh(4)*rhs_rov(i) 
-        e_acc_row(i) = e_acc_row(i) + RKbmbh(4)*rhs_row(i)         
+        e_acc_ro(i) = e_acc_ro(i) + RKbmbh(iRKstep)*rhs_ro(i)       
+        e_acc_rou(i) = e_acc_rou(i) + RKbmbh(iRKstep)*rhs_rou(i)
+        e_acc_rov(i) = e_acc_rov(i) + RKbmbh(iRKstep)*rhs_rov(i) 
+        e_acc_row(i) = e_acc_row(i) + RKbmbh(iRKstep)*rhs_row(i)         
 #ifndef isoT
-        e_acc_E(i) = e_acc_E(i) + RKbmbh(4)*rhs_roE(i)   
+        e_acc_E(i) = e_acc_E(i) + RKbmbh(iRKstep)*rhs_roE(i)   
 #endif
 #ifdef ms 
         do ispec=1,nspec
-           e_acc_Yspec(i,ispec) = e_acc_Yspec(i,ispec) + RKbmbh(4)*rhs_Yspec(i,ispec)
+           e_acc_Yspec(i,ispec) = e_acc_Yspec(i,ispec) + RKbmbh(iRKstep)*rhs_Yspec(i,ispec)
         end do
 #endif
         
@@ -434,7 +446,11 @@ contains
      call get_velocity_from_momentum        
      
      !! Velocity divergence
+#ifdef dim3        
      call calc_divergence(u,v,w,divvel(1:npfb))
+#else
+     call calc_divergence(u,v,divvel(1:npfb))
+#endif        
      call reapply_mirror_bcs_divvel_only
      call halo_exchange_divvel        
 

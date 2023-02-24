@@ -228,16 +228,17 @@ contains
         end if
              
       
-        !$omp parallel do private(i,tmp_vec,tmp_scal,tmpY,divroDgradY,enthalpy,grad_enthalpy, &
+        !$omp parallel do private(i,tmp_scal,tmpY,divroDgradY,enthalpy,grad_enthalpy, &
         !$omp dcpdT,cpispec,tmpro)
         do j=1,npfb-nb
            i=internal_list(j)
            tmpro = one/ro(i) !! tmpro contains 1/ro
-           tmp_vec(1) = u(i);tmp_vec(2) = v(i);tmp_vec(3) = w(i)
 
-           !! Convective term: ro*u.gradY + Y(div.(ro*u))
-           tmp_vec(1) = u(i);tmp_vec(2) = v(i);tmp_vec(3) = w(i)  !! holds (u,v,w)
-           tmp_scal = ro(i)*dot_product(tmp_vec,gradYspec(i,:,ispec)) - Y_thisspec(i)*rhs_ro(i)
+           !! Convective term: ro*u.gradY + Y(div.(ro*u))        
+           tmp_scal = ro(i)*(u(i)*gradYspec(i,1,ispec) + &
+                             v(i)*gradYspec(i,2,ispec) + &
+                             w(i)*gradYspec(i,3,ispec) ) - Y_thisspec(i)*rhs_ro(i)
+           
          
            !! Molecular diffusion terms
            !!divroDgradY = ro*D*lapY + grad(ro*D)*gradY
@@ -282,14 +283,15 @@ contains
            allocate(grad2Yspec(nb,dims));grad2Yspec=zero
            call calc_grad2bound(Yspec(:,ispec),grad2Yspec)
            !$omp parallel do private(i,xn,yn,un,ut,dutdt,lapYspec_tmp,tmpY,roDgradY &
-           !$omp ,divroDgradY,enthalpy,grad_enthalpy,tmpro,cpispec,dcpdT,tmp_vec,tmp_scal)
+           !$omp ,divroDgradY,enthalpy,grad_enthalpy,tmpro,cpispec,dcpdT,tmp_scal)
            do j=1,nb
               i=boundary_list(j)
               tmpro = one/ro(i)  !! tmpro contains 1/ro
               
               !! Convective term: ro*u.gradY + Y(div.(ro*u))
-              tmp_vec(1) = zero;tmp_vec(2) = v(i);tmp_vec(3) = w(i)  !! holds (0,v,w)
-              tmp_scal = ro(i)*dot_product(tmp_vec,gradYspec(i,:,ispec)) - Y_thisspec(i)*rhs_ro(i)              
+              tmp_scal = ro(i)*(u(i)*gradYspec(i,1,ispec) + &
+                                v(i)*gradYspec(i,2,ispec) + &
+                                w(i)*gradYspec(i,3,ispec) ) - Y_thisspec(i)*rhs_ro(i)
                                                                
               !! roDgradY  
               roDgradY(:) = roMdiff(i,ispec)*gradYspec(i,:,ispec)                

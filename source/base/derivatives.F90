@@ -111,25 +111,30 @@ contains
     return
   end subroutine calc_laplacian
 !! ------------------------------------------------------------------------------------------------
+#ifdef dim3
   subroutine calc_divergence(phi1,phi2,phi3,divphi)
     !! Calculate the gradient of scalar phi.
     real(rkind),dimension(:),intent(in) :: phi1,phi2,phi3
+#else
+  subroutine calc_divergence(phi1,phi2,divphi)
+    !! Calculate the gradient of scalar phi.
+    real(rkind),dimension(:),intent(in) :: phi1,phi2
+#endif
     real(rkind),dimension(:),intent(inout) :: divphi
     integer :: i,j,k
-    real(rkind),dimension(2) :: fji
+!    real(rkind),dimension(2) :: fji
     real(rkind) :: divtmp
     
     segment_tstart = omp_get_wtime()         
     
-    !$OMP PARALLEL DO PRIVATE(j,k,fji,divtmp)
+    !$OMP PARALLEL DO PRIVATE(j,k,divtmp)
     do i=1,npfb
        divtmp=zero
        do k=1,ij_count(i)
           j = ij_link(k,i) 
-          fji(1) = phi1(j);fji(2) = phi2(j)
-          divtmp = divtmp + dot_product(fji,ij_w_grad(:,k,i))
+          divtmp = divtmp + phi1(j)*ij_w_grad(1,k,i) + phi2(j)*ij_w_grad(2,k,i)
        end do
-       divphi(i) = divtmp - dot_product((/phi1(i),phi2(i)/),ij_w_grad_sum(:,i))
+       divphi(i) = divtmp - phi1(i)*ij_w_grad_sum(1,i) - phi2(i)*ij_w_grad_sum(2,i)
     end do
     !$OMP END PARALLEL DO
     
