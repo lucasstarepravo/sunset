@@ -596,6 +596,7 @@ contains
      dt_max = min(dt_cfl,dt_parabolic)
      if(dt.gt.dt_max) dt = dt_max
 
+
 #ifdef mp     
      !! Find global time-step
      dt_local = dt

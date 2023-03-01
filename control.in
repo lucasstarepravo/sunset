@@ -1,16 +1,16 @@
 !! This is the control file for sunset code
 
 !! Characteristic length-scale (L_char)
-0.01d0
+0.005d0
 
 !! Characteristic velocity scale (U_char)
-2.05d0
+5.00d0
 
 !! Start and end time (in multiples of L_char/Uchar)
-0.0d0 5.0d0
+0.0d0 1.0d0
 
 !! Output period (in multiples of L_char/U_char)
-0.01d0
+0.001d0
 
 !! Gravity vector (grav)
 0.0d0 0.0d0 0.0d0
@@ -19,7 +19,7 @@
 1.0d0
 
 !! Reference temp (for TDTP)
-3.0d2
+2.98d2
 
 !! Reference viscosity (at T_ref)
 1.806d-5
@@ -36,7 +36,7 @@
 !! Mach number (only used if isoT)
 0.02d0
 
-!! Temperature dependence exponent for TDTP
+!! Temperature depedence exponent for TDTP
 7.0d-1
 
 !! INFLOWS type (non-reflecting (0), hard (1), inout (2))
@@ -44,5 +44,6 @@
 
 !! WALLS: adiabatic(0) or isothermal (1)
 0
+
 
 

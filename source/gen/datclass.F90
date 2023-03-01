@@ -149,7 +149,7 @@ program datgen
 case(4) !! Channel flows, propagating front
 
      xl=1.0d0 ! channel length
-     h0=xl/40.0d0   !cylinder radius
+     h0=xl/20.0d0   !cylinder radius
      yl=xl/5.0d0  ! channel width
      dx0=h0/25.0       !15
      xbcond=0;ybcond=2     
@@ -166,21 +166,22 @@ case(4) !! Channel flows, propagating front
      open(unit=191,file="blob_fcoefs.in")
      read(191,*) n_blob_coefs
      allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
-     blob_centre(1,:)=(/ -0.3d0*xl,0.0d0/);    
+     blob_centre(1,:)=(/ -0.2d0*xl,0.0d0/);    
      do i=1,n_blob_coefs
         read(191,*) blob_coeffs(1,i)
      end do
      close(191)
-     blob_coeffs(1,:) = blob_coeffs(1,:)*h0*0.6461;blob_rotation(1)=-0.1d0*pi;blob_ellipse(1)=0  
+     blob_coeffs(1,:) = 0.0d0;blob_coeffs(1,1)=h0
+     blob_rotation(1)=-0.1d0*pi;blob_ellipse(1)=0  
      
      call make_boundary_edge_vectors
 
      xb_min = minval(b_node(:,1));xb_max = maxval(b_node(:,1));yb_min = minval(b_node(:,2));yb_max = maxval(b_node(:,2))
 
-     varresratio = 3.0d0  !! Ratio for scaling near the solid objects
+     varresratio = 1.0d0  !! Ratio for scaling near the solid objects
      dxmax = dx0  
      dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dx_in=3.0d0*dxmax;dx_out=1.5d0*dxmax  !! dx for solids and in/outs...!! 
+     dxb=dx0/varresratio;dx_in=2.0d0*dxmax;dx_out=2.0d0*dxmax  !! dx for solids and in/outs...!! 
      call make_boundary_particles
      call make_boundary_blobs               
      ipart = nb   
@@ -381,9 +382,9 @@ endif
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.0125d0!0.0125d0  ! channel width
+     yl=0.025d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/1000.0       !15
+     dx0=xl/500.0       !15
      xbcond=0;ybcond=1
      
      nb_patches = 4

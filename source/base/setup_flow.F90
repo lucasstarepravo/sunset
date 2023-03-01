@@ -146,6 +146,20 @@ contains
         end do
         !$omp end parallel do        
      end if
+     
+     !! Initialise the variable holding the inflow species
+     if(nb.ne.0) then
+        allocate(Yspec_inflow(nspec))
+        do j=1,nb
+           i=boundary_list(j)
+           if(node_type(i).eq.1) then !! Inflow node
+              do ispec=1,nspec
+                 Yspec_inflow(ispec) = Yspec(i,ispec)/ro(i)
+              end do
+           end if
+        end do
+     endif
+           
               
      return
   end subroutine initial_solution   
@@ -163,7 +177,7 @@ contains
      real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z,ro_inflow
 
      !! Position and scale     
-     flame_location = -0.0d0
+     flame_location = 0.1d0
      flame_thickness = 2.0d-4/L_char !! Scale thickness because position vectors are scaled...
 
      !! Temperatures
@@ -186,13 +200,14 @@ contains
         !! Error function based progress variable
         c = half*(one + erf((x-flame_location)/flame_thickness))
 !        c = exp(-((x-flame_location)/flame_thickness)**two - (y/flame_thickness)**two)
+!        c = exp(-((x-flame_location)/flame_thickness)**two)        
                 
         !! Temperature profile
         T(i) = T_reactants + (T_products - T_reactants)*c
         
         !! Composition
         Yspec(i,1) = one - c
-        Yspec(i,2) = c
+        Yspec(i,2) = c 
         
         !! Local mixture gas constant
         Rmix_local = zero
@@ -243,7 +258,7 @@ contains
      real(rkind) :: o2n2_ratio,h2o2_stoichiometric,h2o2_ratio
 
      !! Position and scale     
-     flame_location = -0.25d0!zero!-0.27d0
+     flame_location = -0.12d0!zero!-0.27d0
      flame_thickness = 2.0d-4/L_char !! Scale thickness because position vectors are scaled...
    
      !! Determine inlet composition
@@ -277,8 +292,8 @@ contains
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
         
         !! Error function based progress variable
-        c = half*(one + erf((x-flame_location)/flame_thickness))
-!        c = exp(-((x-flame_location)/flame_thickness)**two - (y/flame_thickness)**two)        
+!        c = half*(one + erf((x-flame_location)/flame_thickness))
+        c = exp(-((x-flame_location)/flame_thickness)**two - (y/flame_thickness)**two)        
 !        c = exp(-((x-flame_location)/flame_thickness)**two - ((y-0.05d0)/flame_thickness)**two)    &
 !          + exp(-((x-flame_location)/flame_thickness)**two - ((y+0.05d0)/flame_thickness)**two)        
 !        c = exp(-((x-flame_location)/flame_thickness)**two)
@@ -287,9 +302,9 @@ contains
         T(i) = T_reactants + (T_products - T_reactants)*c
         
         !! Composition
-        Yspec(i,1) = (one - c)*Yin_H2
-        Yspec(i,2) = (one - c)*Yin_O2
-        Yspec(i,3) = c*Yout_H2O
+        Yspec(i,1) = Yin_H2!(one - c)*Yin_H2
+        Yspec(i,2) = Yin_O2!(one - c)*Yin_O2
+        Yspec(i,3) = zero!c*Yout_H2O
         Yspec(i,4:8) = zero
         Yspec(i,9) = Yin_N2
         
@@ -304,7 +319,7 @@ contains
         ro(i) = P_flame/(Rmix_local*T(i))
         
         !! Velocity
-        u(i) = u_reactants*ro_inflow/ro(i)
+        u(i) = u_reactants!*ro_inflow/ro(i)
         v(i) = zero
         w(i) = zero
                         

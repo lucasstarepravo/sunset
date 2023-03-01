@@ -143,7 +143,7 @@ contains
      !! Can be converted to vtk and read into paraview.
      use derivatives
      integer(ikind),intent(in) :: n_out
-     integer(ikind) :: i,j,k,np_out_local,dimsout,nspec_out,nprocsout,iflag
+     integer(ikind) :: i,j,k,np_out_local,dimsout,nspec_out,nprocsout,iflag,ispec
      character(70) :: fname
      real(rkind),dimension(:),allocatable :: vort,testout
      real(rkind),dimension(:,:),allocatable :: testoutv
@@ -233,7 +233,11 @@ contains
  
            !! Pass something to tmpVort (we use vorticity to output other things sometimes during
            !! debugging...)
-           tmpVort =  vort(i)           
+           tmpVort = vort(i)
+           tmpvort = one
+           do ispec=1,nspec
+              tmpvort = tmpvort - Yspec(i,ispec)*tmpro
+           end do         
            
            !! Pass heat release rate to alpha_out?
            alpha_out(i) = hrr(i)

@@ -268,8 +268,7 @@ contains
            end do
         end do
         !$omp end parallel do
-     end if           
-       
+     end if                                        
      
      !! De-allocation of arrays
      if(num_gibbs_species.ne.0) deallocate(gibbs)

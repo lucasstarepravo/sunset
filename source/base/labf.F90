@@ -416,8 +416,8 @@ contains
            if(node_type(j).eq.-3)  ij_wb_grad2(1,k,jj) = -56.0d0/12.0d0/dx2              
            if(node_type(j).eq.-4)  ij_wb_grad2(1,k,jj) =  11.0d0/12.0d0/dx2
               
-           !! Filter in boundary normal direction, but only for outflows. Not required walls and inflows
-           if(node_type(i).eq.2) then
+           !! Filter in boundary normal direction, but only for outflows.
+           if(node_type(i).eq.2) then  
               if(j.eq.i)              ij_w_hyp(k,i) = -zero   !! 4th DERIV
               if(node_type(j).eq.-1)  ij_w_hyp(k,i) =  4.0d0/dx4
               if(node_type(j).eq.-2)  ij_w_hyp(k,i) = -6.0d0/dx4

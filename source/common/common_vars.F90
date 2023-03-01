@@ -131,7 +131,7 @@ module common_vars
   real(rkind) :: p_outflow,p_inflow   !! Desired pressure on outflow boundary (and inflow if required...)
   real(rkind),dimension(:),allocatable :: sumoverspecies_homega
   real(rkind),dimension(:,:),allocatable :: reaction_rate_bound 
-  real(rkind),dimension(:),allocatable :: u_inflow_local
+  real(rkind),dimension(:),allocatable :: u_inflow_local,Yspec_inflow
   
   !! Flags for flux-zero-ing on boundaries
   logical,dimension(:),allocatable :: znf_mdiff,znf_tdiff,znf_vdiff,znf_vtdiff

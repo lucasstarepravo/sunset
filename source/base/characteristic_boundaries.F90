@@ -425,7 +425,7 @@ contains
   end subroutine specify_characteristics_outflow
 !! ------------------------------------------------------------------------------------------------
   subroutine apply_time_dependent_bounds
-     integer(ikind) :: i,j
+     integer(ikind) :: i,j,ispec
      
            
      !! Loop over all boundary nodes
@@ -447,6 +447,15 @@ contains
         
         !! Inflow boundaries
         else if(node_type(i).eq.1) then 
+
+           !! Hard or non-reflecting
+           if(inflow_type.eq.1.or.inflow_type.eq.0)then
+              do ispec = 1,nspec
+                 Yspec(i,ispec) = Yspec_inflow(ispec)*ro(i)
+              end do
+           end if
+        
+        
            if(inflow_type.eq.1) then !! Hard inflow
               !! Prescribed velocity               
               rou(i)=u_inflow_local(j)*ro(i)
