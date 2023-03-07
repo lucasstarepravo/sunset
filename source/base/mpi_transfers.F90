@@ -1168,5 +1168,65 @@ contains
   end subroutine send_halo_sizes_nodes
 !! ------------------------------------------------------------------------------------------------  
 #endif  
+!! ------------------------------------------------------------------------------------------------
+!! The following routines are used for global MPI transfers (e.g. reduce_max, reduce_sum)
+!! ------------------------------------------------------------------------------------------------
+#ifdef mp
+  subroutine global_reduce_sum(phi)
+     !! Routine to perform MPI reductions. If not using mpi, it does nothing.
+     real(rkind),intent(inout) :: phi
+     real(rkind) :: phi_local
+     segment_tstart = omp_get_wtime()     
+     
+     !! Copy phi to local
+     phi_local = phi
+     
+     !! Do MPI reduction
+     call MPI_ALLREDUCE(phi_local,phi,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)              
+     
+     !! Profiling
+     segment_tend = omp_get_wtime()
+     segment_time_local(1) = segment_time_local(1) + segment_tend - segment_tstart    
+     return
+  end subroutine global_reduce_sum
+!! ------------------------------------------------------------------------------------------------
+  subroutine global_reduce_min(phi)
+     !! Routine to perform MPI reductions. If not using mpi, it does nothing.
+     real(rkind),intent(inout) :: phi
+     real(rkind) :: phi_local
+     segment_tstart = omp_get_wtime()     
+     
+     !! Copy phi to local
+     phi_local = phi
+     
+     !! Do MPI reduction
+     call MPI_ALLREDUCE(phi_local,phi,1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)              
+     
+     !! Profiling
+     segment_tend = omp_get_wtime()
+     segment_time_local(1) = segment_time_local(1) + segment_tend - segment_tstart    
+
+     return
+  end subroutine global_reduce_min
+!! ------------------------------------------------------------------------------------------------
+  subroutine global_reduce_max(phi)
+     !! Routine to perform MPI reductions. If not using mpi, it does nothing.
+     real(rkind),intent(inout) :: phi
+     real(rkind) :: phi_local
+     segment_tstart = omp_get_wtime()     
+     
+     !! Copy phi to local
+     phi_local = phi
+     
+     !! Do MPI reduction
+     call MPI_ALLREDUCE(phi_local,phi,1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)              
+     
+     !! Profiling
+     segment_tend = omp_get_wtime()
+     segment_time_local(1) = segment_time_local(1) + segment_tend - segment_tstart    
+     return
+  end subroutine global_reduce_max
+#endif
+!! ------------------------------------------------------------------------------------------------
 end module mpi_transfers
 

@@ -427,7 +427,11 @@ contains
   subroutine apply_time_dependent_bounds
      integer(ikind) :: i,j,ispec
      
-           
+     segment_tstart = omp_get_wtime()
+     
+     !! Update time-dependant inflow velocity
+     call update_u_inflow
+                     
      !! Loop over all boundary nodes
      !$omp parallel do private(i)
      do j=1,nb
@@ -497,12 +501,44 @@ contains
            end if
         end do
         !$omp end parallel do     
-     endif
-       
-     
-  
+     endif           
+
+     !! Profiling
+     segment_tend = omp_get_wtime()
+     segment_time_local(2) = segment_time_local(2) + segment_tend - segment_tstart  
   
      return
   end subroutine apply_time_dependent_bounds 
-!! ------------------------------------------------------------------------------------------------  
+!! ------------------------------------------------------------------------------------------------
+  subroutine update_u_inflow
+     !! Hard-coded routine to apply time-dependent inflow velocity. Currently hard-coded to ramp 
+     !! the inflow over a prescribed time
+     integer(ikind) :: i,j
+     real(rkind) :: u_inflow_0,u_inflow_max
+     real(rkind) :: ramp_time
+     
+     !! Start and end inflow speeds, and ramp time
+     u_inflow_0 = u_char
+     u_inflow_max = two*u_char
+     ramp_time = 1.0d-4   
+     
+     !! Only if before ramp_time
+     if(time.le.ramp_time)then
+        !! Loop over all boundary nodes
+        !$omp parallel do private(i)
+        do j=1,nb
+           i=boundary_list(j)
+           if(node_type(i).eq.1) then !! Inflows only
+              u_inflow_local(j) = u_inflow_0 + (u_inflow_max-u_inflow_0)*time/ramp_time
+           end if
+        end do
+        !$omp end parallel do
+     end if
+     
+     
+     
+  
+     return
+  end subroutine update_u_inflow
+!! ------------------------------------------------------------------------------------------------    
 end module characteristic_boundaries

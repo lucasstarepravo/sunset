@@ -202,7 +202,7 @@ contains
 
     !! Profiling
     segment_tend = omp_get_wtime()
-    segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
+    segment_time_local(5) = segment_time_local(5) + segment_tend - segment_tstart
 
     return
   end subroutine calc_grad2bound
@@ -234,7 +234,7 @@ contains
 
     !! Profiling
     segment_tend = omp_get_wtime()
-    segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
+    segment_time_local(5) = segment_time_local(5) + segment_tend - segment_tstart
 
     return
   end subroutine calc_grad2vecbound  
@@ -268,7 +268,7 @@ contains
 
     !! Profiling
     segment_tend = omp_get_wtime()
-    segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
+    segment_time_local(5) = segment_time_local(5) + segment_tend - segment_tstart
 
     return
   end subroutine calc_grad2crossbound 

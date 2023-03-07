@@ -17,6 +17,8 @@ module setup_flow
 #endif    
   implicit none
   
+  real(rkind),dimension(:),allocatable :: Yspec_reactants,Yspec_products
+  
 contains
 !! ------------------------------------------------------------------------------------------------
   subroutine initial_solution
@@ -59,26 +61,35 @@ contains
      !! =======================================================================
      !! Choose initial conditions
 #ifndef restart     
-#ifdef react
-     if(.true.)then
-        if(nsteps.eq.1) then
-           call make_1d_1step_flame
-        else if(nsteps.eq.21) then
-           call make_1d_21step_flame
-        else if(nsteps.eq.35) then
-           call make_1d_25step_flame
-        end if
-      else
-         call load_flame_file
-      end if
-#else
-     call hardcode_initial_conditions     
-#endif
+     !! Evaluate mass fractions of reactants and products assuming complete combustion
+     call initialise_composition        
 
+     !! HARD-CODED-CHOICE =====================================
+     !! Un-comment ONE of the following routines ==============
+     !! The routines themselves can be modified a bit to change
+     !! e.g. uniform/non-uniform inflow etc.
+        
+     !! Make a 1D flame: pass X-position,flame_thickness and T_hot
+     call make_1d_flame(zero,2.0d-4,2.366d3)
+        
+     !! Make a 2D gaussian hotspot: pass X,Y -positions, flame_thickness and T_hot
+!     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)        
+
+     !! Load an existing 1D flame file
+!     call load_flame_file
+
+     !! A messy routine to play with for other initial conditions
+!     call hardcode_initial_conditions     
+
+     !! END HARD-CODED-CHOICE =================================
+
+     deallocate(Yspec_reactants,Yspec_products)
 #else    
      !! RESTART OPTION. 
      call load_restart_file
-!     call make_ignition_hotspot         
+
+     !! Un-comment this to (re-)ignite a restarting simulation
+!     call superimpose_2d_gaussian_hotspot(-0.22d0,zero,2.0d-4,2.5d3)
 #endif
      !! =======================================================================
      
@@ -169,144 +180,115 @@ contains
 !! primitive variables (ro,u,v,w,T,Y), and hence Yspec holds Y. Everywhere else in the code, 
 !! Yspec holds roY.
 !! ------------------------------------------------------------------------------------------------
-  subroutine make_1d_1step_flame
-     !! Make a single-step fixed stoichiometry flame
-     integer(ikind) :: i,ispec,j
-     real(rkind) :: flame_location,flame_thickness
-     real(rkind) :: T_reactants,T_products
-     real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z,ro_inflow
+  subroutine initialise_composition
+     !! This subroutine evaluates the reactant and product mass fractions for the given
+     !! stoichiometry.
+     real(rkind) :: Yin_H2,Yin_O2,Yin_N2,Yout_H2O
+     real(rkind) :: o2n2_ratio,h2o2_stoichiometric,h2o2_ratio
+     real(rkind) :: Yin_CH4,Yout_CO2
+     real(rkind) :: ch4o2_ratio,ch4o2_stoichiometric,co2h2o_ratio     
+  
+     !! Allocate two arrays
+     allocate(Yspec_reactants(nspec),Yspec_products(nspec))
+  
+     !! Single-step chemistry
+     if(nspec.eq.2) then 
+        Yspec_reactants(1) = one
+        Yspec_reactants(2) = zero
+        Yspec_products(1) = zero
+        Yspec_products(2) = one
+     end if
+    
+     !! 9-species H2 chemistry
+     if(nspec.eq.9) then
+        o2n2_ratio = one*molar_mass(2)/(3.76d0*molar_mass(9))
+        h2o2_stoichiometric = two*molar_mass(1)/(one*molar_mass(2))
+        h2o2_ratio = h2o2_stoichiometric*phi_in
 
-     !! Position and scale     
-     flame_location = 0.1d0
-     flame_thickness = 2.0d-4/L_char !! Scale thickness because position vectors are scaled...
+        Yin_O2 = one/(one + h2o2_ratio + one/o2n2_ratio)
+        Yin_H2 = Yin_O2*h2o2_ratio
+        Yin_N2 = one - Yin_H2 - Yin_O2            
+        Yout_H2O = one - Yin_N2      
 
-     !! Temperatures
-     T_reactants = T_ref
-     T_products = 2.3d3
-         
-     !! Pressure through flame     
-     P_flame = p_ref
-     
-     !! Inflow density
-     ro_inflow = p_ref/(Rgas_universal*T_reactants*one_over_molar_mass(1))    
-     
-     !! Inflow speed
-     u_reactants = u_char
-     
-     !$omp parallel do private(x,y,z,c,Rmix_local,ispec)
-     do i=1,npfb
-        x = rp(i,1);y=rp(i,2);z=rp(i,3)
+        Yspec_reactants(1) = Yin_H2
+        Yspec_reactants(2) = Yin_O2
+        Yspec_reactants(3:8) = zero
+        Yspec_reactants(9) = Yin_N2
         
-        !! Error function based progress variable
-        c = half*(one + erf((x-flame_location)/flame_thickness))
-!        c = exp(-((x-flame_location)/flame_thickness)**two - (y/flame_thickness)**two)
-!        c = exp(-((x-flame_location)/flame_thickness)**two)        
-                
-        !! Temperature profile
-        T(i) = T_reactants + (T_products - T_reactants)*c
-        
-        !! Composition
-        Yspec(i,1) = one - c
-        Yspec(i,2) = c 
-        
-        !! Local mixture gas constant
-        Rmix_local = zero
-        do ispec=1,nspec
-           Rmix_local = Rmix_local + Yspec(i,ispec)*one_over_molar_mass(ispec)
-        end do
-        Rmix_local = Rmix_local*Rgas_universal
-               
-        !! Density
-        ro(i) = P_flame/(Rmix_local*T(i))   
-               
-        !! Velocity
-        u(i) = u_reactants*ro_inflow/ro(i)
-        v(i) = zero
-        w(i) = zero    
-                        
-     end do
-     !$omp end parallel do
+        Yspec_products(1:2) = zero
+        Yspec_products(3) = Yout_H2O
+        Yspec_products(4:8) = zero
+        Yspec_products(9) = Yin_N2      
+     end if
      
-     !! Values on boundaries
-     if(nb.ne.0)then
-        do j=1,nb
-           i=boundary_list(j)
-           if(node_type(i).eq.0) then !! wall initial conditions
-              u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
-              T(i) = T_reactants !+ half*half*(T_products-T_reactants)              
-           end if                 
-           if(node_type(i).eq.1) then !! inflow initial conditions
-!              u(i)=u_char                
-           end if
-           if(node_type(i).eq.2) then !! outflow initial conditions
-              !! Do nothing
-           end if
-           T_bound(j) = T(i)  !! set T_bound to T
-        end do
+     !! 15 species CH4 chemistry
+     if(nspec.eq.16) then
+        o2n2_ratio = one*molar_mass(2)/(3.76d0*molar_mass(16))
+        ch4o2_stoichiometric = one*molar_mass(1)/(two*molar_mass(2))
+        ch4o2_ratio = ch4o2_stoichiometric*phi_in
+          
+        Yin_O2 = one/(one + ch4o2_ratio + one/o2n2_ratio)
+        Yin_CH4 = Yin_O2*ch4o2_ratio
+        Yin_N2 = one - Yin_CH4 - Yin_O2
+   
+        co2h2o_ratio = one*molar_mass(3)/(two*molar_mass(4))  !! Assume complete combustion??
+        Yout_CO2 = (one - Yin_N2)/(one + one/co2h2o_ratio)
+        Yout_H2O = Yout_CO2/co2h2o_ratio        
+     
+        Yspec_reactants(1) = Yin_CH4
+        Yspec_reactants(2) = Yin_O2
+        Yspec_reactants(3:15) = zero
+        Yspec_reactants(16) = Yin_N2
+        
+        Yspec_products(1:2) = zero
+        Yspec_products(3) = Yout_CO2
+        Yspec_products(4) = Yout_H2O
+        Yspec_products(5:15) = zero
+        Yspec_products(16) = Yin_N2   
      end if
   
      return
-  end subroutine make_1d_1step_flame
+  end subroutine initialise_composition
 !! ------------------------------------------------------------------------------------------------ 
-  subroutine make_1d_21step_flame
-     !! Make a 21 step (9 species) H2-AIR flame. Initial profiles are erf(x').
+  subroutine make_1d_flame(flame_location,flame_thickness,T_products)
      integer(ikind) :: i,ispec,j
-     real(rkind) :: flame_location,flame_thickness
-     real(rkind) :: T_reactants,T_products
+     real(rkind),intent(in) :: flame_location,flame_thickness,T_products
+     real(rkind) :: T_reactants,fl_thck
      real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z,ro_inflow
-     real(rkind) :: Yin_H2,Yin_O2,Yin_N2,Yout_H2O
-     real(rkind) :: o2n2_ratio,h2o2_stoichiometric,h2o2_ratio
 
-     !! Position and scale     
-     flame_location = -0.12d0!zero!-0.27d0
-     flame_thickness = 2.0d-4/L_char !! Scale thickness because position vectors are scaled...
-   
-     !! Determine inlet composition
-     o2n2_ratio = one*molar_mass(2)/(3.76d0*molar_mass(9))
-     h2o2_stoichiometric = two*molar_mass(1)/(one*molar_mass(2))
-     h2o2_ratio = h2o2_stoichiometric*phi_in
+     !! Scale thickness because position vectors are scaled...
+     fl_thck = flame_thickness/L_char 
 
-     Yin_O2 = one/(one + h2o2_ratio + one/o2n2_ratio)
-     Yin_H2 = Yin_O2*h2o2_ratio
-     Yin_N2 = one - Yin_H2 - Yin_O2     
-     
-     !! Outlet composition
-     Yout_H2O = one - Yin_N2     
-
-     !! Temperatures
-     T_reactants = T_ref
-     T_products = 2.366d3
-     
-     !! Pressure through flame is reference pressure
+     !! Temperatures, pressures and velocity from reference
+     T_reactants = T_ref     
      P_flame = p_ref
+     u_reactants = u_char
+
+     !! Inflow mixture gas constant
+     Rmix_local = zero
+     do ispec=1,nspec
+        Rmix_local = Rmix_local + Yspec_reactants(ispec)*one_over_molar_mass(ispec)
+     end do
+     Rmix_local = Rmix_local*Rgas_universal     
 
      !! Inflow density
-     ro_inflow = p_flame/(Rgas_universal*T_reactants* &
-             (Yin_H2*one_over_molar_mass(1) + Yin_O2*one_over_molar_mass(2) + Yin_N2*one_over_molar_mass(9)))      
+     ro_inflow = p_flame/(Rmix_local*T_reactants)
     
-     !! Inflow speed
-     u_reactants = u_char
-     
+     !! Loop over all nodes and impose values
      !$omp parallel do private(x,y,z,c,Rmix_local,ispec)
      do i=1,npfb
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
         
         !! Error function based progress variable
-!        c = half*(one + erf((x-flame_location)/flame_thickness))
-        c = exp(-((x-flame_location)/flame_thickness)**two - (y/flame_thickness)**two)        
-!        c = exp(-((x-flame_location)/flame_thickness)**two - ((y-0.05d0)/flame_thickness)**two)    &
-!          + exp(-((x-flame_location)/flame_thickness)**two - ((y+0.05d0)/flame_thickness)**two)        
-!        c = exp(-((x-flame_location)/flame_thickness)**two)
+        c = half*(one + erf((x-flame_location)/fl_thck))
         
         !! Temperature profile
         T(i) = T_reactants + (T_products - T_reactants)*c
         
         !! Composition
-        Yspec(i,1) = Yin_H2!(one - c)*Yin_H2
-        Yspec(i,2) = Yin_O2!(one - c)*Yin_O2
-        Yspec(i,3) = zero!c*Yout_H2O
-        Yspec(i,4:8) = zero
-        Yspec(i,9) = Yin_N2
+        do ispec = 1,nspec
+           Yspec(i,ispec) = (one-c)*Yspec_reactants(ispec) + c*Yspec_products(ispec)
+        end do
         
         !! Local mixture gas constant
         Rmix_local = zero
@@ -319,14 +301,14 @@ contains
         ro(i) = P_flame/(Rmix_local*T(i))
         
         !! Velocity
-        u(i) = u_reactants!*ro_inflow/ro(i)
+        u(i) = u_reactants*ro_inflow/ro(i)
         v(i) = zero
         w(i) = zero
                         
      end do
      !$omp end parallel do
      
-     !! Values on boundaries
+     !! Special apply values on boundaries
      if(nb.ne.0)then
         do j=1,nb
            i=boundary_list(j)
@@ -338,6 +320,7 @@ contains
 !              u(i)=u_char
            end if
            if(node_type(i).eq.2) then !! outflow initial conditions
+              !! Do nothing
            end if
            T_bound(j) = T(i)
         end do
@@ -346,30 +329,107 @@ contains
   
   
      return
-  end subroutine make_1d_21step_flame
-!! ------------------------------------------------------------------------------------------------  
-  subroutine make_ignition_hotspot
-     !! Make a hot spot for ignition (hard-coded to fit 9spec H2 combustion at present
+  end subroutine make_1d_flame
+!! ------------------------------------------------------------------------------------------------ 
+  subroutine make_2d_gaussian_hotspot(f_loc_x,f_loc_y,flame_thickness,T_hot)
+     !! Initialise the flow with a 2D gaussian hotspot
      integer(ikind) :: i,ispec,j
-     real(rkind) :: flame_location,flame_thickness
-     real(rkind) :: T_hot
+     real(rkind),intent(in) :: f_loc_x,f_loc_y,flame_thickness,T_hot
+     real(rkind) :: T_reactants,fl_thck
+     real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z,ro_inflow
+
+     !! Scale thickness because position vectors are scaled...
+     fl_thck = flame_thickness/L_char 
+
+     !! Temperatures, pressures and velocity from reference
+     T_reactants = T_ref     
+     P_flame = p_ref
+     u_reactants = u_char
+
+     !! Inflow mixture gas constant
+     Rmix_local = zero
+     do ispec=1,nspec
+        Rmix_local = Rmix_local + Yspec_reactants(ispec)*one_over_molar_mass(ispec)
+     end do
+     Rmix_local = Rmix_local*Rgas_universal     
+
+     !! Inflow density
+     ro_inflow = p_flame/(Rmix_local*T_reactants)
+    
+     !! Loop over all nodes and impose values
+     !$omp parallel do private(x,y,z,c,Rmix_local,ispec)
+     do i=1,npfb
+        x = rp(i,1);y=rp(i,2);z=rp(i,3)
+        
+        !! Gaussian progress variable
+        c = exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y)/fl_thck)**two)        
+        
+        !! Temperature profile
+        T(i) = T_reactants + (T_hot - T_reactants)*c
+        
+        !! Composition - reactants everywhere
+        do ispec = 1,nspec
+           Yspec(i,ispec) = Yspec_reactants(ispec)
+        end do
+        
+        !! Local mixture gas constant
+        Rmix_local = zero
+        do ispec=1,nspec
+           Rmix_local = Rmix_local + Yspec(i,ispec)*one_over_molar_mass(ispec)
+        end do
+        Rmix_local = Rmix_local*Rgas_universal
+        
+        !! Density
+        ro(i) = P_flame/(Rmix_local*T(i))
+        
+        !! Velocity - uniform
+        u(i) = u_reactants
+        v(i) = zero
+        w(i) = zero
+                        
+     end do
+     !$omp end parallel do
+     
+     !! Special impose values on boundaries
+     if(nb.ne.0)then
+        do j=1,nb
+           i=boundary_list(j)
+           if(node_type(i).eq.0) then !! wall initial conditions
+              u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
+              T(i) = T_reactants
+           end if                 
+           if(node_type(i).eq.1) then !! inflow initial conditions
+!              u(i)=u_char
+           end if
+           if(node_type(i).eq.2) then !! outflow initial conditions
+              !! Do nothing
+           end if
+           T_bound(j) = T(i)
+        end do
+     end if
+    
+     return
+  end subroutine make_2d_gaussian_hotspot
+!! ------------------------------------------------------------------------------------------------  
+  subroutine superimpose_2d_gaussian_hotspot(f_loc_x,f_loc_y,flame_thickness,T_hot)
+     !! Make a hot spot for ignition, superimposed on the existing ro,U,T,Yspec fields
+     !! This subroutine is useful if we want to ignite or re-ignite a restarting simulation - for
+     !! example, when we have run an inert simulation to obtain an initial velocity field.
+     integer(ikind) :: i,ispec,j
+     real(rkind),intent(in) :: f_loc_x,f_loc_y,flame_thickness,T_hot     
+     real(rkind) :: flame_location,fl_thck
      real(rkind) :: P_local,c,Rmix_local,x,y,z
 
-     !! Position and scale     
-     flame_location = -0.27d0!zero!-0.27d0
-     flame_thickness = 2.0d-4/L_char !! Scale thickness because position vectors are scaled...
-   
-     !! Temperature peak
-     T_hot = 2.5d3
-     
+     !! Scale thickness because position vectors are scaled...
+     fl_thck = flame_thickness/L_char 
+
+     !! Loop over all nodes and modify T and ro as required   
      !$omp parallel do private(x,y,z,c,Rmix_local,ispec,P_local)
      do i=1,npfb
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
         
-        !! Gaussian hotspot
-        c = exp(-((x-flame_location)/flame_thickness)**two - (y/flame_thickness)**two)        
-!        c = exp(-((x-flame_location)/flame_thickness)**two)
-        
+        !! Gaussian hotspot progress variable
+        c = exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y)/fl_thck)**two)              
                
         !! Local mixture gas constant
         Rmix_local = zero
@@ -387,111 +447,13 @@ contains
         !! Modify density so pressure is unaffected
         ro(i) = P_local/(Rmix_local*T(i))
         
-        !! composition and velocity are not modified
                         
      end do
      !$omp end parallel do 
   
   
      return
-  end subroutine make_ignition_hotspot  
-!! ------------------------------------------------------------------------------------------------  
-  subroutine make_1d_25step_flame
-     !! Make a 25 step (16 species) CH4-AIR flame. Initial profiles are erf(x').
-     integer(ikind) :: i,ispec,j
-     real(rkind) :: flame_location,flame_thickness
-     real(rkind) :: T_reactants,T_products
-     real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z,ro_inflow
-     real(rkind) :: Yin_CH4,Yin_O2,Yin_N2,Yout_H2O,Yout_CO2
-     real(rkind) :: o2n2_ratio,ch4o2_ratio,ch4o2_stoichiometric,co2h2o_ratio
-
-     !! Position and scale     
-     flame_location = zero
-     flame_thickness = 5.0d-4/L_char !! Scale thickness because position vectors are scaled...
-
-     !! Determine inlet composition
-     o2n2_ratio = one*molar_mass(2)/(3.76d0*molar_mass(16))
-     ch4o2_stoichiometric = one*molar_mass(1)/(two*molar_mass(2))
-     ch4o2_ratio = ch4o2_stoichiometric*phi_in
-          
-     Yin_O2 = one/(one + ch4o2_ratio + one/o2n2_ratio)
-     Yin_CH4 = Yin_O2*ch4o2_ratio
-     Yin_N2 = one - Yin_CH4 - Yin_O2
-
-     !! Outlet composition 
-     co2h2o_ratio = one*molar_mass(3)/(two*molar_mass(4))  !! Assume complete combustion??
-     Yout_CO2 = (one - Yin_N2)/(one + one/co2h2o_ratio)
-     Yout_H2O = Yout_CO2/co2h2o_ratio            
-
-     !! Temperatures
-     T_reactants = T_ref
-     T_products = 2.3d3     
-     
-     !! Pressure through flame 
-     P_flame = p_ref
- 
-     !! inflow density
-     ro_inflow = p_flame/(Rgas_universal*T_reactants* &
-             (Yin_CH4*one_over_molar_mass(1) + Yin_O2*one_over_molar_mass(2) + Yin_N2*one_over_molar_mass(16)))
-
-     
-     !! Inflow speed
-     u_reactants = u_char
-     
-     !$omp parallel do private(x,y,z,c,Rmix_local,ispec)
-     do i=1,npfb
-        x = rp(i,1);y=rp(i,2);z=rp(i,3)
-        
-        !! Error function based progress variable
-        c = half*(one + erf((x-flame_location)/flame_thickness))
-        
-        !! Temperature profile
-        T(i) = T_reactants + (T_products - T_reactants)*c
-        
-        !! Composition
-        Yspec(i,1) = (one - c)*Yin_CH4
-        Yspec(i,2) = (one - c)*Yin_O2
-        Yspec(i,3) = c*Yout_CO2
-        Yspec(i,4) = c*Yout_H2O
-        Yspec(i,5:15) = zero
-        Yspec(i,16) = Yin_N2
-        
-        !! Local mixture gas constant
-        Rmix_local = zero
-        do ispec=1,nspec
-           Rmix_local = Rmix_local + Yspec(i,ispec)*one_over_molar_mass(ispec)
-        end do
-        Rmix_local = Rmix_local*Rgas_universal
-        
-        !! Density
-        ro(i) = P_flame/(Rmix_local*T(i))
-        
-        !! Velocity
-        u(i) = u_reactants*ro_inflow/ro(i)
-        v(i) = zero
-        w(i) = zero
-                        
-     end do
-     !$omp end parallel do
-     
-     !! Values on boundaries
-     if(nb.ne.0)then
-        do j=1,nb
-           i=boundary_list(j)
-           if(node_type(i).eq.0) then !! wall initial conditions
-              u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
-           end if                 
-           if(node_type(i).eq.1) then !! inflow initial conditions
-              u(i)=u_char
-           end if
-           if(node_type(i).eq.2) then !! outflow initial conditions
-           end if
-           T_bound(j) = T(i)           
-        end do
-     end if  
-  
-     return
-  end subroutine make_1d_25step_flame  
+  end subroutine superimpose_2d_gaussian_hotspot  
 !! ------------------------------------------------------------------------------------------------
   subroutine load_flame_file
      use thermodynamics

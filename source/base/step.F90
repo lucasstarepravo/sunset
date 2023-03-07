@@ -117,7 +117,7 @@ contains
         !$omp end parallel do
               
         !! Apply BCs and update halos
-        call apply_time_dependent_bounds        
+        if(nb.ne.0) call apply_time_dependent_bounds        
         call reapply_mirror_bcs
         call halo_exchanges_all
         
@@ -168,7 +168,7 @@ contains
      deallocate(rhs_rou,rhs_rov,rhs_row,rhs_ro,rhs_roE,rhs_Yspec)     
      
      !! Apply BCs and update halos
-     call apply_time_dependent_bounds     
+     if(nb.ne.0) call apply_time_dependent_bounds     
      call reapply_mirror_bcs
      call halo_exchanges_all
               
@@ -176,7 +176,7 @@ contains
      call filter_variables
 
      !! Apply BCs and update halos
-     call apply_time_dependent_bounds
+     if(nb.ne.0) call apply_time_dependent_bounds
      call reapply_mirror_bcs
      call halo_exchanges_all
      
@@ -321,7 +321,7 @@ contains
         !$omp end parallel do
        
         !! Apply BCs and update halos
-        call apply_time_dependent_bounds        
+        if(nb.ne.0) call apply_time_dependent_bounds        
         call reapply_mirror_bcs
         call halo_exchanges_all
         
@@ -430,7 +430,7 @@ contains
                     1.0d-16)
     
      !! Apply BCs and update halos
-     call apply_time_dependent_bounds     
+     if(nb.ne.0) call apply_time_dependent_bounds     
      call reapply_mirror_bcs
      call halo_exchanges_all
           
@@ -438,7 +438,7 @@ contains
      call filter_variables
 
      !! Apply BCs and update halos
-     call apply_time_dependent_bounds
+     if(nb.ne.0) call apply_time_dependent_bounds
      call reapply_mirror_bcs
      call halo_exchanges_all
      
@@ -461,9 +461,9 @@ contains
      use thermodynamics
      use transport
      integer(ikind) :: i
-     real(rkind) :: umag,dt_local
+     real(rkind) :: umag
      real(rkind) :: dt_visc,dt_therm,dt_spec  
-     real(rkind) :: c,uplusc,dt_cfl_local,dt_parabolic_local
+     real(rkind) :: c,uplusc
          
      call evaluate_temperature_and_pressure
      call evaluate_transport_properties   
@@ -531,15 +531,13 @@ contains
      
 #ifdef mp     
      !! Global cfl-based time-step and parabolic parts based time-step
-     dt_cfl_local = dt_cfl;dt_parabolic_local=dt_parabolic
-     call MPI_ALLREDUCE(dt_cfl_local,dt_cfl,1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(dt_parabolic_local,dt_parabolic,1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)       
+     call global_reduce_min(dt_cfl)
+     call global_reduce_min(dt_parabolic)     
                  
      !! Output time-step (only if not reacting)
 #ifndef react
      !! Global time step
-     dt_local = dt
-     call MPI_ALLREDUCE(dt_local,dt,1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
+     call global_reduce_min(dt)
      if(iproc.eq.0) then
         write(192,*) time,dt,one
         flush(192)        
@@ -560,17 +558,16 @@ contains
      !! This routine is generally only called for reacting flows, and *presumes* that 
      !! the CFL-type time-step constraints have been calculated already.
      integer(ikind) :: i
-     real(rkind) :: dtfactor,emax_local
+     real(rkind) :: dtfactor
      real(rkind) :: facA,facB,facC
      real(rkind) :: tratio_min,tratio_max
      real(rkind) :: umag2,umag
-     real(rkind) :: c,dt_local,dt_max
+     real(rkind) :: c,dt_max
         
                   
 #ifdef mp     
      !! Parallel transfer to obtain the global maximum error          
-     emax_local = emax_np1
-     call MPI_ALLREDUCE(emax_local,emax_np1,1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror) 
+     call global_reduce_max(emax_np1)
 #endif     
    
      !! P, I and D factors..  Calculation done in log space...
@@ -599,8 +596,7 @@ contains
 
 #ifdef mp     
      !! Find global time-step
-     dt_local = dt
-     call MPI_ALLREDUCE(dt_local,dt,1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror) 
+     call global_reduce_min(dt)
      if(iproc.eq.0) then
         write(192,*) time,dt,dt/dt_cfl
         flush(192)

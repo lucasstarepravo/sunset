@@ -79,7 +79,7 @@ module common_parameter
   real(rkind), parameter :: ew_norm = 1.0d-2 !! 1d-2 is better for dealing with initial shocks
   real(rkind), parameter :: eroE_norm = 1.0d-2 
   real(rkind), parameter :: eY_norm = 1.0d-10       
-  real(rkind), parameter :: pid_tol = 1.0d-4        !! Error tolerance
+  real(rkind), parameter :: pid_tol = 1.0d-3        !! Error tolerance
   real(rkind), parameter :: pid_a=0.49d0/two  !! P-coefficient   ! 0.7
   real(rkind), parameter :: pid_b=0.34d0/two  !! I-coefficient   ! 0.4
   real(rkind), parameter :: pid_c=0.1d0/two  !! D-coefficient   ! 0.1

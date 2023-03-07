@@ -29,7 +29,7 @@ contains
      real(rkind),dimension(:),allocatable :: maxphi,minphi
      integer(ikind) :: n_threads_global
      real(rkind) :: t_per_dt_global,t_last_x_global,t_run_global
-     real(rkind) :: cput,cput_global,store1
+     real(rkind) :: cput,store1
      
      allocate(maxphi(6+nspec),minphi(6+nspec))
      
@@ -41,9 +41,9 @@ contains
      !! Output cpu-time to file.
 #ifdef mp
      cput = ts_end-ts_start
-     call MPI_ALLREDUCE(cput,cput_global,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
+     call global_reduce_sum(cput)
      if(iproc.eq.0) then 
-        write(191,*) itime,cput_global/(dble(nprocs)+one)
+        write(191,*) itime,cput/(dble(nprocs)+one)
         flush(191)
      end if
 #else
@@ -59,12 +59,13 @@ contains
         call reduce_for_screen_output(maxphi,minphi)
      
         call MPI_ALLREDUCE(n_threads,n_threads_global,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD,ierror)          
-        call MPI_ALLREDUCE(t_per_dt,t_per_dt_global,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
-        call MPI_ALLREDUCE(t_last_X,t_last_X_global,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)         
-        call MPI_ALLREDUCE(t_run,t_run_global,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)              
-        t_last_X_global=t_last_x_global/dble(nprocs)
-        t_per_dt_global =t_per_dt_global/dble(nprocs)
-        t_run_global = t_run_global/dble(nprocs)
+        call global_reduce_sum(t_per_dt)
+        call global_reduce_sum(t_last_X)
+        call global_reduce_sum(t_run)                
+       
+        t_last_X=t_last_x/dble(nprocs)
+        t_per_dt =t_per_dt/dble(nprocs)
+        t_run = t_run/dble(nprocs)
      
         !! Profiling bits
         call MPI_ALLREDUCE(segment_time_local,segment_time_global,10,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)  
@@ -79,20 +80,20 @@ contains
            write(6,*) "max/min ro*E:",maxphi(5),minphi(5)
            write(6,*) "max/min T:",maxphi(6),minphi(6)   
            write(6,*) "There are",n_threads_global,"threads spread over ",nprocs,"MPI tasks"
-           write(6,*) "Wall clock run time=",t_run_global
-           write(6,*) "run-time/itime=",t_per_dt_global,"Moving avg=",t_last_X_global/dble(scr_freq)
+           write(6,*) "Wall clock run time=",t_run
+           write(6,*) "run-time/itime=",t_per_dt,"Moving avg=",t_last_X/dble(scr_freq)
 
            !! Profiling
            store1 = segment_time_global(10) - sum(segment_time_global(1:9))
            write(6,*) "  "
            write(6,*) "Profiling:::"
            write(6,*) "MPI transfers             :",segment_time_global(1)/segment_time_global(10)
-           write(6,*) "Mirror boundaries         :",segment_time_global(2)/segment_time_global(10)
+           write(6,*) "Boundary conditions       :",segment_time_global(2)/segment_time_global(10)
            write(6,*) "Filtering                 :",segment_time_global(3)/segment_time_global(10)
-           write(6,*) "Gradients                 :",segment_time_global(4)/segment_time_global(10)
-           write(6,*) "Laplacians                :",segment_time_global(5)/segment_time_global(10)
+           write(6,*) "1st Derivatives           :",segment_time_global(4)/segment_time_global(10)
+           write(6,*) "2nd Derivatives           :",segment_time_global(5)/segment_time_global(10)
            write(6,*) "Chemistry                 :",segment_time_global(6)/segment_time_global(10)
-           write(6,*) "Boundary 2nd derivatives  :",segment_time_global(7)/segment_time_global(10)
+           write(6,*) "Empty                     :",segment_time_global(7)/segment_time_global(10)
            write(6,*) "Transport                 :",segment_time_global(8)/segment_time_global(10)
            write(6,*) "Thermo                    :",segment_time_global(9)/segment_time_global(10)           
            write(6,*) "Other                     :",store1/segment_time_global(10)       
@@ -119,12 +120,12 @@ contains
         write(6,*) "  "
         write(6,*) "Profiling:::"
         write(6,*) "MPI transfers             :",segment_time_local(1)/segment_time_local(10)
-        write(6,*) "Mirror boundaries         :",segment_time_local(2)/segment_time_local(10)
+        write(6,*) "Boundary conditions       :",segment_time_local(2)/segment_time_local(10)
         write(6,*) "Filtering                 :",segment_time_local(3)/segment_time_local(10)
-        write(6,*) "Gradients                 :",segment_time_local(4)/segment_time_local(10)
-        write(6,*) "Laplacians                :",segment_time_local(5)/segment_time_local(10)
+        write(6,*) "1st Derivatives           :",segment_time_local(4)/segment_time_local(10)
+        write(6,*) "2nd Derivatives           :",segment_time_local(5)/segment_time_local(10)
         write(6,*) "Chemistry                 :",segment_time_local(6)/segment_time_local(10)
-        write(6,*) "Boundary 2nd derivatives  :",segment_time_local(7)/segment_time_local(10)
+        write(6,*) "Empty                     :",segment_time_local(7)/segment_time_local(10)
         write(6,*) "Transport                 :",segment_time_local(8)/segment_time_local(10)        
         write(6,*) "Thermo                    :",segment_time_local(9)/segment_time_local(10)                
         write(6,*) "Other                     :",store1/segment_time_local(10)        
@@ -234,11 +235,7 @@ contains
            !! Pass something to tmpVort (we use vorticity to output other things sometimes during
            !! debugging...)
            tmpVort = vort(i)
-           tmpvort = one
-           do ispec=1,nspec
-              tmpvort = tmpvort - Yspec(i,ispec)*tmpro
-           end do         
-           
+                
            !! Pass heat release rate to alpha_out?
            alpha_out(i) = hrr(i)
 

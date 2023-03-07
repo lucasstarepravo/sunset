@@ -382,9 +382,9 @@ endif
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.025d0!0.0125d0  ! channel width
+     yl=0.0125d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/500.0       !15
+     dx0=xl/1000.0       !15
      xbcond=0;ybcond=1
      
      nb_patches = 4
@@ -624,7 +624,7 @@ case(6) !! Channel flows, propagating front
      open(unit=191,file="blob_fcoefs.in")
      read(191,*) n_blob_coefs
      allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
-     blob_centre(1,:)=(/ -0.3d0*xl,-0.0d0*yl/);
+     blob_centre(1,:)=(/ -0.275d0*xl,-0.0d0*yl/);
 !     blob_centre(2,:)=(/ -0.3d0*xl,0.5d0*yl/);             
      do i=1,n_blob_coefs
         read(191,*) blob_coeffs(1,i)

@@ -195,8 +195,7 @@ contains
      !! Output the L2 of velocity over the domain
      integer(ikind) :: i
      real(rkind) :: tot_vel,tot_vol,tmpro,dVi,tmpvel
-     real(rkind) :: tot_vel_tmp,tot_vol_tmp
-     real(rkind),dimension(dims) :: tot_u,tot_u_tmp
+     real(rkind),dimension(dims) :: tot_u
      real(rkind) :: facA,facB,facC,facT,deflowdt
        
      tot_vel = zero
@@ -217,10 +216,12 @@ contains
      !$omp end parallel do
 
 #ifdef mp
-     tot_vel_tmp = tot_vel;tot_vol_tmp = tot_vol;tot_u_tmp = tot_u
-     call MPI_ALLREDUCE(tot_vel_tmp,tot_vel,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(tot_vol_tmp,tot_vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(tot_u_tmp,tot_u,3,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
+     !! Reduce
+     call global_reduce_sum(tot_vel)
+     call global_reduce_sum(tot_vol)
+     call global_reduce_sum(tot_u(1))
+     call global_reduce_sum(tot_u(2))
+     call global_reduce_sum(tot_u(3))                    
 #endif         
     
      !! Normalise over volume
@@ -271,7 +272,7 @@ contains
   subroutine heat_release_rate
      !! This subroutine calculates the total heat release rate integrated over the domain
      integer(ikind) :: i
-     real(rkind) :: tot_hrr,dVi,tot_hrr_tmp,tot_vol_tmp
+     real(rkind) :: tot_hrr,dVi
 #ifdef react    
    
      tot_hrr = zero
@@ -286,8 +287,7 @@ contains
      !$omp end parallel do
      
 #ifdef mp
-     tot_hrr_tmp = tot_hrr
-     call MPI_ALLREDUCE(tot_hrr_tmp,tot_hrr,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
+     call global_reduce_sum(tot_hrr)
 #endif     
 
      !! Scale by length-scale squared or cubed
@@ -346,13 +346,9 @@ contains
 #endif     
      
 #ifdef mp
-     tot_mass_tmp = tot_mass;tot_vol_tmp = tot_vol;tot_roE_tmp = tot_roE
-     call MPI_ALLREDUCE(tot_mass_tmp,tot_mass,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(tot_vol_tmp,tot_vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(tot_roE_tmp,tot_roE,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
-#endif     
-              
-#ifdef mp
+     call global_reduce_sum(tot_mass)
+     call global_reduce_sum(tot_vol)
+     call global_reduce_sum(tot_roE)          
      if(iproc.eq.0)then
         write(193,*) time/Time_char,tot_mass,tot_vol
         flush(193)
@@ -372,12 +368,12 @@ contains
   subroutine species_check
      !! This subroutine calculates total quantity of each species in the domain
      integer(ikind) :: i,ispec
-     real(rkind) :: dVi,tmpY,sumY,tot_error,tot_error_tmp,tmpro,tot_vol,tot_vol_tmp
-     real(rkind),dimension(:),allocatable :: tot_Yspec,tot_Yspec_tmp
+     real(rkind) :: dVi,tmpY,sumY,tot_error,tmpro,tot_vol
+     real(rkind),dimension(:),allocatable :: tot_Yspec
 #ifdef ms     
      
      !! Allocate and zero accumulators
-     allocate(tot_Yspec(nspec),tot_Yspec_tmp(nspec))   
+     allocate(tot_Yspec(nspec))   
      tot_Yspec = zero     
      tot_error = zero
      tot_vol=zero
@@ -423,12 +419,11 @@ contains
 #endif     
      
 #ifdef mp
-     tot_Yspec_tmp = tot_Yspec
-     tot_error_tmp = tot_error
-     tot_vol_tmp = tot_vol
-     call MPI_ALLREDUCE(tot_Yspec_tmp,tot_Yspec,nspec,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(tot_error_tmp,tot_error,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(tot_vol_tmp,tot_vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)     
+     do ispec=1,nspec
+        call global_reduce_sum(tot_Yspec(ispec))
+     end do
+     call global_reduce_sum(tot_error)
+     call global_reduce_sum(tot_vol)     
      
      !! L2 norm for error           
      tot_error = sqrt(tot_error/tot_vol)
@@ -442,6 +437,8 @@ contains
      write(199,*) time/Time_char,sqrt(tot_error/tot_vol),tot_Yspec(:)
      flush(199)
 #endif
+     
+     deallocate(tot_Yspec)
 
 #endif
 
@@ -492,7 +489,7 @@ contains
     implicit none
     integer(ikind) :: i
     real(rkind) :: u_exact,v_exact,x,y,expo
-    real(rkind) :: U_ex,U_num,error_sum,L2error,Ex_sum,error_sum_local,ex_sum_local
+    real(rkind) :: U_ex,U_num,error_sum,L2error,Ex_sum
   
     error_sum = zero;Ex_sum =zero
     !$omp parallel do private(x,y,u_exact,v_exact,U_ex,U_num) reduction(+:Ex_sum,error_sum)
@@ -510,9 +507,9 @@ contains
     end do
     !$omp end parallel do
 #ifdef mp
-    error_sum_local = error_sum;ex_sum_local = ex_sum
-    call MPI_ALLREDUCE(error_sum_local,error_sum,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
-    call MPI_ALLREDUCE(ex_sum_local,ex_sum,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
+    call global_reduce_sum(error_sum)
+    call global_reduce_sum(ex_sum)    
+    
     L2error = dsqrt(error_sum/Ex_sum)
     if(iproc.eq.0)then
 !       write(6,*) time,L2error,expo,maxval(u(1:npfb))
@@ -535,7 +532,6 @@ contains
      !! This routine is designed specifically for 3D Taylor-Green vortex tests.
      integer(ikind) :: i
      real(rkind) :: srtnorm,sum_enstrophy,vol_i,sum_vol,sum_ke
-     real(rkind) :: sum_enstrophy_local,sum_vol_local,sum_ke_local
      
      sum_enstrophy = zero
      sum_vol = zero
@@ -559,12 +555,9 @@ contains
      !$omp end parallel do
      
 #ifdef mp
-     sum_enstrophy_local = sum_enstrophy
-     sum_vol_local = sum_vol
-     sum_ke_local = sum_ke
-     call MPI_ALLREDUCE(sum_enstrophy_local,sum_enstrophy,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(sum_vol_local,sum_vol,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(sum_ke_local,sum_ke,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)  
+     call global_reduce_sum(sum_enstrophy)
+     call global_reduce_sum(sum_ke)
+     call global_reduce_sum(sum_vol)          
      if(iproc.eq.0)then
         write(198,*) time/Time_char,sum_enstrophy/sum_vol,sum_ke/sum_vol
         flush(198)
