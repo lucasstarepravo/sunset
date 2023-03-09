@@ -197,7 +197,7 @@ contains
      real(rkind),dimension(:,:,:),allocatable :: gradYspec
      real(rkind),dimension(:,:),allocatable :: grad2Yspec
      integer(ikind) :: i,j,ispec
-     real(rkind),dimension(dims) :: tmp_vec,grad_enthalpy,roVY,gradroDY
+     real(rkind),dimension(dims) :: tmp_vec,roVY,gradroDY
      real(rkind) :: tmp_scal,lapYspec_tmp,tmpY,divroVY,enthalpy,dcpdT,cpispec,tmpro,tmpT,roDY
      real(rkind),dimension(:,:),allocatable :: speciessum_roVY,speciessum_hgradY
      real(rkind),dimension(:),allocatable :: speciessum_divroVY,speciessum_hY
@@ -230,7 +230,8 @@ contains
         !! Pre-populate stores 3 and 4 with density and pressure laplacians
         call calc_laplacian(ro,mxav_store3)
         call calc_laplacian(p-p_outflow,mxav_store4)        
-     
+        
+   
         !$omp parallel do private(tmpro,tmpT)
         do i=1,npfb
            !! Store inverse of density and temperature
@@ -251,7 +252,7 @@ contains
            mxav_store4(i) = (tmpro*tmpT/Rgas_universal)*(mxav_store4(i) - dot_product(gradp(i,:),mxav_store1(i,:)))
            
         end do
-        !$omp end parallel do     
+        !$omp end parallel do 
      else
         !! These terms are zero for constant Lewis number assumption
         mxav_store1=zero;mxav_store2=zero
@@ -261,14 +262,14 @@ contains
      
      !! Loop over all species
      do ispec=1,nspec
-     
+    
         !! Store Y=roY/ro for the species (N.B. this loop is over ALL nodes)
         !$omp parallel do 
         do i=1,np
            Y_thisspec(i) = Yspec(i,ispec)/ro(i)
         end do
         !$omp end parallel do
-    
+        
         !! Calculate gradient and Laplacian for Yspec for this species     
         call calc_gradient(Y_thisspec,gradYspec(:,:,ispec))
         call calc_laplacian(Y_thisspec,lapYspec)
@@ -288,8 +289,9 @@ contains
 #endif           
         end if
              
+segment_tstart=omp_get_wtime()      
       
-        !$omp parallel do private(i,tmp_scal,tmpY,divroVY,roVY,enthalpy,grad_enthalpy, &
+        !$omp parallel do private(i,tmp_scal,tmpY,divroVY,roVY,enthalpy, &
         !$omp dcpdT,cpispec,tmpro,gradroDY,roDY)
         do j=1,npfb-nb
            i=internal_list(j)
@@ -301,7 +303,7 @@ contains
                              w(i)*gradYspec(i,3,ispec) ) - Y_thisspec(i)*rhs_ro(i)
            
          
-           !! Molecular diffusion terms
+           !! First part of molecular diffusion terms 
            roVY = roMdiff(i,ispec)*gradYspec(i,:,ispec)                     
            divroVY = roMdiff(i,ispec)*lapYspec(i) &
                       + dot_product(gradYspec(i,:,ispec),gradroMdiff(i,:))
@@ -309,7 +311,7 @@ contains
            
            !! roDY and gradroDY - these are used for additional mixture averaged terms
            roDY = roMdiff(i,ispec)*Y_thisspec(i)
-           gradroDY = roMdiff(i,ispec)*gradYspec(i,:,ispec) + Y_thisspec(i)*gradroMdiff(i,:)
+           gradroDY = roVY + Y_thisspec(i)*gradroMdiff(i,:)
                      
            !! Augment molecular diffusion terms to include mixture averaged driving forces 
            roVY = roVY + roDY*(mxav_store1(i,:) + mxav_store2(i,:)*molar_mass(ispec))                      
@@ -325,12 +327,11 @@ contains
            !! Evaluate enthalpy, cp and dcp/dT for species ispec
            call evaluate_enthalpy_at_node(T(i),ispec,enthalpy,cpispec,dcpdT)
 
-           !! Add h*div.(ro*D*gradY) for species ispec to the energy diffusion store
+           !! Add h*div.(roVY) for species ispec to the energy diffusion store
            store_diff_E(i) = store_diff_E(i) + divroVY*enthalpy   
                
-           !! Add gradh.roVY for species ispec 
-           grad_enthalpy = cpispec*gradT(i,:)
-           store_diff_E(i) = store_diff_E(i) + dot_product(roVY,grad_enthalpy)
+           !! Add gradh.roVY for species ispec ( gradh = cp*gradT )
+           store_diff_E(i) = store_diff_E(i) + cpispec*dot_product(roVY,gradT(i,:))
                                                
            !! Add this species contribution to the mixture enthalpy
            speciessum_hY(i) = speciessum_hY(i) + enthalpy*Y_thisspec(i) 
@@ -348,12 +349,16 @@ contains
         end do
         !$omp end parallel do
 
+!! Profiling
+segment_tend = omp_get_wtime()
+segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
+
         !! Make L5+ispec and boundary RHS
         if(nb.ne.0)then
            allocate(grad2Yspec(nb,dims));grad2Yspec=zero
            call calc_grad2bound(Yspec(:,ispec),grad2Yspec)
            !$omp parallel do private(i,xn,yn,un,ut,dutdt,lapYspec_tmp,tmpY,roVY &
-           !$omp ,divroVY,enthalpy,grad_enthalpy,tmpro,cpispec,dcpdT,tmp_scal,roDY,gradroDY)
+           !$omp ,divroVY,enthalpy,tmpro,cpispec,dcpdT,tmp_scal,roDY,gradroDY)
            do j=1,nb
               i=boundary_list(j)
               tmpro = one/ro(i)  !! tmpro contains 1/ro
@@ -375,7 +380,7 @@ contains
 
                  !! roDY and gradroDY - these are used for additional mixture averaged terms
                  roDY = roMdiff(i,ispec)*Y_thisspec(i)
-                 gradroDY = roMdiff(i,ispec)*gradYspec(i,:,ispec) + Y_thisspec(i)*gradroMdiff(i,:)
+                 gradroDY = roVY + Y_thisspec(i)*gradroMdiff(i,:)
                  gradroDY(1) = zero
 
                  !! Augment molecular diffusion terms to include mixture averaged driving forces 
@@ -391,7 +396,7 @@ contains
 
                  !! roDY and gradroDY - these are used for additional mixture averaged terms
                  roDY = roMdiff(i,ispec)*Y_thisspec(i)
-                 gradroDY = roMdiff(i,ispec)*gradYspec(i,:,ispec) + Y_thisspec(i)*gradroMdiff(i,:)
+                 gradroDY = roVY + Y_thisspec(i)*gradroMdiff(i,:)
 
                  !! Augment molecular diffusion terms to include mixture averaged driving forces 
                  roVY = roVY + roDY*(mxav_store1(i,:) + mxav_store2(i,:)*molar_mass(ispec))                      
@@ -414,9 +419,8 @@ contains
               !! Add h*div.(ro*D*gradY) for species ispec to the energy diffusion store
               store_diff_E(i) = store_diff_E(i) + divroVY*enthalpy
           
-              !! Add gradh(ispec).ro*D*gradY for species ispec 
-              grad_enthalpy = cpispec*gradT(i,:)
-              store_diff_E(i) = store_diff_E(i) + dot_product(roVY,grad_enthalpy)
+              !! Add gradh(ispec).roVY for species ispec (gradh = cp*gradT)
+              store_diff_E(i) = store_diff_E(i) + cpispec*dot_product(roVY,gradT(i,:))
 
               !! Add this species contribution to the mixture enthalpy
               speciessum_hY(i) = speciessum_hY(i) + enthalpy*Y_thisspec(i)
@@ -439,7 +443,7 @@ contains
            !$omp end parallel do 
            deallocate(grad2Yspec)
                        
-        end if       
+        end if                         
 
      end do
     
@@ -449,13 +453,12 @@ contains
       
      deallocate(mxav_store1,mxav_store2,mxav_store3,mxav_store4)
 
- 
-     !! Run through species again and finalise rhs and diffusion store for energy
-     !$omp parallel do private(enthalpy,grad_enthalpy,tmpro,ispec)
-     do i=1,npfb
-        tmpro = one/ro(i) !! tmpro contains 1/ro
-
-        do ispec=1,nspec                                
+     !! Run through species again and finalise rhs
+     do ispec=1,nspec
+     
+        !$omp parallel do private(tmpro)
+        do i=1,npfb
+           tmpro = one/ro(i) !! tmpro contains 1/ro
 
            !! Add the diffusion correction term to the rhs
            rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) &
@@ -463,6 +466,12 @@ contains
                               - dot_product(gradYspec(i,:,ispec),speciessum_roVY(i,:))  !! gradY.sum(roVY)           
 
         end do
+        !$omp end parallel do
+     end do
+     
+     !! Run over all nodes on final time to add terms to energy equation
+     !$omp parallel do
+     do i=1,npfb
         !! Additional terms for energy equation
 #ifndef isoT                                     
         !! Add h*diffusion_correction_term to the energy diffusion store
@@ -471,9 +480,8 @@ contains
         !! Add sum_over_species(h*gradY).sum_over_species(roVY) 
         store_diff_E(i) = store_diff_E(i) - dot_product(speciessum_hgradY(i,:),speciessum_roVY(i,:))
 
-        !! Add ro*cp(mix)*gradT*sum_over_species(DgradY) 
-        grad_enthalpy = cp(i)*gradT(i,:)
-        store_diff_E(i) = store_diff_E(i) - dot_product(grad_enthalpy,speciessum_roVY(i,:))
+        !! Add cp(mix)*gradT*sum_over_species(roVY) 
+        store_diff_E(i) = store_diff_E(i) - cp(i)*dot_product(gradT(i,:),speciessum_roVY(i,:))
                                                
 #endif                                               
      end do

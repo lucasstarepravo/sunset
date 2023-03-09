@@ -430,7 +430,7 @@ contains
      segment_tstart = omp_get_wtime()
      
      !! Update time-dependant inflow velocity
-     call update_u_inflow
+!     call update_u_inflow
                      
      !! Loop over all boundary nodes
      !$omp parallel do private(i)

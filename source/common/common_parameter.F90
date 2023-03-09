@@ -72,18 +72,16 @@ module common_parameter
   real(rkind),parameter :: rk3_4s_2r_c4=one
   real(rkind),dimension(4),parameter :: rk3_4s_2r_c=(/rk3_4s_2r_c1,rk3_4s_2r_c2,rk3_4s_2r_c3,rk3_4s_2r_c4/)      
 
-  !! Normalisation constants and parameters for PID error estimators (OK for combustion at standard P,T)
-  real(rkind), parameter :: ero_norm = 1.0d-10
-  real(rkind), parameter :: eu_norm = 1.0d-2 
-  real(rkind), parameter :: ev_norm = 1.0d-2 !! 1d-6 might be necessary for steadier flows.
-  real(rkind), parameter :: ew_norm = 1.0d-2 !! 1d-2 is better for dealing with initial shocks
-  real(rkind), parameter :: eroE_norm = 1.0d-2 
-  real(rkind), parameter :: eY_norm = 1.0d-10       
-  real(rkind), parameter :: pid_tol = 1.0d-3        !! Error tolerance
+  !! Parameters for PID error estimators (OK for combustion at standard P,T)
+  real(rkind), parameter :: pid_tol = 1.0d-2        !! Error tolerance
   real(rkind), parameter :: pid_a=0.49d0/two  !! P-coefficient   ! 0.7
   real(rkind), parameter :: pid_b=0.34d0/two  !! I-coefficient   ! 0.4
   real(rkind), parameter :: pid_c=0.1d0/two  !! D-coefficient   ! 0.1
   real(rkind), parameter :: pid_k=0.9d0      !! kappa coefficient !0.9
+  real(rkind), parameter :: ero_norm = 1.0d-10
+  real(rkind), parameter :: erou_norm = 1.0d-2 
+  real(rkind), parameter :: eroE_norm = 1.0d-2 
+  real(rkind), parameter :: eroY_norm = 1.0d-10    
   
   !! Finite difference stencil sizes
 #define FDORDER 8              

@@ -101,7 +101,8 @@ module common_vars
   real(rkind) :: emax_nm1,emax_n,emax_np1  !! errors for PID controller
   real(rkind) :: eflow_nm1,eflow_n,sum_eflow !! errors for PID to control <u> (constant-ish flow rate)
   real(rkind), dimension(dims) :: driving_force
-  real(rkind) :: mean_int_energy0
+  real(rkind) :: mean_int_energy0 
+  
 
   !! Neighbour numbers and lists
   integer(ikind),dimension(:),allocatable :: ij_count
@@ -142,7 +143,7 @@ module common_vars
   real(rkind) ts_start,ts_end,t_run,t_per_dt,t_last_X
   integer(ikind) :: n_threads  
   real(rkind) :: segment_tstart,segment_tend
-  real(rkind),dimension(10) :: segment_time_local,segment_time_global
+  real(rkind),dimension(10) :: segment_time_local
   real(rkind) :: cputimecheck
   real(rkind) :: transport_totaltime
   

@@ -64,6 +64,10 @@ program sunset
 #endif  
   if(mix_av_flag.eq.1) call load_transport_file
   call initial_solution
+#ifdef restart
+     call set_tstep
+     dt = half*half*min(dt_cfl,dt_parabolic)
+#endif   
 
   !! Initialise time profiling and output counter...
   n_out = 0;ts_start = omp_get_wtime()

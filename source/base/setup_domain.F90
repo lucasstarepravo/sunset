@@ -327,7 +327,7 @@ contains
 !     call MPI_Abort(MPI_COMM_WORLD, ii, ierror)
            
      !! Initialise PID controller variables
-     emax_np1=5.0d-4;emax_n=5.0d-4;emax_nm1=5.0d-4
+     emax_np1=pid_tol;emax_n=pid_tol;emax_nm1=pid_tol
 
      !! Initialise PID controller variables for <|u|>
      eflow_nm1 = one

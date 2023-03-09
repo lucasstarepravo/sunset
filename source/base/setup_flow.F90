@@ -70,10 +70,10 @@ contains
      !! e.g. uniform/non-uniform inflow etc.
         
      !! Make a 1D flame: pass X-position,flame_thickness and T_hot
-     call make_1d_flame(zero,2.0d-4,2.366d3)
+!     call make_1d_flame(zero,2.0d-4,2.366d3)
         
      !! Make a 2D gaussian hotspot: pass X,Y -positions, flame_thickness and T_hot
-!     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)        
+     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)        
 
      !! Load an existing 1D flame file
 !     call load_flame_file
@@ -144,7 +144,7 @@ contains
      cputimecheck = zero         
      
      !! Initialise the time-stepping (necessary for PID controlled stepping)
-     dt = 1.0d-10
+     dt = 1.0d-10   
      
      !! Initialise the variable which holds inflow velocity locally
      if(nb.ne.0)then

@@ -608,7 +608,7 @@ case(6) !! Channel flows, propagating front
 
      xl=1.0d0 ! channel length
      h0=xl/40.0d0   !cylinder radius
-     yl=xl/1.0d0  ! channel width
+     yl=xl/10.0d0  ! channel width
      dx0=h0/25.0       !15
      xbcond=0;ybcond=2     
      

@@ -26,6 +26,7 @@ contains
      !! This routine writes information about the simulation to screen in a fairly easy to read
      !! format. For this to work (nicely) terminal window should be 24 lines tall.
      integer(ikind) :: scr_freq=100
+     real(rkind),dimension(10) :: stg !! segment_time_global...
      real(rkind),dimension(:),allocatable :: maxphi,minphi
      integer(ikind) :: n_threads_global
      real(rkind) :: t_per_dt_global,t_last_x_global,t_run_global
@@ -68,71 +69,77 @@ contains
         t_run = t_run/dble(nprocs)
      
         !! Profiling bits
-        call MPI_ALLREDUCE(segment_time_local,segment_time_global,10,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)  
+        call MPI_ALLREDUCE(segment_time_local,stg,10,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)  
 
         if(iproc.eq.0) then
  
            write(6,*)"itime,time,dt=", itime,time,dt
            write(6,*) "npfb,np",npfb_global,np_global,"n_out real",time/dt_out
            write(6,*) "Max |u|,|v|:",max(maxphi(1),abs(minphi(1))),max(maxphi(2),abs(minphi(2)))
-           write(6,*) "Max |w|:",max(maxphi(3),abs(minphi(3)))
-           write(6,*) "max/min ro:",maxphi(4),minphi(4)
-           write(6,*) "max/min ro*E:",maxphi(5),minphi(5)
-           write(6,*) "max/min T:",maxphi(6),minphi(6)   
-           write(6,*) "There are",n_threads_global,"threads spread over ",nprocs,"MPI tasks"
-           write(6,*) "Wall clock run time=",t_run
-           write(6,*) "run-time/itime=",t_per_dt,"Moving avg=",t_last_X/dble(scr_freq)
+           write(6,*) "Max |w|    :",max(maxphi(3),abs(minphi(3)))
+           write(6,*) "max/min ro :",maxphi(4),minphi(4)
+           write(6,*) "max/min roE:",maxphi(5),minphi(5)
+           write(6,*) "max/min T  :",maxphi(6),minphi(6)   
+           write(6,*) "# threads  :",n_threads_global,"spread across ",nprocs,"MPI tasks"
+           write(6,*) "Wall clock run time:",t_run
+           write(6,*) "run-time/itime:",t_per_dt,"Moving avg:",t_last_X/dble(scr_freq)
 
            !! Profiling
-           store1 = segment_time_global(10) - sum(segment_time_global(1:9))
+           store1 = stg(10) - sum(stg(1:9))
            write(6,*) "  "
            write(6,*) "Profiling:::"
-           write(6,*) "MPI transfers             :",segment_time_global(1)/segment_time_global(10)
-           write(6,*) "Boundary conditions       :",segment_time_global(2)/segment_time_global(10)
-           write(6,*) "Filtering                 :",segment_time_global(3)/segment_time_global(10)
-           write(6,*) "1st Derivatives           :",segment_time_global(4)/segment_time_global(10)
-           write(6,*) "2nd Derivatives           :",segment_time_global(5)/segment_time_global(10)
-           write(6,*) "Chemistry                 :",segment_time_global(6)/segment_time_global(10)
-           write(6,*) "Empty                     :",segment_time_global(7)/segment_time_global(10)
-           write(6,*) "Transport                 :",segment_time_global(8)/segment_time_global(10)
-           write(6,*) "Thermo                    :",segment_time_global(9)/segment_time_global(10)           
-           write(6,*) "Other                     :",store1/segment_time_global(10)       
+           write(6,291) "MPI transfers   :",100.0d0*stg(1)/stg(10),'%,',stg(1)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "BCs             :",100.0d0*stg(2)/stg(10),'%,',stg(2)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Filtering       :",100.0d0*stg(3)/stg(10),'%,',stg(3)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "1st Derivatives :",100.0d0*stg(4)/stg(10),'%,',stg(4)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "2nd Derivatives :",100.0d0*stg(5)/stg(10),'%,',stg(5)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Chemistry       :",100.0d0*stg(6)/stg(10),'%,',stg(6)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Empty           :",100.0d0*stg(7)/stg(10),'%,',stg(7)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Transport       :",100.0d0*stg(8)/stg(10),'%,',stg(8)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Thermo          :",100.0d0*stg(9)/stg(10),'%,',stg(9)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Other           :",100.0d0*store1/stg(10),'%,',store1/dble(scr_freq*nprocs),"seconds/step"
            write(6,'(A)') "  "
                                          
         end if
 
-        t_last_X = 0.0d0
+        t_last_X = zero
 #else
         !! Single processor
         write(6,*)"itime,time,dt=", itime,time,dt
         write(6,*) "np,npfb",np,npfb,"n_out real",time/dt_out
         write(6,*) "Max |u|,|v|:",max(maxval(u(1:npfb)),abs(minval(u(1:npfb)))),max(maxval(v(1:npfb)),abs(minval(v(1:npfb))))
-        write(6,*) "Max |w|:",max(maxval(w(1:npfb)),abs(minval(w(1:npfb))))
+        write(6,*) "Max |w|    :",max(maxval(w(1:npfb)),abs(minval(w(1:npfb))))
         write(6,*) "Max/min roE:",maxval(roE(1:npfb)),minval(roE(1:npfb))
-        write(6,*) "Max/min T:",maxval(T(1:npfb)),minval(T(1:npfb))        
-        write(6,*) "max/min ro:",maxval(ro(1:npfb)),minval(ro(1:npfb))   
-        write(6,*) "Number of threads=",n_threads,"Run time=",t_run
-        write(6,*) "run-time/itime=",t_per_dt,"Moving avg=",t_last_X/dble(scr_freq)
-        t_last_X = 0.0d0
+        write(6,*) "Max/min T  :",maxval(T(1:npfb)),minval(T(1:npfb))        
+        write(6,*) "max/min ro :",maxval(ro(1:npfb)),minval(ro(1:npfb))   
+        write(6,*) "# threads  :",n_threads,"Run time:",t_run
+        write(6,*) "run-time/itime:",t_per_dt,"Moving avg:",t_last_X/dble(scr_freq)
+        t_last_X = zero
         
         !! Profiling
-        store1 = segment_time_local(10) - sum(segment_time_local(1:9))        
+        stg = segment_time_local
+        store1 = stg(10) - sum(stg(1:9))        
         write(6,*) "  "
         write(6,*) "Profiling:::"
-        write(6,*) "MPI transfers             :",segment_time_local(1)/segment_time_local(10)
-        write(6,*) "Boundary conditions       :",segment_time_local(2)/segment_time_local(10)
-        write(6,*) "Filtering                 :",segment_time_local(3)/segment_time_local(10)
-        write(6,*) "1st Derivatives           :",segment_time_local(4)/segment_time_local(10)
-        write(6,*) "2nd Derivatives           :",segment_time_local(5)/segment_time_local(10)
-        write(6,*) "Chemistry                 :",segment_time_local(6)/segment_time_local(10)
-        write(6,*) "Empty                     :",segment_time_local(7)/segment_time_local(10)
-        write(6,*) "Transport                 :",segment_time_local(8)/segment_time_local(10)        
-        write(6,*) "Thermo                    :",segment_time_local(9)/segment_time_local(10)                
-        write(6,*) "Other                     :",store1/segment_time_local(10)        
+        write(6,291) "MPI transfers   :",100.0d0*stg(1)/stg(10),'%,',stg(1)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "BCs             :",100.0d0*stg(2)/stg(10),'%,',stg(2)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Filtering       :",100.0d0*stg(3)/stg(10),'%,',stg(3)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "1st Derivatives :",100.0d0*stg(4)/stg(10),'%,',stg(4)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "2nd Derivatives :",100.0d0*stg(5)/stg(10),'%,',stg(5)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Chemistry       :",100.0d0*stg(6)/stg(10),'%,',stg(6)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Empty           :",100.0d0*stg(7)/stg(10),'%,',stg(7)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Transport       :",100.0d0*stg(8)/stg(10),'%,',stg(8)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Thermo          :",100.0d0*stg(9)/stg(10),'%,',stg(9)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Other           :",100.0d0*store1/stg(10),'%,',store1/dble(scr_freq*nprocs),"seconds/step"     
         write(6,'(/,A)') "  "                  
 #endif          
      
+     !! Zero segment time
+     segment_time_local = zero
+     
      end if
+     
+  291 FORMAT(' ',A17,F5.2,A2,1X,ES11.5,1X,A12)       
      
    
      ts_start=omp_get_wtime()

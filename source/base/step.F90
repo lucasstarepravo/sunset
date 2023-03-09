@@ -348,7 +348,7 @@ contains
      
      !! Build the right hand sides
      call calc_all_rhs    
-     
+          
      enrm_ro=zero;enrm_rou=zero;enrm_rov=zero;enrm_E=zero;enrm_Yspec=zero;enrm_row=zero
      !$omp parallel do private(ispec) reduction(max:enrm_ro,enrm_rou,enrm_rov,enrm_E,enrm_Yspec,enrm_row)
      do i=1,npfb
@@ -389,11 +389,11 @@ contains
         enrm_ro = max(enrm_ro, &
                      abs(e_acc_ro(i))/(ro(i)+ero_norm))      
         enrm_rou = max(enrm_rou, &
-                     abs(e_acc_rou(i))/(abs(u(i)) + eu_norm))
+                     abs(e_acc_rou(i))/(abs(u(i)) + erou_norm))
         enrm_rov = max(enrm_rov, &
-                     abs(e_acc_rov(i))/(abs(v(i)) + ev_norm))  
+                     abs(e_acc_rov(i))/(abs(v(i)) + erou_norm))  
         enrm_row = max(enrm_row, &
-                     abs(e_acc_row(i))/(abs(w(i)) + ew_norm))      
+                     abs(e_acc_row(i))/(abs(w(i)) + erou_norm))      
 #ifndef isoT
         enrm_E = max(enrm_E, &
                      abs(e_acc_E(i))/(abs(roE(i)) + eroE_norm))
@@ -401,9 +401,10 @@ contains
 #ifdef ms 
         do ispec=1,nspec
            enrm_Yspec(ispec) = max(enrm_Yspec(ispec), &
-                                   abs(e_acc_Yspec(i,ispec))/(abs(Yspec(i,ispec)) + eY_norm))
+                                   abs(e_acc_Yspec(i,ispec))/(abs(Yspec(i,ispec)) + eroY_norm))
         end do
 #endif
+
 
      end do
      !$omp end parallel do  
@@ -427,7 +428,7 @@ contains
                             max(enrm_row,emax_Y) &
                             ) &
                         ), &
-                    1.0d-16)
+                    1.0d-16)    
     
      !! Apply BCs and update halos
      if(nb.ne.0) call apply_time_dependent_bounds     
@@ -584,7 +585,7 @@ contains
 
      !! Alternative approach is impose hard limits on dtfactor
      dtfactor = max(half,dtfactor)
-     dtfactor = min(1.1d0,dtfactor)         
+     dtfactor = min(1.02d0,dtfactor)         
        
      !! Set time new step
      dt = dt*dtfactor
@@ -598,11 +599,11 @@ contains
      !! Find global time-step
      call global_reduce_min(dt)
      if(iproc.eq.0) then
-        write(192,*) time,dt,dt/dt_cfl
+        write(192,*) time,dt,dt/dt_cfl,emax_np1
         flush(192)
      end if
 #else
-     write(192,*) time,dt,dt/dt_cfl
+     write(192,*) time,dt,dt/dt_cfl,emax_np1
      flush(192)         
 #endif 
  
