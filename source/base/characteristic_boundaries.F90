@@ -514,29 +514,34 @@ contains
      !! Hard-coded routine to apply time-dependent inflow velocity. Currently hard-coded to ramp 
      !! the inflow over a prescribed time
      integer(ikind) :: i,j
-     real(rkind) :: u_inflow_0,u_inflow_max
-     real(rkind) :: ramp_time
+     real(rkind) :: y,u_inflow_start,u_inflow_end
+     real(rkind) :: ramp_time,u_inflow_mean
      
      !! Start and end inflow speeds, and ramp time
-     u_inflow_0 = u_char
-     u_inflow_max = two*u_char
+     u_inflow_start = u_char
+     u_inflow_end = u_char
      ramp_time = 1.0d-4   
      
-     !! Only if before ramp_time
-     if(time.le.ramp_time)then
+     !! Set the desired mean inflow velocity
+     if(time.le.ramp_time) then
+        u_inflow_mean = u_inflow_start + (u_inflow_end-u_inflow_start)*time/ramp_time
+     else
+        u_inflow_mean = u_inflow_end
+     end if
+     
+     !! Only update u_inflow_local if it has changed (i.e. time<ramp_time)
+     if(time.le.ramp_time) then
         !! Loop over all boundary nodes
-        !$omp parallel do private(i)
+        !$omp parallel do private(i,y)
         do j=1,nb
            i=boundary_list(j)
            if(node_type(i).eq.1) then !! Inflows only
-              u_inflow_local(j) = u_inflow_0 + (u_inflow_max-u_inflow_0)*time/ramp_time
+              y = rp(i,2)
+              u_inflow_local(j) = u_inflow_mean*six*(half-y)*(half+y)
            end if
         end do
         !$omp end parallel do
-     end if
-     
-     
-     
+     end if             
   
      return
   end subroutine update_u_inflow

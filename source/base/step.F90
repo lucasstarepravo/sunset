@@ -381,6 +381,24 @@ contains
         end do
 #endif
         
+        !! Trick for outflow stability - upscale the errors at the outflow. This is because the 
+        !! low-order mixed discretisation at the boundary is less accurate than internally, and
+        !! requires a more restrictive time step. For non-uniform resolutions, we usually have
+        !! the resolution in the outflow boundary larger than around obstacles in the domain, in which
+        !! circumstances this doesn't make a difference (outflow boundary isn't most restrictive).
+        if(node_type(i).eq.2) then
+           e_acc_ro(i) = e_acc_ro(i)*1.0d2
+           e_acc_rou(i) = e_acc_rou(i)*1.0d2
+           e_acc_rov(i) = e_acc_rov(i)*1.0d2
+           e_acc_row(i) = e_acc_row(i)*1.0d2
+#ifndef isoT      
+           e_acc_E(i) = e_acc_E(i)*1.0d2
+#endif           
+#ifdef ms
+           e_acc_Yspec(i,:) = e_acc_Yspec(i,:)*1.0d2
+#endif           
+        end if
+        
         !! Calculating L_infinity norm of errors. Variables "eX_norm" provide a value for divide-by-
         !! zero mollification, and this value is scaled according to the expected magnitude of the
         !! property. (e.g. eroE_norm is much bigger than eY_norm). They are set in common parameters.

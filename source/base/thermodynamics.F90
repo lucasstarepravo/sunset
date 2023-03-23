@@ -329,6 +329,11 @@ contains
      psum_in = zero;nsum_in = 0
      psum_out = zero;nsum_out = 0     
      if(nb.ne.0)then
+#ifdef restart
+        !! For restarts, we don't want to update the target pressure
+        P_outflow = p_ref
+        P_inflow = p_ref
+#else             
         !$omp parallel do private(i) reduction(+:psum_in,psum_out,nsum_in,nsum_out)
         do j=1,nb
            i=boundary_list(j)
@@ -359,7 +364,7 @@ contains
            P_outflow = zero
         end if
         
-
+#endif
      end if
 #else
      P_outflow = csq*rho_char

@@ -88,16 +88,16 @@ contains
            store1 = stg(10) - sum(stg(1:9))
            write(6,*) "  "
            write(6,*) "Profiling:::"
-           write(6,291) "MPI transfers   :",100.0d0*stg(1)/stg(10),'%,',stg(1)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "BCs             :",100.0d0*stg(2)/stg(10),'%,',stg(2)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "Filtering       :",100.0d0*stg(3)/stg(10),'%,',stg(3)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "1st Derivatives :",100.0d0*stg(4)/stg(10),'%,',stg(4)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "2nd Derivatives :",100.0d0*stg(5)/stg(10),'%,',stg(5)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "Chemistry       :",100.0d0*stg(6)/stg(10),'%,',stg(6)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "Empty           :",100.0d0*stg(7)/stg(10),'%,',stg(7)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "Transport       :",100.0d0*stg(8)/stg(10),'%,',stg(8)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "Thermo          :",100.0d0*stg(9)/stg(10),'%,',stg(9)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "Other           :",100.0d0*store1/stg(10),'%,',store1/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "MPI transfers    :",100.0d0*stg(1)/stg(10),'%,',stg(1)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "BCs              :",100.0d0*stg(2)/stg(10),'%,',stg(2)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Filtering        :",100.0d0*stg(3)/stg(10),'%,',stg(3)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "1st Derivatives  :",100.0d0*stg(4)/stg(10),'%,',stg(4)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "2nd Derivatives  :",100.0d0*stg(5)/stg(10),'%,',stg(5)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Chemistry        :",100.0d0*stg(6)/stg(10),'%,',stg(6)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Species RHS loop :",100.0d0*stg(7)/stg(10),'%,',stg(7)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Transport        :",100.0d0*stg(8)/stg(10),'%,',stg(8)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Thermo           :",100.0d0*stg(9)/stg(10),'%,',stg(9)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Other            :",100.0d0*store1/stg(10),'%,',store1/dble(scr_freq*nprocs),"seconds/step"
            write(6,'(A)') "  "
                                          
         end if
@@ -121,16 +121,16 @@ contains
         store1 = stg(10) - sum(stg(1:9))        
         write(6,*) "  "
         write(6,*) "Profiling:::"
-        write(6,291) "MPI transfers   :",100.0d0*stg(1)/stg(10),'%,',stg(1)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "BCs             :",100.0d0*stg(2)/stg(10),'%,',stg(2)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "Filtering       :",100.0d0*stg(3)/stg(10),'%,',stg(3)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "1st Derivatives :",100.0d0*stg(4)/stg(10),'%,',stg(4)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "2nd Derivatives :",100.0d0*stg(5)/stg(10),'%,',stg(5)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "Chemistry       :",100.0d0*stg(6)/stg(10),'%,',stg(6)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "Empty           :",100.0d0*stg(7)/stg(10),'%,',stg(7)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "Transport       :",100.0d0*stg(8)/stg(10),'%,',stg(8)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "Thermo          :",100.0d0*stg(9)/stg(10),'%,',stg(9)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "Other           :",100.0d0*store1/stg(10),'%,',store1/dble(scr_freq*nprocs),"seconds/step"     
+        write(6,291) "MPI transfers    :",100.0d0*stg(1)/stg(10),'%,',stg(1)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "BCs              :",100.0d0*stg(2)/stg(10),'%,',stg(2)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Filtering        :",100.0d0*stg(3)/stg(10),'%,',stg(3)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "1st Derivatives  :",100.0d0*stg(4)/stg(10),'%,',stg(4)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "2nd Derivatives  :",100.0d0*stg(5)/stg(10),'%,',stg(5)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Chemistry        :",100.0d0*stg(6)/stg(10),'%,',stg(6)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Species RHS loop :",100.0d0*stg(7)/stg(10),'%,',stg(7)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Transport        :",100.0d0*stg(8)/stg(10),'%,',stg(8)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Thermo           :",100.0d0*stg(9)/stg(10),'%,',stg(9)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Other            :",100.0d0*store1/stg(10),'%,',store1/dble(scr_freq*nprocs),"seconds/step"     
         write(6,'(/,A)') "  "                  
 #endif          
      
@@ -244,7 +244,7 @@ contains
            tmpVort = vort(i)
                 
            !! Pass heat release rate to alpha_out?
-           alpha_out(i) = hrr(i)
+!           alpha_out(i) = hrr(i)
 
 #ifdef dim3
            write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),h(i),node_type(i),ro(i), &

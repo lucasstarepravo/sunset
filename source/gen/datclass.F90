@@ -608,7 +608,7 @@ case(6) !! Channel flows, propagating front
 
      xl=1.0d0 ! channel length
      h0=xl/40.0d0   !cylinder radius
-     yl=xl/10.0d0  ! channel width
+     yl=xl/1.0d0  ! channel width
      dx0=h0/25.0       !15
      xbcond=0;ybcond=2     
      
@@ -647,7 +647,7 @@ case(6) !! Channel flows, propagating front
      ipart = nb   
      
      !! Wall to first growth; region of first growth; region of 2nd growth.
-     b0 = 3.0d0;b1 = 40.0d0;b2 = 40.0d0
+     b0 = 2.0d0;b1 = 30.0d0;b2 = 50.0d0
          
      !! Initialise a line of potential dot points   
      nsearch = ceiling(yb_max-yb_min)/dxmin/2.0d0
@@ -690,11 +690,20 @@ if((x-blob_centre(1,1)).gt.0.0d0) then
 ! temp = sqrt((x-blob_centre(1,1))**2.0d0 + ((abs(blob_centre(1,2))-abs(y))**2.0d0)) !! Radial distance from blob centre
  temp = sqrt((x-blob_centre(1,1))**2.0d0 + ((y-blob_centre(1,2))**2.0d0)) !! Radial distance from blob centre 
  temp = acos((x-blob_centre(1,1))/temp) !! Angle theta
- dxio = dx_out + (dx_in - dx_out)*(1.0d0-exp(-(temp)**4.0d0))
+
+ tmp2 = exp(-(0.8d0*temp)**4.0d0) !! Outlet spreading function
+ temp = exp(-(2.0d0*temp)**4.0d0)  !! Blob-side spreading function
+ 
+ r_mag = ((xb_max - x)/(xb_max - blob_centre(1,1)))**0.5d0
+! r_mag = max(0.0d0,((xb_max - x)/(xb_max - blob_centre(1,1)))**0.5d0)
+ 
+ temp = r_mag*temp + (1.0d0-r_mag)*tmp2
+
+ dxio = dx_out + (dx_in - dx_out)*(1.0d0-temp)
  !! Stretch distribution downstream
 ! temp = (x-blob_centre(1,1))/h0
 ! temp = max(exp(-temp*temp),0.5d0)
- dist2bound = dist2bound*(1.0d0-0.5d0*exp(-(temp)**4.0d0))
+ dist2bound = dist2bound*(1.0d0-0.75d0*tmp2**2.0d0)
 else
  dxio = dx_in 
 endif            
@@ -1306,9 +1315,10 @@ case(8) !! Something periodic
   ! 
   
   !! Write to fort file for quick visualisation
-!  do i=1,npfb
-!     write(31,*) xp(i),yp(i),dxp(i)
-!  end do
+  write(31,*) npfb
+  do i=1,npfb
+     write(31,*) xp(i),yp(i),dxp(i)
+  end do
   !! Use Octave/Matlab and run  "A=load('fort.31');scatter(A(:,1),A(:,2),1,A(:,3),'filled');colorbar" 
   !! from this directory for instant visualisation.
   

@@ -70,10 +70,10 @@ contains
      !! e.g. uniform/non-uniform inflow etc.
         
      !! Make a 1D flame: pass X-position,flame_thickness and T_hot
-!     call make_1d_flame(zero,2.0d-4,2.366d3)
+     call make_1d_flame(zero,2.0d-4,2.366d3)
         
      !! Make a 2D gaussian hotspot: pass X,Y -positions, flame_thickness and T_hot
-     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)        
+!     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)        
 
      !! Load an existing 1D flame file
 !     call load_flame_file
@@ -382,8 +382,8 @@ contains
         !! Density
         ro(i) = P_flame/(Rmix_local*T(i))
         
-        !! Velocity - uniform
-        u(i) = u_reactants
+        !! Velocity
+        u(i) = u_reactants*six*(half-y)*(half+y)
         v(i) = zero
         w(i) = zero
                         

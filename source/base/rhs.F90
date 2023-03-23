@@ -89,12 +89,9 @@ contains
      allocate(gradroE(npfb,dims))
      call calc_gradient(roE,gradroE)
 
-     !! Temperature gradient... a lot depends on this
-     allocate(gradT(npfb,dims))
-     call calc_gradient(T,gradT)   
-     
-     !! Allocation and calculation of temperature laplacian     
-     allocate(lapT(npfb))
+     !! Temperature gradient and Laplacian
+     allocate(gradT(npfb,dims),lapT(npfb))
+     call calc_gradient(T,gradT)        
      call calc_laplacian(T,lapT)   
      
 #endif     
@@ -463,7 +460,8 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
            !! Add the diffusion correction term to the rhs
            rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) &
                               - tmpro*Yspec(i,ispec)*speciessum_divroVY(i) &  !! Y*sum(divroVY)
-                              - dot_product(gradYspec(i,:,ispec),speciessum_roVY(i,:))  !! gradY.sum(roVY)           
+                              - dot_product(gradYspec(i,:,ispec),speciessum_roVY(i,:))  !! gradY.sum(roVY)   
+                              
 
         end do
         !$omp end parallel do
@@ -697,6 +695,9 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
               rhs_rou(i) = -v(i)*gradu(i,2) - w(i)*gradu(i,3) + f_visc_u + body_force_u  
               rhs_rov(i) = -v(i)*gradv(i,2) - w(i)*gradv(i,3) - gradp(i,2) + f_visc_v + body_force_v
               rhs_row(i) = -v(i)*gradw(i,2) - w(i)*gradw(i,3) - gradp(i,3) + f_visc_w + body_force_w 
+              
+                     
+              
            end if
         end do
         !$omp end parallel do 
@@ -922,6 +923,9 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
                
      !! Filter density
      call calc_filtered_var(ro)
+     
+     !! Evaluate lengthscales
+!     call get_flow_lengthscale(ro)
      
      !! Filter velocity components
      call calc_filtered_var(rou)

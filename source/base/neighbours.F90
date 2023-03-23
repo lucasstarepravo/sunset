@@ -18,7 +18,7 @@ module neighbours
   implicit none
 
   private
-  public :: find_neighbours
+  public :: find_neighbours,order_neighbours
 
   integer(ikind), dimension(:), allocatable ::ist, ip, nc
   integer(ikind), dimension(:), allocatable :: cellpart,ic_count
@@ -264,5 +264,66 @@ contains
   
     return
   end subroutine neighbour_node_cell
+!! ------------------------------------------------------------------------------------------------  
+  subroutine order_neighbours
+    !! This routine sorts the neighbour list in order of increasing distance.
+    integer(ikind) :: i,j,k
+    real(rkind),dimension(dims) :: rij
+    real(rkind),dimension(:),allocatable :: rij2
+  
+    !! Allocate space for rij2
+    allocate(rij2(nplink))
+  
+    !! Loop over nodes
+    !$omp parallel do private(j,k,rij,rij2)
+    do i=1,npfb
+    
+       !! First evaluate square of distance
+       rij2 = zero
+       do k=1,ij_count(i)
+          j=ij_link(k,i)
+          rij = rp(i,:) - rp(j,:)
+          rij2(k) = dot_product(rij,rij)
+       end do
+       
+       !! Now sort by value of rij2
+       call quicksort_neighbours(i,rij2,1,ij_count(i))       
+    
+    
+    end do
+    !$omp end parallel do
+    
+    deallocate(rij2)
+  
+
+    return
+  end subroutine order_neighbours
+!! ------------------------------------------------------------------------------------------------
+  recursive subroutine quicksort_neighbours(ii,a, first, last)
+    integer(ikind),intent(in) :: ii  !! Index of node whose neighbours we're sorting
+    real(rkind) ::  a(*), x, t
+    integer(ikind),intent(in) :: first, last  !! Start and end indices of sort
+    integer(ikind) i, j,it
+
+    x = a( (first+last) / 2 )
+    i = first
+    j = last
+    do
+       do while (a(i) < x)
+          i=i+1
+       end do
+       do while (x < a(j))
+          j=j-1
+       end do
+       if (i >= j) exit
+       t = a(i);  a(i) = a(j);  a(j) = t
+       it = ij_link(i,ii); ij_link(i,ii) = ij_link(j,ii);ij_link(j,ii) = it
+       i=i+1
+       j=j-1
+    end do
+    if (first.lt.i-1) call quicksort_neighbours(ii,a, first, i-1)
+    if (j+1.lt.last)  call quicksort_neighbours(ii,a, j+1, last)
+    
+  end subroutine quicksort_neighbours
 !! ------------------------------------------------------------------------------------------------  
 end module neighbours

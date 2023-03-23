@@ -36,13 +36,13 @@ contains
        gradtmp=zero
        do k=1,ij_count(i)
           j = ij_link(k,i) 
-          gradtmp(1:2) = gradtmp(1:2) + phi(j)*ij_w_grad(:,k,i)
+          gradtmp(1:2) = gradtmp(1:2) + phi(j)*ij_w_grad(:,k,i)                      
+          
        end do
        gradphi(i,1:2) = gradtmp(1:2) - phi(i)*ij_w_grad_sum(:,i)                           
     end do
     !$OMP END PARALLEL DO
      
-    
 #ifdef dim3       
     !! Finite differences along z
     !$OMP PARALLEL DO PRIVATE(j,k,gradztmp)
@@ -322,5 +322,41 @@ contains
 
     return
   end subroutine calc_filtered_var   
+!! ------------------------------------------------------------------------------------------------       
+  subroutine get_flow_lengthscale(phi)
+    !! Calculate the lengthscale of the flow features from the hyperviscosity operator
+    real(rkind),dimension(:),intent(in) :: phi
+    integer i,j,k
+    real(rkind) :: lap_tmp,g_tmp,filt_tmp
+    
+    !! Calculate filtered phi
+    !$OMP PARALLEL DO PRIVATE(j,k,lap_tmp,g_tmp,filt_tmp)
+    do i=1,npfb
+       lap_tmp = zero;g_tmp=zero;filt_tmp=zero
+       do k=1,ij_count(i)
+          j = ij_link(k,i) 
+          lap_tmp = lap_tmp + T(j)*ij_w_lap(k,i)
+          
+          g_tmp = g_tmp + T(j)*ij_w_grad(1,k,i)
+          
+          filt_tmp = filt_tmp + T(j)*ij_w_hyp(k,i)
+
+       end do
+       lap_tmp = lap_tmp - T(i)*ij_w_lap_sum(i)
+       g_tmp = g_tmp - T(i)*ij_w_grad_sum(1,i)
+       filt_tmp = T(i) + filter_coeff(i)*(filt_tmp-T(i)*ij_w_hyp_sum(i))       
+       
+       g_tmp = abs(g_tmp)
+       filt_tmp = abs(filt_tmp)
+
+       alpha_out(i) = abs(lap_tmp)*s(i)*s(i)/T_ref
+
+!       alpha_out(i) = (lap_tmp - phi(i)*ij_w_lap_sum(i))
+    end do
+    !$OMP END PARALLEL DO
+
+
+    return
+  end subroutine get_flow_lengthscale     
 !! ------------------------------------------------------------------------------------------------     
 end module derivatives
