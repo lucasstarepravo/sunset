@@ -430,7 +430,7 @@ contains
      segment_tstart = omp_get_wtime()
      
      !! Update time-dependant inflow velocity
-!     call update_u_inflow
+     call update_u_inflow
                      
      !! Loop over all boundary nodes
      !$omp parallel do private(i)
@@ -537,7 +537,7 @@ contains
            i=boundary_list(j)
            if(node_type(i).eq.1) then !! Inflows only
               y = rp(i,2)
-              u_inflow_local(j) = u_inflow_mean*six*(half-y)*(half+y)
+              u_inflow_local(j) = u_inflow_mean!*six*(half-y)*(half+y)
            end if
         end do
         !$omp end parallel do

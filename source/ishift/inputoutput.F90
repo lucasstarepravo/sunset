@@ -10,6 +10,8 @@ module inputoutput
 
   real(rkind),dimension(:),allocatable :: x,y,xn,yn,ds  !! Properties for post-shift tidying
   integer(ikind),dimension(:),allocatable :: nt  
+  
+  integer(ikind),dimension(:),allocatable :: nband,effective_nband  
 
   !! Start and end indices for domain decomposition
   integer(ikind),dimension(:),allocatable :: nstart,nend
@@ -293,11 +295,108 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      return
   end subroutine remove_fd_nodes  
 !! ------------------------------------------------------------------------------------------------
+  subroutine find_band_sizes
+     !! Create sizes of vertical bands for X decomposition. Adjust by diffusion equation to ensure
+     !! load balancing.
+  
+     integer(ikind) :: i,kk,nband_mean,nptmp,nl_ini,nl_end,ii,nblock,ll,nl_end_column,j
+     integer(ikind) :: nshift
+     integer(ikind),dimension(:),allocatable :: nband_exchange
+     logical :: keepgoing
+    
+     !! How many particles (total) need sorting
+     nptmp = npfb-4*nb
+     
+     !! allocation of index limits
+     allocate(nband(nprocsX),effective_nband(nprocsX))
+     allocate(nband_exchange(nprocsX))
+     
+     !! Determine how many nodes in each X-band
+     nl_end = 0
+     do kk=1,nprocsX
+        !! Approximate particles per band:
+        nband(kk) = ceiling(dble(nptmp/nprocsX))
+        
+        nl_ini = nl_end + 1
+        nl_end = nl_ini - 1 + nband(kk)
+     
+        !! Add a few to final process if npfb_global isn't divisible by nprocs
+        if(kk.eq.nprocsX) then 
+           ii = nl_end - nptmp   !! How many too many (or too few if negative)
+           nband(kk) = nband(kk) - ii;nl_end = nl_ini - 1 + nband(kk)
+        end if     
+        
+        effective_nband(kk) = 0
+        do i=nl_ini,nl_end
+           if(nt(i).ge.0.and.nt(i).le.2) then
+              effective_nband(kk) = effective_nband(kk) + 5
+           else
+              effective_nband(kk) = effective_nband(kk) + 1              
+           end if
+        end do
+        
+     end do
+     
+     keepgoing = .true.
+     j=0
+     do while(keepgoing)
+     
+        !! Exchange nodes between bands        
+        do kk=1,nprocsX-1
+           !! Amount to exchange between bands
+           ll = 0.4*(effective_nband(kk+1)-effective_nband(kk)) 
+           nband(kk) = nband(kk) + ll
+           nband(kk+1) = nband(kk+1) - ll
+        end do
+   
+        !! Re-calculate effective band sizes
+        nl_end = 0     
+        do kk=1,nprocsX
+           !! Approximate particles per band:   
+       
+           nl_ini = nl_end + 1
+           nl_end = nl_ini - 1 + nband(kk)
+            
+           effective_nband(kk) = 0
+           do i=nl_ini,nl_end
+              if(nt(i).ge.0.and.nt(i).le.2) then
+                 effective_nband(kk) = effective_nband(kk) + 5
+              else
+                 effective_nband(kk) = effective_nband(kk) + 1              
+              end if
+           end do
+        
+        end do     
+        
+        j=j+1
+        if(j.gt.50) keepgoing=.false.
+     
+
+     
+     end do
+     
+     !! Diagnostics
+     j=0
+     write(6,*) "Band sizes and effective band sizes"
+     do kk=1,nprocsX
+        write(6,*) kk,nband(kk),effective_nband(kk)
+        j=j+nband(kk)
+     end do
+     write(6,*) "checking sums",j,npfb-4*nb
+
+!     stop
+     
+     
+     
+      
+     return
+  end subroutine find_band_sizes
+!! ------------------------------------------------------------------------------------------------
   subroutine rearrange_nodes
      !! Re-arranges nodes in order of increasing x, then for each band in x, re-arranges in order 
      !! of increasing y, but allowing for periodics...
   
-     integer(ikind) :: kk,nband,nptmp,nl_ini,nl_end,ii,nblock,ll,nl_end_column
+     integer(ikind) :: i,kk,nband_mean,nptmp,nl_ini,nl_end,ii,nblock,ll,nl_end_column,j
      integer(ikind) :: nshift
    
      !! First sort nodes in X
@@ -309,38 +408,33 @@ write(6,*) "Shifting iteration",ll,"of ",kk
     
      !! How many particles (total) need sorting
      nptmp = npfb-4*nb
+    
+     !! Find band sizes, and adjust by 1d diffusion
+     call find_band_sizes
+    
      
      !! allocation of index limits
      allocate(nstart(nprocs),nend(nprocs))
-     
+        
      !! Loop over all bands along X
+     nl_end = 0
      do kk=1,nprocsX
 
-           !! Approximate particles per band:
-           nband = ceiling(dble(nptmp/nprocsX))
-        
-           nl_ini = (kk-1)*nband + 1
-           nl_end = nl_ini - 1 + nband
-     
-           !! Add a few to final process if npfb_global isn't divisible by nprocs
-           if(kk.eq.nprocsX) then 
-           write(6,*) "hi",kk,nprocsX
-              ii = nl_end - nptmp   !! How many too many (or too few if negative)
-              nband = nband - ii;nl_end = nl_ini - 1 + nband
-           end if
-   
+           nl_ini = nl_end + 1
+           nl_end = nl_ini - 1 + nband(kk)
+       
     
         !! If more than 1 processor in Y direction, for each band of X, sort in Y
         if(nprocsY.ne.1)then
         
     
            !! Sort the range nl_ini:nl_end by y-position            
-           write(6,*) "sorting in y for processor band ",kk,nl_ini,nl_end,nband
+           write(6,*) "sorting in y for processor band ",kk,nl_ini,nl_end,nband(kk)
            call quicksorty(y,nl_ini,nl_end)
            write(6,*) "sorted in y for processor band ",kk   
            
            !! Shuffle the blocks to create cyclical structure in y
-           nblock = ceiling(dble(nband/nprocsY))      
+           nblock = ceiling(dble(nband(kk)/nprocsY))      
            nshift = floor(0.5*nblock) 
            call shift_indices(nl_ini,nl_end,nshift)
                        

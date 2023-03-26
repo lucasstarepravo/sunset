@@ -80,7 +80,6 @@ contains
 
 #ifdef mp 
 
-if(.false.)then
      !! u-momentum
      call halo_exchange(rou)
     
@@ -105,10 +104,6 @@ if(.false.)then
         call halo_exchange(Yspec(:,ispec))
      end do
 #endif     
-
-else
-     call halo_exchange_cons_vars(ro)
-endif
 
 #endif     
 
@@ -540,7 +535,7 @@ endif
            end if
         end if
      end do
-     
+    
      !! All left and right
      do k=1,2*nprocsY
         if(xodd) then !! ODD X: SEND FIRST, RECEIVE SECOND
@@ -587,6 +582,7 @@ endif
            end if
         end if
      end do        
+     
      
      !! Finally forward and back
      do k=1,2
@@ -638,255 +634,6 @@ endif
      return
   end subroutine halo_exchange
 !! ------------------------------------------------------------------------------------------------  
-  subroutine halo_exchange_cons_vars(phi)    
-     !! This routine does halo exchanges for phi= u,v,ro,E,Yspec
-     real(rkind),dimension(:),intent(inout) :: phi     
-     real(rkind),dimension(:),allocatable :: halo_phi
-     integer(ikind) :: i,j,k,tag,nfields,jf,ispec
-     logical :: xodd,yodd,zodd
-     
-     !! How many fields are we exchanging?
-     nfields = 3 !ro, rou, rov
-#ifdef dim3
-     nfields = nfields + 1 !row
-#endif          
-#ifndef isoT
-     nfields = nfields + 1 !roE
-#endif
-#ifdef ms
-     nfields = nfields + nspec ! Yspec
-#endif
-     
-
-     xodd = .true.     
-     if(mod(iprocX,2).eq.0) then
-        xodd = .false.
-     end if
-     yodd = .true.     
-     if(mod(iprocY,2).eq.0) then
-        yodd = .false.
-     end if
-     zodd = .true.     
-     if(mod(iprocZ,2).eq.0) then
-        zodd = .false.
-     end if     
-     
-     !! Up and down first
-     do k=1,2
-        if(yodd) then !! ODD Y: SEND FIRST, RECEIVE SECOND
-           if(iproc_S_UD(k).ge.0)then !! Send neighbour exists
-              !! Put data in an array for sending
-              allocate(halo_phi(nhalo_UD(k)))
-              do i=1,nhalo_UD(k)
-                 j=halo_lists_UD(i,k)
-                 halo_phi(i) = phi(j)
-              end do
-              
-              !! Send the data
-              tag = iproc + 100*k
-              call MPI_SEND(halo_phi,nhalo_UD(k),MPI_DOUBLE_PRECISION,iproc_S_UD(k), &
-                            tag,MPI_COMM_WORLD,ierror)
-              deallocate(halo_phi)
-           end if
-           if(iproc_R_UD(k).ge.0) then !! Receive neighbour exists
-              tag = iproc_R_UD(k) + 100*k
-              call MPI_RECV(phi(nrecstart(k):nrecstart(k)+inhalo_UD(k)-1),&
-                            inhalo_UD(k),MPI_DOUBLE_PRECISION,iproc_R_UD(k),tag,MPI_COMM_WORLD, &
-                            MPI_STATUS_IGNORE,ierror)
-           end if
-        else !! EVEN Y: RECEIVE FIRST, SEND SECOND
-           if(iproc_R_UD(k).ge.0)then !! Receive neighbour exists
-              !! Receive the data
-              tag = iproc_R_UD(k) + 100*k
-              call MPI_RECV(phi(nrecstart(k):nrecstart(k)+inhalo_UD(k)-1), &
-                            inhalo_UD(k),MPI_DOUBLE_PRECISION,iproc_R_UD(k),tag,MPI_COMM_WORLD, &
-                            MPI_STATUS_IGNORE,ierror)
-           end if
-           if(iproc_S_UD(k).ge.0)then !! Send neighbour exists
-              allocate(halo_phi(nhalo_UD(k)))
-              do i=1,nhalo_UD(k)
-                 j=halo_lists_UD(i,k)
-                 halo_phi(i)=phi(j)
-              end do
-              
-              !! Send the data
-              tag = iproc + 100*k
-              call MPI_SEND(halo_phi,nhalo_UD(k),MPI_DOUBLE_PRECISION,iproc_S_UD(k), &
-                            tag,MPI_COMM_WORLD,ierror)
-              deallocate(halo_phi)
-           end if
-        end if
-     end do
-     
-     !! All left and right
-     do k=1,2*nprocsY
-        if(xodd) then !! ODD X: SEND FIRST, RECEIVE SECOND
-           if(iproc_S_LR(k).ge.0)then !! Send neighbour exists
-              !! Put data in an array for sending
-              allocate(halo_phi(nhalo_LR(k)*nfields))
-              do i=1,nhalo_LR(k)              
-                 j=halo_lists_LR(i,k)
-                 jf = 1
-                 halo_phi(nfields*(i-1) + jf) = ro(j);jf = jf + 1    
-                 halo_phi(nfields*(i-1) + jf) = rou(j);jf = jf + 1
-                 halo_phi(nfields*(i-1) + jf) = rov(j);jf = jf + 1
-#ifdef dim3
-                 halo_phi(nfields*(i-1) + jf) = row(j);jf = jf + 1
-#endif                                             
-#ifndef isoT
-                 halo_phi(nfields*(i-1) + jf) = roE(j);jf = jf + 1  
-#endif      
-#ifdef ms
-                 do ispec = 1,nspec
-                    halo_phi(nfields*(i-1) + jf) = Yspec(j,ispec);jf = jf + 1                   
-                 end do
-#endif
-              end do
-         
-              
-              !! Send the data
-              tag = iproc + 100*k
-              call MPI_SEND(halo_phi,nhalo_LR(k)*nfields,MPI_DOUBLE_PRECISION,iproc_S_LR(k), &
-                            tag,MPI_COMM_WORLD,ierror)
-              deallocate(halo_phi)
-           end if
-           if(iproc_R_LR(k).ge.0) then !! Receive neighbour exists
-              tag = iproc_R_LR(k) + 100*k
-              allocate(halo_phi(inhalo_LR(k)*nfields))
-              call MPI_RECV(halo_phi,inhalo_LR(k)*nfields,MPI_DOUBLE_PRECISION,iproc_R_LR(k),tag, &
-                            MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
-              !! Distribute recieved data to conservative variables
-              do i=1,inhalo_LR(k)
-                 j=nrecstart(2+k)-1+i
-                 jf=1
-                 ro(j) = halo_phi(nfields*(i-1)+jf);jf = jf+1
-                 rou(j) = halo_phi(nfields*(i-1)+jf);jf = jf+1 
-                 rov(j) = halo_phi(nfields*(i-1)+jf);jf = jf+1
-#ifdef dim3
-                 row(j) = halo_phi(nfields*(i-1)+jf);jf = jf+1
-#endif              
-#ifndef isoT
-                 roE(j) = halo_phi(nfields*(i-1)+jf);jf = jf+1
-#endif              
-#ifdef ms
-                 do ispec=1,nspec
-                    Yspec(j,ispec) = halo_phi(nfields*(i-1)+jf);jf=jf+1
-                 end do
-#endif   
-              end do
-              deallocate(halo_phi)
-           end if
-        else !! EVEN X: RECEIVE FIRST, SEND SECOND
-           if(iproc_R_LR(k).ge.0)then !! Receive neighbour exists
-              !! Receive the data
-              tag = iproc_R_LR(k) + 100*k             
-              allocate(halo_phi(inhalo_LR(k)*nfields))
-              call MPI_RECV(halo_phi,inhalo_LR(k)*nfields,MPI_DOUBLE_PRECISION,iproc_R_LR(k),tag, &
-                            MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
-              !! Distribute recieved data to conservative variables
-              do i=1,inhalo_LR(k)
-                 j=nrecstart(2+k)-1+i
-                 jf=1
-                 ro(j) = halo_phi(nfields*(i-1)+jf);jf = jf+1
-                 rou(j) = halo_phi(nfields*(i-1)+jf);jf = jf+1 
-                 rov(j) = halo_phi(nfields*(i-1)+jf);jf = jf+1
-#ifdef dim3
-                 row(j) = halo_phi(nfields*(i-1)+jf);jf = jf+1
-#endif              
-#ifndef isoT
-                 roE(j) = halo_phi(nfields*(i-1)+jf);jf = jf+1
-#endif              
-#ifdef ms
-                 do ispec=1,nspec
-                    Yspec(j,ispec) = halo_phi(nfields*(i-1)+jf);jf=jf+1
-                 end do
-#endif   
-              end do    
-              deallocate(halo_phi)                        
-                            
-                            
-           end if
-           if(iproc_S_LR(k).ge.0)then !! Send neighbour exists
-             
-              allocate(halo_phi(nhalo_LR(k)*nfields))
-              do i=1,nhalo_LR(k)              
-                 j=halo_lists_LR(i,k)
-                 jf = 1
-                 halo_phi(nfields*(i-1) + jf) = ro(j);jf = jf + 1    
-                 halo_phi(nfields*(i-1) + jf) = rou(j);jf = jf + 1
-                 halo_phi(nfields*(i-1) + jf) = rov(j);jf = jf + 1
-#ifdef dim3
-                 halo_phi(nfields*(i-1) + jf) = row(j);jf = jf + 1
-#endif                                             
-#ifndef isoT
-                 halo_phi(nfields*(i-1) + jf) = roE(j);jf = jf + 1  
-#endif      
-#ifdef ms
-                 do ispec = 1,nspec
-                    halo_phi(nfields*(i-1) + jf) = Yspec(j,ispec);jf = jf + 1                   
-                 end do
-#endif
-              end do              
-              
-              !! Send the data
-              tag = iproc + 100*k
-              call MPI_SEND(halo_phi,nhalo_LR(k)*nfields,MPI_DOUBLE_PRECISION,iproc_S_LR(k), &
-                            tag,MPI_COMM_WORLD,ierror)
-              deallocate(halo_phi)
-           end if
-        end if
-     end do        
-     
-     !! Finally forward and back
-     do k=1,2
-        if(zodd) then !! ODD Z: SEND FIRST, RECEIVE SECOND
-           if(iproc_S_FB(k).ge.0)then !! Send neighbour exists
-              !! Put data in an array for sending
-              allocate(halo_phi(nhalo_FB(k)))
-              do i=1,nhalo_FB(k)
-                 j=halo_lists_FB(i,k)
-                 halo_phi(i) = phi(j)
-              end do
-              
-              !! Send the data
-              tag = iproc + 100*k
-              call MPI_SEND(halo_phi,nhalo_FB(k),MPI_DOUBLE_PRECISION,iproc_S_FB(k), &
-                            tag,MPI_COMM_WORLD,ierror)
-              deallocate(halo_phi)
-           end if
-           if(iproc_R_FB(k).ge.0) then !! Receive neighbour exists
-              tag = iproc_R_FB(k) + 100*k
-              call MPI_RECV(phi(nrecstart(2+2*nprocsY+k):nrecstart(2+2*nprocsY+k)+inhalo_FB(k)-1),&
-                            inhalo_FB(k),MPI_DOUBLE_PRECISION,iproc_R_FB(k),tag,MPI_COMM_WORLD, &
-                            MPI_STATUS_IGNORE,ierror)
-           end if
-        else !! EVEN Z: RECEIVE FIRST, SEND SECOND
-           if(iproc_R_FB(k).ge.0)then !! Receive neighbour exists
-              !! Receive the data
-              tag = iproc_R_FB(k) + 100*k
-              call MPI_RECV(phi(nrecstart(2+2*nprocsY+k):nrecstart(2+2*nprocsY+k)+inhalo_FB(k)-1), &
-                            inhalo_FB(k),MPI_DOUBLE_PRECISION,iproc_R_FB(k),tag,MPI_COMM_WORLD, &
-                            MPI_STATUS_IGNORE,ierror)
-           end if
-           if(iproc_S_FB(k).ge.0)then !! Send neighbour exists
-              allocate(halo_phi(nhalo_FB(k)))
-              do i=1,nhalo_FB(k)
-                 j=halo_lists_FB(i,k)
-                 halo_phi(i)=phi(j)
-              end do
-              
-              !! Send the data
-              tag = iproc + 100*k
-              call MPI_SEND(halo_phi,nhalo_FB(k),MPI_DOUBLE_PRECISION,iproc_S_FB(k), &
-                            tag,MPI_COMM_WORLD,ierror)
-              deallocate(halo_phi)
-           end if
-        end if
-     end do                                 
-     
-     return
-  end subroutine halo_exchange_cons_vars 
-!! ------------------------------------------------------------------------------------------------  
   subroutine halo_exchange_int(phi) 
      !! This routine does halo exchanges for integers (only used at startup)   
      integer(ikind),dimension(:),intent(inout) :: phi     
@@ -920,9 +667,11 @@ endif
               
               !! Send the data
               tag = iproc + 100*k
+
               call MPI_SEND(halo_phi,nhalo_UD(k),MPI_INT,iproc_S_UD(k), &
                             tag,MPI_COMM_WORLD,ierror)
               deallocate(halo_phi)
+                           
            end if
            if(iproc_R_UD(k).ge.0) then !! Receive neighbour exists
               tag = iproc_R_UD(k) + 100*k

@@ -101,6 +101,9 @@ contains
            write(6,'(A)') "  "
                                          
         end if
+        
+!        store1 = sum(segment_time_local(2:9))
+!        write(6,*) iproc,store1,npfb,np_nohalo,np
 
         t_last_X = zero
 #else
@@ -244,7 +247,7 @@ contains
            tmpVort = vort(i)
                 
            !! Pass heat release rate to alpha_out?
-!           alpha_out(i) = hrr(i)
+           alpha_out(i) = hrr(i)
 
 #ifdef dim3
            write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),h(i),node_type(i),ro(i), &

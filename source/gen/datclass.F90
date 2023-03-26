@@ -608,7 +608,7 @@ case(6) !! Channel flows, propagating front
 
      xl=1.0d0 ! channel length
      h0=xl/40.0d0   !cylinder radius
-     yl=xl/1.0d0  ! channel width
+     yl=xl/10.0d0  ! channel width
      dx0=h0/25.0       !15
      xbcond=0;ybcond=2     
      
@@ -625,14 +625,11 @@ case(6) !! Channel flows, propagating front
      read(191,*) n_blob_coefs
      allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
      blob_centre(1,:)=(/ -0.275d0*xl,-0.0d0*yl/);
-!     blob_centre(2,:)=(/ -0.3d0*xl,0.5d0*yl/);             
      do i=1,n_blob_coefs
         read(191,*) blob_coeffs(1,i)
-!        blob_coeffs(2,i)=blob_coeffs(1,i)
      end do
      close(191)
      blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi;blob_ellipse(1)=0
-!     blob_coeffs(2,:) = blob_coeffs(2,:)*h0;blob_rotation(2)=-0.0d0*pi;blob_ellipse(2)=0         
      
      call make_boundary_edge_vectors
 
