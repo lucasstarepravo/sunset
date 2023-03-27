@@ -43,7 +43,7 @@ program main
   call remove_fd_nodes
   call rearrange_nodes
   
-  !! Save nodes (to IPART in this directory
+  !! Save nodes (to IPART in this directory)
   call output_newnodes
 
   stop

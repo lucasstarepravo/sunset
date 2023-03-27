@@ -75,6 +75,7 @@ contains
      !! If using mpi, this calls routines to transfer all properties between halos. If not using
      !! mpi, it does nothing
      integer(ikind) :: ispec
+          
      segment_tstart = omp_get_wtime()
 
 
@@ -116,6 +117,7 @@ contains
   subroutine halo_exchange_divvel  
      !! If using mpi, this calls routines to transfer divvel between halos. If not using
      !! mpi, it does nothing
+     
      segment_tstart = omp_get_wtime()
 
 #ifdef mp 

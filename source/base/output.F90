@@ -31,6 +31,7 @@ contains
      integer(ikind) :: n_threads_global
      real(rkind) :: t_per_dt_global,t_last_x_global,t_run_global
      real(rkind) :: cput,store1
+     integer(ikind) :: i,j
      
      allocate(maxphi(6+nspec),minphi(6+nspec))
      
@@ -88,7 +89,7 @@ contains
            store1 = stg(10) - sum(stg(1:9))
            write(6,*) "  "
            write(6,*) "Profiling:::"
-           write(6,291) "MPI transfers    :",100.0d0*stg(1)/stg(10),'%,',stg(1)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "MPI & waiting    :",100.0d0*stg(1)/stg(10),'%,',stg(1)/dble(scr_freq*nprocs),"seconds/step"
            write(6,291) "BCs              :",100.0d0*stg(2)/stg(10),'%,',stg(2)/dble(scr_freq*nprocs),"seconds/step"
            write(6,291) "Filtering        :",100.0d0*stg(3)/stg(10),'%,',stg(3)/dble(scr_freq*nprocs),"seconds/step"
            write(6,291) "1st Derivatives  :",100.0d0*stg(4)/stg(10),'%,',stg(4)/dble(scr_freq*nprocs),"seconds/step"
@@ -101,9 +102,15 @@ contains
            write(6,'(A)') "  "
                                          
         end if
-        
+ 
+        !! Load balancing diagnostics       
+!        call MPI_BARRIER( MPI_COMM_WORLD, ierror)                       
+!        j=0
+!        do i=1,npfb
+!           j = j + ij_count(i)
+!        end do
 !        store1 = sum(segment_time_local(2:9))
-!        write(6,*) iproc,store1,npfb,np_nohalo,np
+!        write(6,*) iproc,store1,npfb,j,store1/dble(j)
 
         t_last_X = zero
 #else
@@ -124,7 +131,7 @@ contains
         store1 = stg(10) - sum(stg(1:9))        
         write(6,*) "  "
         write(6,*) "Profiling:::"
-        write(6,291) "MPI transfers    :",100.0d0*stg(1)/stg(10),'%,',stg(1)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "MPI & waiting    :",100.0d0*stg(1)/stg(10),'%,',stg(1)/dble(scr_freq*nprocs),"seconds/step"
         write(6,291) "BCs              :",100.0d0*stg(2)/stg(10),'%,',stg(2)/dble(scr_freq*nprocs),"seconds/step"
         write(6,291) "Filtering        :",100.0d0*stg(3)/stg(10),'%,',stg(3)/dble(scr_freq*nprocs),"seconds/step"
         write(6,291) "1st Derivatives  :",100.0d0*stg(4)/stg(10),'%,',stg(4)/dble(scr_freq*nprocs),"seconds/step"
@@ -142,7 +149,7 @@ contains
      
      end if
      
-  291 FORMAT(' ',A17,F5.2,A2,1X,ES11.5,1X,A12)       
+  291 FORMAT(' ',A18,F5.2,A2,1X,ES11.5,1X,A12)       
      
    
      ts_start=omp_get_wtime()
