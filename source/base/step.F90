@@ -227,7 +227,7 @@ contains
      !! Register 3 is rhs_ro,rhs_rou,rhs_rov (only used for RHS)
      !! Register 4 is e_acc_ro,e_acc_rou,e_acc_rov - error accumulator
      integer(ikind) :: i,k,ispec
-     real(rkind) :: time0,emax_Y,tmpro
+     real(rkind) :: time0,emax_Y
      real(rkind),dimension(:),allocatable :: rou_reg1,rov_reg1,row_reg1,ro_reg1,roE_reg1
      real(rkind),dimension(:),allocatable :: e_acc_ro,e_acc_rou,e_acc_rov,e_acc_E,e_acc_row
      real(rkind),dimension(:,:),allocatable :: Yspec_reg1,e_acc_Yspec
@@ -398,31 +398,21 @@ contains
            e_acc_Yspec(i,:) = e_acc_Yspec(i,:)*1.0d2
 #endif           
         end if
+
         
-        !! Calculating L_infinity norm of errors. Variables "eX_norm" provide a value for divide-by-
-        !! zero mollification, and this value is scaled according to the expected magnitude of the
-        !! property. (e.g. eroE_norm is much bigger than eY_norm). They are set in common parameters.
-        !! N.B. for initialising simulations with velocity discontinuities, it's helpful to relax
-        !! the constraint on the velocity a bit by increasing eu_norm, ev_norm & ew_norm.
-        enrm_ro = max(enrm_ro, &
-                     abs(e_acc_ro(i))/(ro(i)+ero_norm))      
-        enrm_rou = max(enrm_rou, &
-                     abs(e_acc_rou(i))/(abs(u(i)) + erou_norm))
-        enrm_rov = max(enrm_rov, &
-                     abs(e_acc_rov(i))/(abs(v(i)) + erou_norm))  
-        enrm_row = max(enrm_row, &
-                     abs(e_acc_row(i))/(abs(w(i)) + erou_norm))      
+        !! Calculating L_infinity norm of errors, normalised by eX_norm. 
+        enrm_ro = max(enrm_ro,abs(e_acc_ro(i))*ero_norm)      
+        enrm_rou = max(enrm_rou,abs(e_acc_rou(i))*erou_norm)
+        enrm_rov = max(enrm_rov,abs(e_acc_rov(i))*erou_norm)
+        enrm_row = max(enrm_row,abs(e_acc_row(i))*erou_norm)
 #ifndef isoT
-        enrm_E = max(enrm_E, &
-                     abs(e_acc_E(i))/(abs(roE(i)) + eroE_norm))
+        enrm_E = max(enrm_E,abs(e_acc_E(i))*eroE_norm)
 #endif
 #ifdef ms 
         do ispec=1,nspec
-           enrm_Yspec(ispec) = max(enrm_Yspec(ispec), &
-                                   abs(e_acc_Yspec(i,ispec))/(abs(Yspec(i,ispec)) + eroY_norm))
+           enrm_Yspec(ispec) = max(enrm_Yspec(ispec),abs(e_acc_Yspec(i,ispec))*eroY_norm)
         end do
-#endif
-
+#endif                                      
 
      end do
      !$omp end parallel do  
@@ -440,14 +430,15 @@ contains
 #endif         
      emax_np1 = max( &
                     max( &
-                        max(enrm_ro,enrm_E), &
+                        max(enrm_ro,enrm_E), & 
                         max( &
                             max(enrm_rou,enrm_rov),&
                             max(enrm_row,emax_Y) &
                             ) &
                         ), &
-                    1.0d-16)    
-    
+                    doublesmall)   
+                    
+                        
      !! Apply BCs and update halos
      if(nb.ne.0) call apply_time_dependent_bounds     
      call reapply_mirror_bcs
@@ -480,7 +471,6 @@ contains
      use thermodynamics
      use transport
      integer(ikind) :: i
-     real(rkind) :: umag
      real(rkind) :: dt_visc,dt_therm,dt_spec  
      real(rkind) :: c,uplusc
          
@@ -576,12 +566,9 @@ contains
      !! Adapt the time-step using the PID controller based on intergation errors.
      !! This routine is generally only called for reacting flows, and *presumes* that 
      !! the CFL-type time-step constraints have been calculated already.
-     integer(ikind) :: i
      real(rkind) :: dtfactor
      real(rkind) :: facA,facB,facC
-     real(rkind) :: tratio_min,tratio_max
-     real(rkind) :: umag2,umag
-     real(rkind) :: c,dt_max
+     real(rkind) :: dt_max
         
                   
 #ifdef mp     

@@ -51,7 +51,11 @@ contains
      t_run = zero;t_last_X=zero
 
      !! Open a files for outputting
+#ifdef mp
+     if(iproc.eq.0) call open_stats_files
+#else
      call open_stats_files
+#endif     
  
      !! Profiling:
      segment_time_local = zero
@@ -325,16 +329,7 @@ contains
 !     call output_layer(3)     
 !     call MPI_BARRIER( MPI_COMM_WORLD, ierror)     
 !     call MPI_Abort(MPI_COMM_WORLD, ii, ierror)
-           
-     !! Initialise PID controller variables
-     emax_np1=pid_tol;emax_n=pid_tol;emax_nm1=pid_tol
-
-     !! Initialise PID controller variables for <|u|>
-     eflow_nm1 = one
-     sum_eflow = zero   
-     
-     transport_totaltime=zero
-                 
+                           
 write(6,*) "sizes",iproc,npfb,np_nohalo,np            
                  
      return

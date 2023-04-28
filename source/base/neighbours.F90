@@ -243,12 +243,12 @@ contains
     !! node ii which has position (vector) ri.
     integer(ikind),intent(in) :: ii,jc !! jc is cell
     real(rkind),dimension(:),intent(in) :: ri
-    real(rkind) :: rr2tmp,rad,stencilsize2
+    real(rkind) :: rr2tmp,stencilsize2
     integer(ikind) :: j,jj,is,ie
     real(rkind),dimension(dims) :: rij
     
     if(nc(jc).ne.0)then !! if the cell isn't empty
-       stencilsize2=(h(ii)*ss)**2
+       stencilsize2=(h(ii)*ss)**two
        is =ist(jc);ie=ist(jc+1)-1  !! Start and end indices of particles in cell jc
        do jj=is,ie       !! Loop over all particles in cell jc
           j=ip(jj)       !! j is regular index, jj is cell-ordered index
@@ -282,8 +282,9 @@ contains
        rij2 = zero
        do k=1,ij_count(i)
           j=ij_link(k,i)
-          rij = rp(i,:) - rp(j,:)
-          rij2(k) = dot_product(rij,rij)
+!          rij = rp(i,:) - rp(j,:)
+!          rij2(k) = dot_product(rij,rij)
+          rij2(k) = dble(j)
        end do
        
        !! Now sort by value of rij2

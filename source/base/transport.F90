@@ -33,9 +33,8 @@ contains
      use mirror_boundaries
      !! Uses temperature, cp and density to evaluate thermal conductivity, viscosity and 
      !! molecular diffusivity. For isothermal flows, or if not(tdtp), use reference values.
-     integer(ikind) :: ispec,i,j
+     integer(ikind) :: ispec,i
      real(rkind) :: tmp
-     real(rkind) :: wtime1,wtime2
      segment_tstart=omp_get_wtime()             
        
 #ifndef isoT     

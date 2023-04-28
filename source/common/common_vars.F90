@@ -20,6 +20,7 @@ module common_vars
   real(rkind) :: Lz,Time_char  !! build from L_char,U_char
   real(rkind), dimension(dims) :: grav !! Gravity    
   real(rkind) :: rho_char,T_ref,visc_ref,p_ref,phi_in
+  real(rkind) :: dt_out,dt_out_stats !! Time interval between outputs  
   real(rkind) :: Pr,Ma
   integer(ikind) :: mix_av_flag
 #ifdef isoT
@@ -67,14 +68,13 @@ module common_vars
   real(rkind),dimension(:,:),allocatable :: lindemann_coefs
   integer(ikind),dimension(:),allocatable :: gibbs_flag_species    
   
-  
   !! Right-hand-sides
   real(rkind),dimension(:),allocatable :: rhs_ro,rhs_rou,rhs_rov,rhs_row,rhs_roE
   real(rkind),dimension(:,:),allocatable :: rhs_Yspec
     
   !! Discretisation properties
   real(rkind), dimension(:,:), allocatable, target :: rp,rnorm
-  real(rkind), dimension(:), allocatable, target   :: h,filter_coeff,s
+  real(rkind), dimension(:), allocatable, target   :: h,filter_coeff,s,vol
   integer(ikind),dimension(:),allocatable :: node_type !! Identify whether node is boundary, fluid etc...
   integer(ikind),dimension(:),allocatable :: zlayer_index_global,ilayer_index !! Identify where in the z-stack the node is
   integer(ikind),dimension(:),allocatable :: boundary_list,internal_list !! Lists for quick looping
@@ -93,17 +93,19 @@ module common_vars
 
   !! Parameters related to time and some forces etc
   real(rkind) :: time,time_end !! Start/current, and end time
-  real(rkind) :: time_star !! Dimensionless time - outputs are scaled by this
+
+  !! Time-stepping
   real(rkind) :: dt,dt_cfl,dt_parabolic  !! Various time-steps
-  real(rkind) :: dt_out !! Time interval between outputs
   real(rkind) :: umax,smax,cmax,smin                  !! maximum velocity,node-spacing,sound speed
   integer(ikind) :: itime,iRKstep
   real(rkind) :: emax_nm1,emax_n,emax_np1  !! errors for PID controller
+  real(rkind) :: ero_norm,erou_norm,eroE_norm,eroY_norm
+
+  !! P.I.D. controller for velocity
   real(rkind) :: eflow_nm1,eflow_n,sum_eflow !! errors for PID to control <u> (constant-ish flow rate)
   real(rkind), dimension(dims) :: driving_force
   real(rkind) :: mean_int_energy0 
   
-
   !! Neighbour numbers and lists
   integer(ikind),dimension(:),allocatable :: ij_count
   integer(ikind),dimension(:,:),allocatable :: ij_link
@@ -127,7 +129,7 @@ module common_vars
   integer(ikind),dimension(:),allocatable :: fd_parent !! pointer to the boundary node which is parent 
   
   !! Characteristic BC bits
-  integer(ikind) :: inflow_type,wall_type
+  integer(ikind) :: inflow_type,wall_type,inflow_velocity_control
   real(rkind),dimension(:),allocatable :: T_bound
   real(rkind) :: p_outflow,p_inflow   !! Desired pressure on outflow boundary (and inflow if required...)
   real(rkind),dimension(:),allocatable :: sumoverspecies_homega
@@ -135,17 +137,14 @@ module common_vars
   real(rkind),dimension(:),allocatable :: u_inflow_local,Yspec_inflow
   
   !! Flags for flux-zero-ing on boundaries
-  logical,dimension(:),allocatable :: znf_mdiff,znf_tdiff,znf_vdiff,znf_vtdiff
-  
-  
+  logical,dimension(:),allocatable :: znf_mdiff,znf_tdiff,znf_vdiff,znf_vtdiff  
   
   !! Profiling and openMP parallelisation
   real(rkind) ts_start,ts_end,t_run,t_per_dt,t_last_X
   integer(ikind) :: n_threads  
   real(rkind) :: segment_tstart,segment_tend
-  real(rkind),dimension(10) :: segment_time_local
+  real(rkind),dimension(11) :: segment_time_local
   real(rkind) :: cputimecheck
-  real(rkind) :: transport_totaltime
   
   !! MPI decomposition related variables
   integer(ikind) :: nprocs,iproc,ierror,iproc_in_sheet  !! processes, this process id, error int,process id in sheet

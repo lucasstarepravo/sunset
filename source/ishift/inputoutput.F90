@@ -11,15 +11,107 @@ module inputoutput
   real(rkind),dimension(:),allocatable :: x,y,xn,yn,ds  !! Properties for post-shift tidying
   integer(ikind),dimension(:),allocatable :: nt  
   
-  integer(ikind),dimension(:),allocatable :: nband,effective_nband  
+  integer(ikind),dimension(:),allocatable :: nband,effective_nband 
+  integer(ikind),dimension(:),allocatable :: nblock,effective_nblock 
 
   !! Start and end indices for domain decomposition
   integer(ikind),dimension(:),allocatable :: nstart,nend
   
   !! Local hovs for shifting
   real(rkind),parameter :: hovs_local = 2.5d0
+  
+  real(rkind),parameter :: coef_diffusion=0.4d0
+  integer(ikind),parameter :: maxiters_diffusion = 200
 
 contains
+!! ------------------------------------------------------------------------------------------------  
+   subroutine shift_only
+     !! Reads in boundary patches
+     use boundaries
+     integer(ikind) i,j,ii,jj,npfb_tmp,k
+     real(rkind) :: ns,dummy,prox,rad,radmin,dx,dy,smag
+     real(rkind),dimension(dims) :: rij
+     real(rkind),dimension(:,:),allocatable :: tmp_vec
+     integer(ikind) :: shiftflag
+
+     !! STEP 1: Load IPART (some params, plus list of nodes + boundary normals)
+     open(13,file='../gen/IPART')
+     read(13,*) nb,npfb,dummy      !! dummy is largest s(i) in domain...
+     read(13,*) xmin,xmax,ymin,ymax
+     read(13,*) xbcond,ybcond     
+     !! For the purposes of shifting, ybcond=3 (no-slip) is the same as ybcond=2 (symmetry)
+     
+     !! Calculate some useful constants
+     smax = dummy;h0 = hovs_local*dummy;sup_size = ss*h0;h2=h0*h0;h3=h2*h0
+          
+     allocate(rp(4*npfb,dims),rnorm(4*npfb,dims),h(4*npfb),s(4*npfb));rp=0.0d0;rnorm=0.0d0
+     allocate(node_type(4*npfb));node_type=0
+     allocate(fd_parent(2*npfb));fd_parent=0
+          
+     !! Load all nodes. Build FD stencils near boundaries on the fly.
+     npfb_tmp = npfb
+     nb = 0;ii = 0
+    
+     do i=1,npfb_tmp
+        ii = ii + 1
+        read(13,*) rp(ii,1:2),jj,rnorm(ii,1:2),dummy
+        h(ii) = dummy*hovs_local
+        s(ii) = dummy
+        node_type(ii) = jj
+        if(jj.ge.0.and.jj.le.2) then !! If it is a boundary node
+           k = ii !! k is the index of the parent node
+           nb = nb + 1
+           do j=1,4  !! Make 4 additional nodes
+              ii = ii + 1
+              rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
+              rnorm(ii,:)=rnorm(k,:)          !! Copy normals
+              h(ii)=h(k);s(ii)=s(k)          !! length-scales
+              node_type(ii) = -j           !! and node type
+              fd_parent(ii) = k            !! and lineage
+              npfb = npfb + 1           
+           end do
+        end if
+     end do
+
+     write(6,*) nb,npfb     
+     close(13)     
+
+     
+
+     !! Randomly perturb the nodes
+     smag = 0.5d0
+     do i=1,npfb
+        if(node_type(i).ge.3)then  !! only perturb interior nodes
+        dx = rand();dx = smag*(dx - 0.5d0)*2.0d0*s(i)
+        dy = rand();dy = smag*(dy - 0.5d0)*2.0d0*s(i)        
+        rp(i,:) = rp(i,:) + (/dx,dy/)
+        end if
+!        write(32,*) rp(i,:)
+     end do
+
+     write(6,*) "Before iterative shifting:",nb,npfb,np
+
+     call iteratively_shift(10)
+     call iteratively_shift(10)
+     call iteratively_shift(10)
+     call iteratively_shift(10)
+     call iteratively_shift(10)                   
+     write(6,*) "After iterative shifting:",nb,npfb,np
+     
+     !! Write new file to ../gen/IPART
+     open(unit=13,file='../gen/IPART')
+     write(13,*) nb,npfb-4*nb,smax
+     write(13,*) xmin,xmax,ymin,ymax
+     write(13,*) xbcond,ybcond         
+     do i=1,npfb
+        if(node_type(i).ge.0) then
+           write(13,*) rp(i,1),rp(i,2),node_type(i),rnorm(i,1),rnorm(i,2),s(i)     
+        end if
+     end do
+     close(13)                        
+   
+      return
+   end subroutine shift_only
 !! ------------------------------------------------------------------------------------------------  
   subroutine iteratively_shift(kk)
      use boundaries     
@@ -167,40 +259,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      end do
 
      write(6,*) nb,npfb     
-     close(13)     
-
-     write(6,*) "Shake and shift nodes? (1=yes, 0=no)"
-     read(5,*) shiftflag
-     
-     if(shiftflag.eq.1) then
-
-        !! Randomly perturb the nodes
-        smag = 0.5d0
-        do i=1,npfb
-           if(node_type(i).ge.3)then  !! only perturb interior nodes
-           dx = rand();dx = smag*(dx - 0.5d0)*2.0d0*s(i)
-           dy = rand();dy = smag*(dy - 0.5d0)*2.0d0*s(i)        
-           rp(i,:) = rp(i,:) + (/dx,dy/)
-           end if
-!           write(32,*) rp(i,:)
-        end do
-
-        write(6,*) "Before iterative shifting:",nb,npfb,np
-
-        call iteratively_shift(10)
-        call iteratively_shift(10)
-        call iteratively_shift(10)
-        call iteratively_shift(10)
-        call iteratively_shift(10)                   
-
-        write(6,*) "After iterative shifting:",nb,npfb,np
-     
-     end if
-
-     !! Output post-shift distribution
-!     do i=1,npfb
- !       write(31,*) rp(i,:)
-  !   end do
+     close(13)        
 
 
                     
@@ -299,17 +358,15 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      !! Create sizes of vertical bands for X decomposition. Adjust by diffusion equation to ensure
      !! load balancing.
   
-     integer(ikind) :: i,kk,nband_mean,nptmp,nl_ini,nl_end,ii,nblock,ll,nl_end_column,j
+     integer(ikind) :: i,kk,nband_mean,nptmp,nl_ini,nl_end,ii,nblock,ll,j
      integer(ikind) :: nshift
-     integer(ikind),dimension(:),allocatable :: nband_exchange
-     logical :: keepgoing
-    
+     logical :: keepgoing       
+     
      !! How many particles (total) need sorting
      nptmp = npfb-4*nb
      
      !! allocation of index limits
      allocate(nband(nprocsX),effective_nband(nprocsX))
-     allocate(nband_exchange(nprocsX))
      
      !! Determine how many nodes in each X-band
      nl_end = 0
@@ -344,7 +401,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
         !! Exchange nodes between bands        
         do kk=1,nprocsX-1
            !! Amount to exchange between bands
-           ll = 0.4*(effective_nband(kk+1)-effective_nband(kk)) 
+           ll = coef_diffusion*(effective_nband(kk+1)-effective_nband(kk)) 
            nband(kk) = nband(kk) + ll
            nband(kk+1) = nband(kk+1) - ll
         end do
@@ -369,7 +426,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
         end do     
         
         j=j+1
-        if(j.gt.50) keepgoing=.false.
+        if(j.gt.maxiters_diffusion) keepgoing=.false.
      
 
      
@@ -384,19 +441,112 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      end do
      write(6,*) "checking sums",j,npfb-4*nb
 
-!     stop
-     
-     
-     
+!     stop            
       
      return
   end subroutine find_band_sizes
 !! ------------------------------------------------------------------------------------------------
+  subroutine find_block_sizes(nband_start,nband_size)
+     !! Create sizes of blocks for Y decomposition. Adjust by diffusion equation to ensure
+     !! load balancing.
+     integer(ikind),intent(in) :: nband_start,nband_size
+     integer(ikind) :: i,kk,nband_mean,nl_ini,nl_end,ii,ll,j
+     integer(ikind) :: nshift
+     logical :: keepgoing  
+         
+    
+     !! allocation of index limits
+     allocate(effective_nblock(nprocsY))
+     
+     !! Determine how many nodes in each Y-block
+     nl_end = nband_start - 1
+     do kk=1,nprocsY
+        !! Approximate particles per block:
+        nblock(kk) = ceiling(dble(nband_size/nprocsY))              
+        
+        nl_ini = nl_end + 1
+        nl_end = nl_ini - 1 + nblock(kk)
+     
+        !! Add a few to final process if required
+        if(kk.eq.nprocsY) then 
+           nl_end = nband_start - 1 + nband_size
+           nblock(kk) = nl_end - nl_ini + 1
+        end if     
+        
+        effective_nblock(kk) = 0
+        do i=nl_ini,nl_end
+           if(nt(i).ge.0.and.nt(i).le.2) then
+              effective_nblock(kk) = effective_nblock(kk) + 5
+           else
+              effective_nblock(kk) = effective_nblock(kk) + 1              
+           end if
+        end do
+        
+     end do
+     
+     keepgoing = .true.
+     j=0
+     do while(keepgoing)
+     
+        !! Exchange nodes between blocks        
+        do kk=1,nprocsY-1
+           !! Amount to exchange between blocks
+           ll = coef_diffusion*(effective_nblock(kk+1)-effective_nblock(kk))
+           nblock(kk) = nblock(kk) + ll
+           nblock(kk+1) = nblock(kk+1) - ll
+        end do
+        !! Final flux between last and first block...        
+        ll = coef_diffusion*(effective_nblock(1)-effective_nblock(nprocsY))
+        nblock(nprocsY) = nblock(nprocsY) + ll
+        nblock(1) = nblock(1) - ll
+   
+        !! Re-calculate effective band sizes
+        nl_end = nband_start - 1     
+        do kk=1,nprocsY
+           !! Approximate particles per band:   
+       
+           nl_ini = nl_end + 1
+           nl_end = nl_ini - 1 + nblock(kk)
+            
+           effective_nblock(kk) = 0
+           do i=nl_ini,nl_end
+              if(nt(i).ge.0.and.nt(i).le.2) then
+                 effective_nblock(kk) = effective_nblock(kk) + 5
+              else
+                 effective_nblock(kk) = effective_nblock(kk) + 1              
+              end if
+           end do
+        
+        end do     
+        
+        j=j+1
+        if(j.gt.maxiters_diffusion) keepgoing=.false.     
+
+     
+     end do
+     
+     !! Diagnostics
+     j=0
+     write(6,*) "block sizes and effective block sizes for band"
+     do kk=1,nprocsY     
+        write(6,*) kk,nblock(kk),effective_nblock(kk)
+        j=j+nblock(kk)
+     end do
+     write(6,*) "checking sums",j,nband_size
+     
+     deallocate(effective_nblock)
+
+!     stop           
+ 
+      
+     return
+  end subroutine find_block_sizes
+!! ------------------------------------------------------------------------------------------------  
   subroutine rearrange_nodes
      !! Re-arranges nodes in order of increasing x, then for each band in x, re-arranges in order 
      !! of increasing y, but allowing for periodics...
   
-     integer(ikind) :: i,kk,nband_mean,nptmp,nl_ini,nl_end,ii,nblock,ll,nl_end_column,j
+     integer(ikind) :: i,kk,nband_mean,nptmp,nl_ini,nl_end,ii,ll,j
      integer(ikind) :: nshift
    
      !! First sort nodes in X
@@ -433,24 +583,21 @@ write(6,*) "Shifting iteration",ll,"of ",kk
            call quicksorty(y,nl_ini,nl_end)
            write(6,*) "sorted in y for processor band ",kk   
            
+           allocate(nblock(nprocsY))           
+           
+           
            !! Shuffle the blocks to create cyclical structure in y
-           nblock = ceiling(dble(nband(kk)/nprocsY))      
-           nshift = floor(0.5*nblock) 
+           nblock(:) = ceiling(dble(nband(kk)/nprocsY))      
+           nshift = floor(0.5*nblock(1)) 
            call shift_indices(nl_ini,nl_end,nshift)
                        
-                  
-        
+           call find_block_sizes(nl_ini,nband(kk))       
+                
            !! Calculate the block sizes
-           nl_end_column = nl_end
            nl_end = nl_ini - 1
            do ll=1,nprocsY
-              if(ll.ne.nprocsY) then
-                 nl_ini = nl_end + 1
-                 nl_end = nl_ini + nblock              
-              else
-                 nl_ini = nl_end + 1
-                 nl_end = nl_end_column              
-              end if
+              nl_ini = nl_end + 1
+              nl_end = nl_ini - 1 + nblock(ll)              
                                             
               !! Store the start and end indices of the block
               nstart((kk-1)*nprocsY+ll) = nl_ini
@@ -458,7 +605,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
            
            end do
         
-        
+           deallocate(nblock)    
         
         else
            !! Store the start and end indices of the Xbands (each column)

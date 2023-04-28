@@ -72,14 +72,14 @@ program sunset
 
   !! Initialise time profiling and output counter...
   n_out = 0;ts_start = omp_get_wtime()
-  m_out = 0 
+  m_out = 0  ! Stats output counter
         
   !! MAIN TIME LOOP ---------------------------------------------------
   do while (time.le.time_end)
 
      !! Output, conditionally: at start, subsequently every dt_out
      if(itime.eq.0.or.time.gt.n_out*dt_out) then 
-!     if(itime.eq.0.or.mod(itime,1).eq.0)then
+!     if(itime.eq.0.or.mod(itime,100).eq.0)then
         n_out = n_out + 1
         call output_layer(n_out)        
         call output_laminar_flame_structure(n_out)
@@ -104,12 +104,12 @@ program sunset
 
      !! Profiling and write some things to screen
      segment_tend_main = omp_get_wtime()
-     segment_time_local(10) = segment_time_local(10) + segment_tend_main - segment_tstart_main
+     segment_time_local(11) = segment_time_local(11) + segment_tend_main - segment_tstart_main
      itime = itime + 1
      call output_to_screen
 
      !! Call routines to evaluate global statistics and adjust forcing terms if desired
-     call statistics_control
+     call statistics_control(m_out)
      
   end do
   !! END MAIN TIME LOOP -----------------------------------------------
@@ -130,10 +130,14 @@ subroutine deallocate_everything
   use common_vars
   
   !! Tell the screen we've reached the end
-  write(6,*) iproc,"Reached the end of simulation. Cleaning up and stopping!"
+#ifdef mp
+  if(iproc.eq.0) write(6,*) "Reached the end of simulation. Cleaning up and stopping!"
+#else  
+  write(6,*) "Reached the end of simulation. Cleaning up and stopping!"
+#endif  
   
   !! Discretisation arrays
-  deallocate(rp,s)
+  deallocate(rp,s,vol,h)
   
   !! Primary properties
   deallocate(rou,rov,row,ro,roE,Yspec)

@@ -22,6 +22,9 @@
       real(rkind),dimension(:),allocatable :: blob_rotation
       integer(ikind),dimension(:),allocatable :: blob_ellipse
       integer(ikind) :: n_blob_coefs
+      
+      !! Blob-perimeter
+      real(rkind),dimension(:),allocatable :: Sblob
 
 
       end module global_variables 

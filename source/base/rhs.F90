@@ -39,11 +39,8 @@ module rhs
   real(rkind),dimension(:,:),allocatable :: gradT,gradcp
   
   real(rkind),dimension(:),allocatable :: store_diff_E
-  
-  real(rkind),dimension(:),allocatable :: enth
-  real(rkind),dimension(:,:),allocatable :: grad_enth
-  
-  real(rkind) :: drodn,drodt,dundn,dundt,dutdn,dutdt,dpdn,dpdt
+    
+  real(rkind) :: dundn,dutdn,dutdt,dpdn
   real(rkind) :: xn,yn,un,ut
   
   !! Characteristic boundary condition formulation
@@ -54,9 +51,9 @@ contains
 !! ------------------------------------------------------------------------------------------------
   subroutine calc_all_rhs
      use statistics
+     integer(ikind) :: i
      !! Control routine for calculating right hand sides. Does thermodynamic evaluations, finds
      !! gradients, and then calls property-specific RHS routines
-     integer(ikind) :: k,i
           
      !! Some initial allocation of space for boundaries
 #ifndef ms
@@ -101,7 +98,7 @@ contains
      allocate(gradp(npfb,dims));gradp=zero
 #ifndef isoT
      !! Evaluate pressure gradient directly (LABFM...)
-     call calc_gradient(p-p_outflow,gradp) 
+     call calc_gradient(p-p_ref,gradp) 
 #else
      !! Evaluate the pressure gradient (from density gradient
      !$omp parallel do
@@ -132,6 +129,7 @@ contains
         deallocate(sumoverspecies_homega,reaction_rate_bound)
 #endif                
      end if
+      
           
      !! If we want to calculate total dissipation rate
      if(.false..and.iRKstep.eq.1) then
@@ -161,7 +159,7 @@ contains
         tmp_vec(1) = u(i);tmp_vec(2) = v(i);tmp_vec(3)= w(i)
         tmp_scal = dot_product(tmp_vec,gradro(i,:))
 
-        rhs_ro(i) = -ro(i)*divvel(i) - tmp_scal  
+        rhs_ro(i) = -ro(i)*divvel(i) - tmp_scal   
      end do
      !$omp end parallel do
 
@@ -194,7 +192,7 @@ contains
      real(rkind),dimension(:,:,:),allocatable :: gradYspec
      real(rkind),dimension(:,:),allocatable :: grad2Yspec
      integer(ikind) :: i,j,ispec
-     real(rkind),dimension(dims) :: tmp_vec,roVY,gradroDY
+     real(rkind),dimension(dims) :: roVY,gradroDY
      real(rkind) :: tmp_scal,lapYspec_tmp,tmpY,divroVY,enthalpy,dcpdT,cpispec,tmpro,tmpT,roDY
      real(rkind),dimension(:,:),allocatable :: speciessum_roVY,speciessum_hgradY
      real(rkind),dimension(:),allocatable :: speciessum_divroVY,speciessum_hY
@@ -226,7 +224,7 @@ contains
      
         !! Pre-populate stores 3 and 4 with density and pressure laplacians
         call calc_laplacian(ro,mxav_store3)
-        call calc_laplacian(p-p_outflow,mxav_store4)        
+        call calc_laplacian(p-p_ref,mxav_store4)        
         
    
         !$omp parallel do private(tmpro,tmpT)
@@ -498,7 +496,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
      integer(ikind) :: i,j
      real(rkind),dimension(dims) :: tmp_vec
      real(rkind) :: tmp_scal_u,tmp_scal_v,tmp_scal_w,f_visc_u,f_visc_v,f_visc_w
-     real(rkind) :: tmpro,body_force_u,body_force_v,body_force_w,one_over_ro
+     real(rkind) :: tmpro,body_force_u,body_force_v,body_force_w
      real(rkind) :: c
      real(rkind),dimension(:,:),allocatable :: grad2uvec,grad2ucross    
      real(rkind),dimension(:,:),allocatable :: gradvisc
@@ -582,8 +580,9 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
         rhs_row(i) = -tmp_scal_w - gradp(i,3) + body_force_w + f_visc_w
 #else
         rhs_row(i) = zero
-#endif                       
-     end do
+#endif      
+
+    end do
      !$omp end parallel do
          
      !! Make L1,L2,L3,L4,L5 and populate viscous + body force part of rhs' and save transverse
@@ -925,7 +924,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
      call calc_filtered_var(ro)
      
      !! Evaluate lengthscales
-!     call get_flow_lengthscale(ro)
+!     call get_flow_lengthscale
      
      !! Filter velocity components
      call calc_filtered_var(rou)

@@ -72,12 +72,12 @@ contains
      !! Reduce nplink now, to avoid allocating more memory than necessary
      nplink = maxval(ij_count(1:npfb))
 
-     !! Left hand sides and arrays for interparticle weights
+     !! Left hand sides and arrays for interparticle weights 
      allocate(ij_w_grad(2,nplink,npfb),ij_w_lap(nplink,npfb))
      allocate(ij_w_hyp(nplink,npfb),amathyp(nsizeG,nsizeG),amatyy(nsizeG,nsizeG))
      allocate(amatx(nsizeG,nsizeG),amaty(nsizeG,nsizeG),amatxx(nsizeG,nsizeG),amatxy(nsizeG,nsizeG))
      amatx=zero;amaty=zero;amatxx=zero;amatxy=zero;amatyy=zero
- 
+      
      !! Right hand sides, vectors of monomials and ABFs
      allocate(bvecx(nsizeG),bvecy(nsizeG),bvecxx(nsizeG),bvecxy(nsizeG),bvecyy(nsizeG),bvechyp(nsizeG))
      allocate(gvec(nsizeG),xvec(nsizeG));gvec=zero;xvec=zero
@@ -258,7 +258,7 @@ contains
            ij_w_lap(k,i) = dot_product(bvecxx+bvecyy,gvec)
            ij_w_hyp(k,i) = dot_product(bvechyp,gvec)
            
-        end do
+        end do             
         
         write(2,*) "" !! Temporary fix for a weird openblas/lapack/openmp bug 
         !! The bug may be due to a race condition or something, but not really sure
@@ -267,6 +267,9 @@ contains
      !$OMP END PARALLEL DO
      deallocate(amatx,amaty,amatxx,amatxy,amatyy,amathyp)
      deallocate(bvecx,bvecy,bvecxx,bvecxy,bvecyy,bvechyp,gvec,xvec)   
+     
+     !! Calculate node volumes - used for evaluating integral quantities in statistics routines
+     call calc_node_volumes
     
      write(6,*) "iproc",iproc,"LABFM weights calculated"
     
@@ -300,7 +303,7 @@ contains
         !! Scale Laplacians by length-scale squared
         ij_w_lap_sum(i) = ij_w_lap_sum(i)/L_char/L_char
         ij_w_lap(:,i) = ij_w_lap(:,i)/L_char/L_char
-                 
+        
      end do
      !$OMP END PARALLEL DO
 
@@ -331,6 +334,58 @@ contains
              
      return
   end subroutine calc_labf_sums
+!! ------------------------------------------------------------------------------------------------ 
+  subroutine calc_node_volumes
+     integer(ikind) :: i,j,k,ii
+     real(rkind) :: rad,x,y,ff1,hh
+     real(rkind),dimension(dims) :: rij
+  
+     !! Array for node volumes
+     allocate(vol(npfb));vol(:)=zero
+     
+     !! For internal nodes
+     !$OMP PARALLEL DO PRIVATE(i,k,j,rij,rad,x,y,ff1,hh)
+     do ii=1,npfb-nb
+        i=internal_list(ii) 
+        hh=h(i)
+       
+
+        !! Loop over neighbours and calculate kernel sum
+!        vol(i) = Wab(zero)*h2/(hh*hh)
+        do k=1,ij_count(i)
+           j = ij_link(k,i) 
+           rij(:) = rp(i,:) - rp(j,:)
+           x=-rij(1);y=-rij(2)
+           rad = sqrt(x*x + y*y)/hh
+!           ff1 = Wab(rad)*h2/(hh*hh)
+           
+           ff1 = (9.0d0/pi)*exp(-9.0d0*rad*rad)/(hh*hh)          
+
+           vol(i) = vol(i) + ff1
+
+        end do             
+        
+        !! Volume = 1/kernel sum
+        vol(i) = one/vol(i)
+        
+     end do
+     !$OMP END PARALLEL DO     
+     
+     !! For boundary nodes
+     do ii=1,nb
+        i=boundary_list(ii)
+        
+        vol(i) = s(i)*s(i)
+     end do
+     
+     !! Check
+!     do i=1,npfb
+!        write(6,*) iproc,i,s(i),vol(i),vol(i)/(s(i)*s(i))
+!     end do
+     
+     
+     return
+  end subroutine calc_node_volumes
 !! ------------------------------------------------------------------------------------------------
   subroutine calc_boundary_weights
      !! Calculates weights for derivatives near boundaries.
@@ -1087,8 +1142,24 @@ write(6,*) i,i1,"stopping because of NaN",ii
         filter_coeff(i) = (one/3.0d0)/lsum  !(two/3.0d0)
         
         filter_coeff(i) = filter_coeff(i)*half
+        
      end do
      !$omp end parallel do
+     
+     !! Pre-scale filter weights
+     !$omp parallel do private(k)
+     do i=1,npfb
+        ij_w_hyp_sum(i) = zero
+        do k=1,ij_count(i)
+           ij_w_hyp(k,i) = ij_w_hyp(k,i)*filter_coeff(i)
+           ij_w_hyp_sum(i) = ij_w_hyp_sum(i) + ij_w_hyp(k,i)
+        end do
+        
+     end do
+     !$omp end parallel do
+    
+     !! Deallocate coefficients
+     deallocate(filter_coeff)
     
      return
   end subroutine filter_coefficients

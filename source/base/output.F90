@@ -26,7 +26,7 @@ contains
      !! This routine writes information about the simulation to screen in a fairly easy to read
      !! format. For this to work (nicely) terminal window should be 24 lines tall.
      integer(ikind) :: scr_freq=100
-     real(rkind),dimension(10) :: stg !! segment_time_global...
+     real(rkind),dimension(11) :: stg !! segment_time_global...
      real(rkind),dimension(:),allocatable :: maxphi,minphi
      integer(ikind) :: n_threads_global
      real(rkind) :: t_per_dt_global,t_last_x_global,t_run_global
@@ -70,35 +70,35 @@ contains
         t_run = t_run/dble(nprocs)
      
         !! Profiling bits
-        call MPI_ALLREDUCE(segment_time_local,stg,10,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)  
+        call MPI_ALLREDUCE(segment_time_local,stg,11,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)  
 
         if(iproc.eq.0) then
- 
+
            write(6,*)"itime,time,dt=", itime,time,dt
            write(6,*) "npfb,np",npfb_global,np_global,"n_out real",time/dt_out
            write(6,*) "Max |u|,|v|:",max(maxphi(1),abs(minphi(1))),max(maxphi(2),abs(minphi(2)))
            write(6,*) "Max |w|    :",max(maxphi(3),abs(minphi(3)))
            write(6,*) "max/min ro :",maxphi(4),minphi(4)
-           write(6,*) "max/min roE:",maxphi(5),minphi(5)
+           write(6,*) "max/min p  :",maxphi(5),minphi(5)
            write(6,*) "max/min T  :",maxphi(6),minphi(6)   
            write(6,*) "# threads  :",n_threads_global,"spread across ",nprocs,"MPI tasks"
            write(6,*) "Wall clock run time:",t_run
            write(6,*) "run-time/itime:",t_per_dt,"Moving avg:",t_last_X/dble(scr_freq)
 
            !! Profiling
-           store1 = stg(10) - sum(stg(1:9))
-           write(6,*) "  "
-           write(6,*) "Profiling:::"
-           write(6,291) "MPI & waiting    :",100.0d0*stg(1)/stg(10),'%,',stg(1)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "BCs              :",100.0d0*stg(2)/stg(10),'%,',stg(2)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "Filtering        :",100.0d0*stg(3)/stg(10),'%,',stg(3)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "1st Derivatives  :",100.0d0*stg(4)/stg(10),'%,',stg(4)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "2nd Derivatives  :",100.0d0*stg(5)/stg(10),'%,',stg(5)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "Chemistry        :",100.0d0*stg(6)/stg(10),'%,',stg(6)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "Species RHS loop :",100.0d0*stg(7)/stg(10),'%,',stg(7)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "Transport        :",100.0d0*stg(8)/stg(10),'%,',stg(8)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "Thermo           :",100.0d0*stg(9)/stg(10),'%,',stg(9)/dble(scr_freq*nprocs),"seconds/step"
-           write(6,291) "Other            :",100.0d0*store1/stg(10),'%,',store1/dble(scr_freq*nprocs),"seconds/step"
+           store1 = stg(11) - sum(stg(1:10))
+           write(6,*) "----------------------Profiling----------------------"
+           write(6,291) "MPI transfers    :",100.0d0*stg(1)/stg(11),'%,',stg(1)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "BCs              :",100.0d0*stg(2)/stg(11),'%,',stg(2)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Filtering        :",100.0d0*stg(3)/stg(11),'%,',stg(3)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "1st Derivatives  :",100.0d0*stg(4)/stg(11),'%,',stg(4)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "2nd Derivatives  :",100.0d0*stg(5)/stg(11),'%,',stg(5)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Chemistry        :",100.0d0*stg(6)/stg(11),'%,',stg(6)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Species RHS loop :",100.0d0*stg(7)/stg(11),'%,',stg(7)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Transport        :",100.0d0*stg(8)/stg(11),'%,',stg(8)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Thermo           :",100.0d0*stg(9)/stg(11),'%,',stg(9)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Waiting          :",100.0d0*stg(10)/stg(11),'%,',stg(10)/dble(scr_freq*nprocs),"seconds/step"
+           write(6,291) "Other            :",100.0d0*store1/stg(11),'%,',store1/dble(scr_freq*nprocs),"seconds/step"
            write(6,'(A)') "  "
                                          
         end if
@@ -110,7 +110,7 @@ contains
 !           j = j + ij_count(i)
 !        end do
 !        store1 = sum(segment_time_local(2:9))
-!        write(6,*) iproc,store1,npfb,j,store1/dble(j)
+!        write(6,*) iproc,store1,nb,npfb,j
 
         t_last_X = zero
 #else
@@ -119,7 +119,7 @@ contains
         write(6,*) "np,npfb",np,npfb,"n_out real",time/dt_out
         write(6,*) "Max |u|,|v|:",max(maxval(u(1:npfb)),abs(minval(u(1:npfb)))),max(maxval(v(1:npfb)),abs(minval(v(1:npfb))))
         write(6,*) "Max |w|    :",max(maxval(w(1:npfb)),abs(minval(w(1:npfb))))
-        write(6,*) "Max/min roE:",maxval(roE(1:npfb)),minval(roE(1:npfb))
+        write(6,*) "Max/min p  :",maxval(p(1:npfb)),minval(p(1:npfb))
         write(6,*) "Max/min T  :",maxval(T(1:npfb)),minval(T(1:npfb))        
         write(6,*) "max/min ro :",maxval(ro(1:npfb)),minval(ro(1:npfb))   
         write(6,*) "# threads  :",n_threads,"Run time:",t_run
@@ -128,19 +128,19 @@ contains
         
         !! Profiling
         stg = segment_time_local
-        store1 = stg(10) - sum(stg(1:9))        
-        write(6,*) "  "
-        write(6,*) "Profiling:::"
-        write(6,291) "MPI & waiting    :",100.0d0*stg(1)/stg(10),'%,',stg(1)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "BCs              :",100.0d0*stg(2)/stg(10),'%,',stg(2)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "Filtering        :",100.0d0*stg(3)/stg(10),'%,',stg(3)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "1st Derivatives  :",100.0d0*stg(4)/stg(10),'%,',stg(4)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "2nd Derivatives  :",100.0d0*stg(5)/stg(10),'%,',stg(5)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "Chemistry        :",100.0d0*stg(6)/stg(10),'%,',stg(6)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "Species RHS loop :",100.0d0*stg(7)/stg(10),'%,',stg(7)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "Transport        :",100.0d0*stg(8)/stg(10),'%,',stg(8)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "Thermo           :",100.0d0*stg(9)/stg(10),'%,',stg(9)/dble(scr_freq*nprocs),"seconds/step"
-        write(6,291) "Other            :",100.0d0*store1/stg(10),'%,',store1/dble(scr_freq*nprocs),"seconds/step"     
+        store1 = stg(11) - sum(stg(1:10))        
+        write(6,*) "----------------------Profiling----------------------"
+        write(6,291) "MPI transfers    :",100.0d0*stg(1)/stg(11),'%,',stg(1)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "BCs              :",100.0d0*stg(2)/stg(11),'%,',stg(2)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Filtering        :",100.0d0*stg(3)/stg(11),'%,',stg(3)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "1st Derivatives  :",100.0d0*stg(4)/stg(11),'%,',stg(4)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "2nd Derivatives  :",100.0d0*stg(5)/stg(11),'%,',stg(5)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Chemistry        :",100.0d0*stg(6)/stg(11),'%,',stg(6)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Species RHS loop :",100.0d0*stg(7)/stg(11),'%,',stg(7)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Transport        :",100.0d0*stg(8)/stg(11),'%,',stg(8)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Thermo           :",100.0d0*stg(9)/stg(11),'%,',stg(9)/dble(scr_freq*nprocs),"seconds/step"
+        write(6,291) "Waiting          :",100.0d0*stg(10)/stg(11),'%,',stg(10)/dble(scr_freq*nprocs),"seconds/step"        
+        write(6,291) "Other            :",100.0d0*store1/stg(11),'%,',store1/dble(scr_freq*nprocs),"seconds/step"     
         write(6,'(/,A)') "  "                  
 #endif          
      
@@ -172,6 +172,7 @@ contains
         nprocsout = nprocsX*nprocsY
 !if(.true.)then     
 !nprocsout = nprocsX*nprocsY*nprocsZ
+
 
         !! Calculate the vorticity 
         allocate(gradu(npfb,dims),gradv(npfb,dims),gradw(npfb,dims));gradw=zero
@@ -221,13 +222,13 @@ contains
         k=10000
 #endif     
         if( n_out .lt. 10 ) then 
-           write(fname,'(A17,I5,A1,I1)') './data_out/layer_',k,'_',n_out        
+           write(fname,'(A18,I5,A1,I1)') './data_out/fields_',k,'_',n_out        
         else if( n_out .lt. 100 ) then 
-           write(fname,'(A17,I5,A1,I2)') './data_out/layer_',k,'_',n_out        
+           write(fname,'(A18,I5,A1,I2)') './data_out/fields_',k,'_',n_out        
         else if( n_out .lt. 1000 ) then
-           write(fname,'(A17,I5,A1,I3)') './data_out/layer_',k,'_',n_out        
+           write(fname,'(A18,I5,A1,I3)') './data_out/fields_',k,'_',n_out        
         else
-           write(fname,'(A17,I5,A1,I4)') './data_out/layer_',k,'_',n_out        
+           write(fname,'(A18,I5,A1,I4)') './data_out/fields_',k,'_',n_out        
         end if 
      
         !! Local number nodes output
@@ -257,17 +258,23 @@ contains
            alpha_out(i) = hrr(i)
 
 #ifdef dim3
-           write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),h(i),node_type(i),ro(i), &
-                       u(i),v(i),w(i),tmpVort,tmpT,alpha_out(i),Yspec(i,1:nspec_out)*tmpro       
+           write(20,*) ro(i),u(i),v(i),w(i),tmpVort,tmpT,p(i),alpha_out(i),Yspec(i,1:nspec_out)*tmpro       
+!           write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),h(i),node_type(i),ro(i), &
+!                       u(i),v(i),w(i),tmpVort,tmpT,alpha_out(i),Yspec(i,1:nspec_out)*tmpro       
 #else
-           write(20,*) rp(i,1),rp(i,2),s(i),h(i),node_type(i),ro(i),u(i),v(i),tmpVort, &
-                       tmpT,alpha_out(i),Yspec(i,1:nspec_out)*tmpro
+           write(20,*) ro(i),u(i),v(i),tmpVort,tmpT,p(i),alpha_out(i),Yspec(i,1:nspec_out)*tmpro
+!           write(20,*) rp(i,1),rp(i,2),s(i),h(i),node_type(i),ro(i),u(i),v(i),tmpVort, &
+!                       tmpT,alpha_out(i),Yspec(i,1:nspec_out)*tmpro
 #endif
         end do
 
         flush(20)
         close(20)
-        if(allocated(vort)) deallocate(vort)               
+        if(allocated(vort)) deallocate(vort)    
+               
+        !! Also output the nodes/discretisation if it is output #1
+        if(n_out.eq.1) call output_nodes(np_out_local)                       
+                   
      end if
 
      !! Write the time,dump number and # nodes to file
@@ -289,6 +296,43 @@ contains
 
      return
   end subroutine output_layer
+!! ------------------------------------------------------------------------------------------------  
+  subroutine output_nodes(np_out_local)
+     !! Little subroutine to write out discretisation variables
+     !! Can be converted to vtk and read into paraview.
+     !! This routine is only called for processors which are outputting
+     integer(ikind),intent(in) :: np_out_local
+     integer(ikind) :: i,j,k,dimsout,nspec_out,nprocsout,iflag,ispec
+     character(70) :: fname
+     real(rkind) :: tmpT,xn,yn,tmpro
+
+         
+     !! set the name of the file...
+     !! first number is processor number, second is dump number (allowed up to 9999 processors)
+#ifdef mp
+     k=10000+iproc
+#else
+     k=10000
+#endif     
+     write(fname,'(A17,I5)') './data_out/nodes_',k
+                       
+     !! Write the nodes files
+     open(unit = 20,file=fname)  
+     write(20,*) np_out_local
+     do i=1,np_out_local
+        
+#ifdef dim3
+        write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),h(i),node_type(i)    
+#else
+        write(20,*) rp(i,1),rp(i,2),s(i),h(i),node_type(i)
+#endif
+     end do
+
+     flush(20)
+     close(20)
+
+     return
+  end subroutine output_nodes
 !! ------------------------------------------------------------------------------------------------
   subroutine output_laminar_flame_structure(n_out)
      !! Output data for a laminar 1D flame profile.

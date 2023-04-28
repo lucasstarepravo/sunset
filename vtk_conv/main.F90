@@ -20,12 +20,11 @@ program main
   real :: dr
       
   real,allocatable,dimension(:):: xp,zp,up,vp,wp,ro,vort,h,Temp,yp
-  real,allocatable,dimension(:):: alpha
+  real,allocatable,dimension(:):: alpha,p
   real,allocatable,dimension(:,:) :: Yspec
   integer,allocatable,dimension(:) :: processor,node_type
   real time(i_PART_counter_max), DT(i_PART_counter_max)
   integer np_all(i_PART_counter_max), IT(i_PART_counter_max)
-  integer subset_flag
   real  DT1(i_PART_counter_max),DT2(i_PART_counter_max)  
   integer :: nprocs,iproc,np_ini,np_end,dummy_int,nspecs
   real :: dummy_real
@@ -44,17 +43,13 @@ program main
   allocate(h(np_max))
   allocate(Temp(np_max))
   allocate(alpha(np_max))
+  allocate(p(np_max))
   
   allocate(processor(np_max),node_type(np_max))
   
 
   DQ=CHAR(34)
-   
-  !! Do we want to output all?
-  write(6,*) "Do you want to output all or only vorticity"
-  write(6,*) "Type 1 for all, and 0 for vorticity only"
-  read(*,*) subset_flag
-      
+        
      
   !! LOAD AND READ TIME,DT FROM FILE DT. 
   open(unit=70,file='../data_out/time.out',status='old')
@@ -81,6 +76,40 @@ program main
   
   !! adjust dim-flag
   dim_flag = dim_flag - 2
+
+
+  !! Load nodes.
+  npp=0 ! keeps track of total number of particles/nodes across all processors
+  !! Loop over each processor
+  do iproc = 1,nprocs
+     write(proc5,'(i5)') 10000+iproc-1
+     name_orig='../data_out/nodes_'//proc5
+                     
+     open(ifi,file=name_orig,status='old')
+     !! Read nodes data in
+     read(ifi,*) np
+     np_ini = npp + 1
+     np_end = np_ini + np 
+     if(dim_flag.eq.1) then 
+        do i=np_ini,np_end
+           read(ifi,*,end=400) xp(i),yp(i),zp(i),h(i),dummy_real,node_type(i)
+           processor(i) = iproc
+           npp=npp+1
+        enddo
+     else
+        do i=np_ini,np_end
+           read(ifi,*,end=400) xp(i),yp(i),h(i),dummy_real,node_type(i)
+           processor(i) = iproc
+           npp=npp+1
+        enddo
+     end if           
+400     close (ifi)
+
+  !! END LOOP OVER ALL PROCESSORS...
+  end do  
+  np = npp
+  write(6,*) "Read in nodes complete."
+  !! ----------------------------------------------------------------
   
   write(6,*) "There are ",Nframes+1,"frames."   
   write(6,*) "Enter starting frame"
@@ -88,9 +117,11 @@ program main
   
   !! Can only load 9 species + all thermo-chem data...
   nspecs = min(nspecs,9) 
+
+
   
   allocate(Yspec(np_max,nspecs))
-  ngrab = N_start-1
+  ngrab = N_start-1 
         
   !! Loop over each frame   
   do iframe=N_start,Nframes+1
@@ -114,19 +145,19 @@ program main
 !       % READ IN THE PART FILE FOR EACH FRAME
         if(ngrab.lt.10) then
            write(supp1,'(i0)') ngrab
-           name_orig='../data_out/layer_'//proc5//"_"//supp1
+           name_orig='../data_out/fields_'//proc5//"_"//supp1
         end if
         if(ngrab.ge.10.and.ngrab.lt.100) then
            write(supp2,'(i2)') ngrab
-           name_orig='../data_out/layer_'//proc5//"_"//supp2
+           name_orig='../data_out/fields_'//proc5//"_"//supp2
         end if
         if(ngrab.ge.100.and.ngrab.lt.1000) then
            write(supp3,'(i3)') ngrab
-           name_orig='../data_out/layer_'//proc5//"_"//supp3
+           name_orig='../data_out/fields_'//proc5//"_"//supp3
         end if
         if(ngrab.ge.1000.and.ngrab.lt.10000) then
            write(supp,'(i4)') ngrab
-           name_orig='../data_out/layer_'//proc5//"_"//supp
+           name_orig='../data_out/fields_'//proc5//"_"//supp
         end if
         
         open(ifi,file=name_orig,status='old')
@@ -134,39 +165,24 @@ program main
         read(ifi,*) np
         np_ini = npp + 1
         np_end = np_ini + np 
-        if(subset_flag.eq.1) then
-           if(dim_flag.eq.1) then 
-              do i=np_ini,np_end
-                 read(ifi,*,end=300) xp(i),yp(i),zp(i),h(i),dummy_real,node_type(i),ro(i), &
-                                     up(i),vp(i),wp(i), &
-                                     vort(i),Temp(i),alpha(i),Yspec(i,1:nspecs)
-                 processor(i) = iproc
-                 npp=npp+1
-              enddo
-           else
-              do i=np_ini,np_end
-                 read(ifi,*,end=300) xp(i),yp(i),h(i),dummy_real,node_type(i),ro(i), &
-                                     up(i),vp(i), &
-                                     vort(i),Temp(i),alpha(i),Yspec(i,1:nspecs)
-                 processor(i) = iproc
-                 npp=npp+1
-              enddo
-           end if           
+        if(dim_flag.eq.1) then 
+           do i=np_ini,np_end
+              read(ifi,*,end=300) ro(i), &
+                                  up(i),vp(i),wp(i), &
+                                  vort(i),Temp(i),p(i),alpha(i),Yspec(i,1:nspecs)
+              processor(i) = iproc
+              npp=npp+1
+           enddo
         else
-           if(dim_flag.eq.1) then
-              do i=np_ini,np_end
-                 read(ifi,*,end=300) xp(i),yp(i),zp(i),dr,dr,di,dr,dr,dr,dr,vort(i),dr,dr,dr,dr
-                 processor(i) = iproc
-                 npp=npp+1
-              enddo        
-           else
-              do i=np_ini,np_end
-                 read(ifi,*,end=300) xp(i),yp(i),dr,dr,di,dr,dr,dr,vort(i),dr,dr,dr,dr
-                 processor(i) = iproc
-                 npp=npp+1
-              enddo                   
-           end if
-        end if
+           do i=np_ini,np_end
+              read(ifi,*,end=300) ro(i), &
+                                  up(i),vp(i), &
+                                  vort(i),Temp(i),p(i),alpha(i),Yspec(i,1:nspecs)
+              processor(i) = iproc
+              npp=npp+1
+           enddo
+        end if           
+
 300     close (ifi)
 
      !! END LOOP OVER ALL PROCESSORS...
@@ -227,114 +243,120 @@ program main
      string3 = '    </DataArray>'
      write(ifo,202) string3
 
-     if(subset_flag.eq.1) then !! Only do those in this if-statement if we want all          
+     string2 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'s'//DQ//' format='//DQ//'ascii'//DQ//'>'
+     !! Resolution (actualy s, though array is h)
+     write(ifo,202)string2
+     do ii=1,np
+        write(ifo,*)h(ii)        
+     enddo
+     string3 = '    </DataArray>'
+     write(ifo,202)string3
 
-        string2 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'s'//DQ//' format='//DQ//'ascii'//DQ//'>'
-        !! Resolution (actualy s, though array is h)
-        write(ifo,202)string2
-        do ii=1,np
-           write(ifo,*)h(ii)        
-        enddo
-        string3 = '    </DataArray>'
-        write(ifo,202)string3
-
-        !! Density   
-        string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'Density'//DQ//' format='//DQ//'ascii'//DQ//'>'
-        write(ifo,202)string1
-        do ii=1,np
-           write(ifo,*)ro(ii)
-        enddo
-        string3 = '    </DataArray>'
-        write(ifo,202) string3
-        
-        !! Y mass frac
-        do iii=1,nspecs
-           write(ispec_string1,'(A1,i1.1)') 'Y',iii
-           string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//ispec_string1//DQ//' format='//DQ//'ascii'//DQ//'>'
-           write(ifo,202)string1
-           do ii=1,np
-              write(ifo,*)Yspec(ii,iii)
-           enddo
-           string3 = '    </DataArray>'
-           write(ifo,202) string3        
-        end do
-
-        !! Temperature
-        string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'Temperature'//DQ// &
-                  ' format='//DQ//'ascii'//DQ//'>'
-        write(ifo,202)string1
-        do ii=1,np
-           write(ifo,*)Temp(ii)
-        enddo
-        string3 = '    </DataArray>'
-        write(ifo,202) string3
-        
-        !! alpha
-        string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'alpha'//DQ// &
-                  ' format='//DQ//'ascii'//DQ//'>'
-        write(ifo,202)string1
-        do ii=1,np
-           write(ifo,*)alpha(ii)
-        enddo
-        string3 = '    </DataArray>'
-        write(ifo,202) string3        
-
-        !! Processor
-        string1 = '    <DataArray type='//DQ//'Int32'//DQ//' Name='//DQ//'processor'//DQ//' format='//DQ//'ascii'//DQ//'>'
-        write(ifo,202)string1
-        do ii=1,np
-           write(ifo,*)processor(ii)
-        enddo
-        string3 = '    </DataArray>'
-        write(ifo,202) string3
-
-        !! Node-type
-        string1 = '    <DataArray type='//DQ//'Int32'//DQ//' Name='//DQ//'node_type'//DQ//' format='//DQ//'ascii'//DQ//'>'
-        write(ifo,202)string1
-        do ii=1,np
-           write(ifo,*)node_type(ii)
-        enddo
-        string3 = '    </DataArray>'
-        write(ifo,202) string3
-
-        !! U-velocity
-        string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'u'//DQ//' format='//DQ//'ascii'//DQ//'>'
-        write(ifo,202)string1
-        do ii=1,np
-           write(ifo,*)up(ii)
-        enddo
-        string3 = '    </DataArray>'
-        write(ifo,202) string3
-
-        !! V-velocity
-        string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'v'//DQ//' format='//DQ//'ascii'//DQ//'>'
-        write(ifo,202)string1
-        do ii=1,np
-           write(ifo,*)vp(ii)
-        enddo
-        string3 = '    </DataArray>'
-        write(ifo,202) string3
-        
-        !! W-velocity
-        string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'w'//DQ//' format='//DQ//'ascii'//DQ//'>'
-        write(ifo,202)string1
-        do ii=1,np
-           write(ifo,*)wp(ii)
-        enddo
-        string3 = '    </DataArray>'
-        write(ifo,202) string3        
-            
-        !! Vector velocity
-        string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'Velocity'//DQ// &
-                  ' NumberOfComponents='//DQ//'3'//DQ//' format='//DQ//'ascii'//DQ//'>'
-        write(ifo,202) string1
-        do ii=1,np
-           write(ifo,*)up(ii),vp(ii),wp(ii)
-        enddo
-        string3 = '    </DataArray>'
-        write(ifo,202) string3
+     !! Density   
+     string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'Density'//DQ//' format='//DQ//'ascii'//DQ//'>'
+     write(ifo,202)string1
+     do ii=1,np
+        write(ifo,*)ro(ii)
+     enddo
+     string3 = '    </DataArray>'
+     write(ifo,202) string3
      
-     end if
+     !! Pressure   
+     string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'Pressure'//DQ//' format='//DQ//'ascii'//DQ//'>'
+     write(ifo,202)string1
+     do ii=1,np
+        write(ifo,*)p(ii)
+     enddo
+     string3 = '    </DataArray>'
+     write(ifo,202) string3     
+        
+     !! Y mass frac
+     do iii=1,nspecs
+        write(ispec_string1,'(A1,i1.1)') 'Y',iii
+        string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//ispec_string1//DQ//' format='//DQ//'ascii'//DQ//'>'
+        write(ifo,202)string1
+        do ii=1,np
+           write(ifo,*)Yspec(ii,iii)
+        enddo
+        string3 = '    </DataArray>'
+        write(ifo,202) string3        
+     end do
+
+     !! Temperature
+     string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'Temperature'//DQ// &
+               ' format='//DQ//'ascii'//DQ//'>'
+     write(ifo,202)string1
+     do ii=1,np
+        write(ifo,*)Temp(ii)
+     enddo
+     string3 = '    </DataArray>'
+     write(ifo,202) string3
+        
+     !! alpha
+     string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'alpha'//DQ// &
+               ' format='//DQ//'ascii'//DQ//'>'
+     write(ifo,202)string1
+     do ii=1,np
+        write(ifo,*)alpha(ii)
+     enddo
+     string3 = '    </DataArray>'
+     write(ifo,202) string3        
+
+     !! Processor
+     string1 = '    <DataArray type='//DQ//'Int32'//DQ//' Name='//DQ//'processor'//DQ//' format='//DQ//'ascii'//DQ//'>'
+     write(ifo,202)string1
+     do ii=1,np
+        write(ifo,*)processor(ii)
+     enddo
+     string3 = '    </DataArray>'
+     write(ifo,202) string3
+
+     !! Node-type
+     string1 = '    <DataArray type='//DQ//'Int32'//DQ//' Name='//DQ//'node_type'//DQ//' format='//DQ//'ascii'//DQ//'>'
+     write(ifo,202)string1
+     do ii=1,np
+        write(ifo,*)node_type(ii)
+     enddo
+     string3 = '    </DataArray>'
+     write(ifo,202) string3
+
+     !! U-velocity
+     string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'u'//DQ//' format='//DQ//'ascii'//DQ//'>'
+     write(ifo,202)string1
+     do ii=1,np
+        write(ifo,*)up(ii)
+     enddo
+     string3 = '    </DataArray>'
+     write(ifo,202) string3
+
+     !! V-velocity
+     string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'v'//DQ//' format='//DQ//'ascii'//DQ//'>'
+     write(ifo,202)string1
+     do ii=1,np
+        write(ifo,*)vp(ii)
+     enddo
+     string3 = '    </DataArray>'
+     write(ifo,202) string3
+        
+     !! W-velocity
+     string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'w'//DQ//' format='//DQ//'ascii'//DQ//'>'
+     write(ifo,202)string1
+     do ii=1,np
+        write(ifo,*)wp(ii)
+     enddo
+     string3 = '    </DataArray>'
+     write(ifo,202) string3        
+            
+     !! Vector velocity
+     string1 = '    <DataArray type='//DQ//'Float32'//DQ//' Name='//DQ//'Velocity'//DQ// &
+               ' NumberOfComponents='//DQ//'3'//DQ//' format='//DQ//'ascii'//DQ//'>'
+     write(ifo,202) string1
+     do ii=1,np
+        write(ifo,*)up(ii),vp(ii),wp(ii)
+     enddo
+     string3 = '    </DataArray>'
+     write(ifo,202) string3
+     
 
      !! End of point data
      string4 = '   </PointData>'

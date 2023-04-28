@@ -30,8 +30,8 @@ contains
   subroutine evaluate_temperature_and_pressure
      !! Evaluate temperature numerically with cp = polynomial(T), and the pressure from P=ro*R*T
      !! Also evaluate the mixture gas constant, and the mixture specific heat capacity
-     integer(ikind) :: i,ii,j,ispec,iorder,NRiters,maxiters,sumiters
-     real(rkind) :: tmp_kinetic,deltaT,cp_tmp,tmpro
+     integer(ikind) :: i,ispec,iorder,NRiters,maxiters,sumiters
+     real(rkind) :: deltaT,cp_tmp,tmpro
      real(rkind),dimension(:),allocatable :: fT_coef_C,dfT_coef_C
      real(rkind) :: fT_coef_C0
      real(rkind) :: T_tmp,fT,dfT
@@ -47,7 +47,7 @@ contains
      !! Loop over ALL nodes
      maxiters = 0;sumiters=0
      !$omp parallel do private(fT_coef_C0,fT_coef_C,ispec,iorder,T_tmp,NRiters,fT,dfT,deltaT,dfT_coef_C, &
-     !$omp cp_tmp,tmpro) &
+     !$omp cp_tmp,tmpro,keepgoing) &
      !$omp reduction(max:maxiters) reduction(+:sumiters)
      do i=1,np
                   
@@ -112,7 +112,7 @@ contains
            end if
            
         end do
-        
+                
         !! Pass new T back to temperature array
         T(i) = T_tmp
                 
@@ -132,7 +132,8 @@ contains
         cp(i) = cp(i)*tmpro !! Divide by ro to get cp
 
         !! Evaluate the pressure        
-        p(i) = ro(i)*Rgas_mix(i)*T(i)           
+        p(i) = ro(i)*Rgas_mix(i)*T(i)   
+  
      end do
      !$omp end parallel do
      
@@ -252,8 +253,8 @@ contains
      !! Evaluate roE based on u,ro,T at a specific node
      integer(ikind),intent(in) :: i
      real(rkind),intent(in) :: tmpT
-     integer(ikind) :: ispec,j,nsum
-     real(rkind) :: enthalpy,Rgas_mix_local,p_local,psum,cpispec,dummy_real
+     integer(ikind) :: ispec
+     real(rkind) :: enthalpy,Rgas_mix_local,cpispec,dummy_real
      
 #ifndef isoT              
         !! Initialise roE with K.E. term
@@ -263,7 +264,7 @@ contains
         Rgas_mix_local = zero
         do ispec=1,nspec       
            !! Evaluate local species enthalpy
-           call evaluate_enthalpy_at_node(T(i),ispec,enthalpy,cpispec,dummy_real)
+           call evaluate_enthalpy_at_node(tmpT,ispec,enthalpy,cpispec,dummy_real)
            
            !! Add species enthalpy contribution
            roE(i) = roE(i) + Yspec(i,ispec)*enthalpy
@@ -273,7 +274,7 @@ contains
         end do           
 
         !! Subtract roRgasT
-        roE(i) = roE(i) - Rgas_mix_local*T(i)     
+        roE(i) = roE(i) - Rgas_mix_local*tmpT     
                     
 #endif
 
@@ -289,7 +290,7 @@ contains
      !! Additionally calculate the pressure on outflow boundary nodes, and set P_outflow to the
      !! average of this (it should be uniform along bound)
      integer(ikind) :: i,ispec,j,nsum_in,nsum_out
-     real(rkind) :: enthalpy,Rgas_mix_local,p_local,psum_in,tmpro,cpispec,dummy_real,psum_out
+     real(rkind) :: enthalpy,Rgas_mix_local,psum_in,tmpro,cpispec,dummy_real,psum_out
      
 #ifndef isoT     
      !! Evaluate the energy (roE) and pressure.
@@ -356,12 +357,12 @@ contains
         if(nsum_in.ne.0) then
            P_inflow = psum_in/dble(nsum_in)
         else
-           P_inflow = zero
+           P_inflow = p_ref
         end if
         if(nsum_out.ne.0) then
            P_outflow = psum_out/dble(nsum_out)
         else
-           P_outflow = zero
+           P_outflow = p_ref
         end if
         
 #endif

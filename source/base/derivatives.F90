@@ -291,7 +291,7 @@ contains
           j = ij_link(k,i) 
           hyp_tmp = hyp_tmp + phi(j)*ij_w_hyp(k,i)
        end do
-       filtphi(i) = phi(i) + filter_coeff(i)*(hyp_tmp - phi(i)*ij_w_hyp_sum(i))
+       filtphi(i) = phi(i) + (hyp_tmp - phi(i)*ij_w_hyp_sum(i))
     end do
     !$OMP END PARALLEL DO
 
@@ -323,9 +323,8 @@ contains
     return
   end subroutine calc_filtered_var   
 !! ------------------------------------------------------------------------------------------------       
-  subroutine get_flow_lengthscale(phi)
+  subroutine get_flow_lengthscale
     !! Calculate the lengthscale of the flow features from the hyperviscosity operator
-    real(rkind),dimension(:),intent(in) :: phi
     integer i,j,k
     real(rkind) :: lap_tmp,g_tmp,filt_tmp
     

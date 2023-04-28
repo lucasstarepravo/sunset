@@ -106,9 +106,10 @@ program datgen
 !! ------------------------------------------------------------------------------------------------
   case(3) !! Kolmogorov flow
 
-     yl=2.0d0*pi;h0=yl
+     yl=1.0d0!2.0d0*pi
+     h0=yl
      xl=1.0d0*yl
-     dx0=yl/64.0!0.025d0
+     dx0=yl/100.0!0.025d0
      xbcond=1;ybcond=1     
 
      !   JRCK boundary conditions
@@ -608,7 +609,7 @@ case(6) !! Channel flows, propagating front
 
      xl=1.0d0 ! channel length
      h0=xl/40.0d0   !cylinder radius
-     yl=xl/10.0d0  ! channel width
+     yl=xl/10.0d0!(4.0d0/3.0d0)  ! channel width
      dx0=h0/25.0       !15
      xbcond=0;ybcond=2     
      
@@ -629,6 +630,7 @@ case(6) !! Channel flows, propagating front
         read(191,*) blob_coeffs(1,i)
      end do
      close(191)
+     blob_coeffs(1,:) = 0.0d0;blob_coeffs(1,1) = 1.0d0
      blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi;blob_ellipse(1)=0
      
      call make_boundary_edge_vectors
@@ -638,7 +640,7 @@ case(6) !! Channel flows, propagating front
      varresratio = 2.0d0  !! Ratio for scaling near the solid objects
      dxmax = dx0  
      dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dx_in=3.0d0*dxmax;dx_out=1.5d0*dxmax  !! dx for solids and in/outs...!! 
+     dxb=dx0/varresratio;dx_in=3.0d0*dxmax;dx_out=1.0d0*dxmax  !! dx for solids and in/outs...!! 
      call make_boundary_particles
      call make_boundary_blobs               
      ipart = nb   
@@ -1466,31 +1468,44 @@ end subroutine quicksort
    
      ipart=nb
 
+     allocate(Sblob(nb_blobs))
+     call evaluate_blob_perimeters
+
 
      if(nb_blobs.ne.0)then
         do ib=1,nb_blobs
           
            !! Blobby blobs
            if(blob_ellipse(ib).eq.0)then
+           
+              !! Estimate approx number of nodes round the blob              
+              nb = floor(Sblob(ib)/dxb)
+
+              !! Revise node spacing to get integer number round blob
+              dxlocal = Sblob(ib)/dble(nb)                      
+                      
               a0 = blob_coeffs(ib,1)     
               x0 = blob_centre(ib,1);y0=blob_centre(ib,2)
               th = 0.0d0 !! theta
-              do while(th.le.2.0d0*pi-0.25*dxb/a0)
+              do while(th.le.2.0d0*pi-0.25*dxlocal/a0)
                  !! Position node
                  th_sh = th - blob_rotation(ib)
                 
+                 !! Evaluate radius
                  r_mag = blob_coeffs(ib,1)
                  do ibc=2,n_blob_coefs
                     r_mag = r_mag + blob_coeffs(ib,ibc)*cos(dble(ibc-1)*th_sh)
                  end do
                  
+                 !! Relative position
                  x = r_mag*cos(th);y = r_mag*sin(th)
 
+                 !! If the position is within the domain, create a particle
                  if(x+x0.ge.xb_min.and.x+x0.lt.xb_max.and.y+y0.ge.yb_min.and.y+y0.lt.yb_max)then              
                     ipart = ipart + 1 
                     xp(ipart)=x0 + x;yp(ipart)=y0 + y;dxp(ipart)=dxb
          
-                    !! Normals
+                    !! Calculate normals
                     tmp2 = 0.0
                     do ibc=2,n_blob_coefs
                        tmp2 = tmp2 - dble(ibc-1)*blob_coeffs(ib,ibc)*sin(dble(ibc-1)*th_sh)
@@ -1503,9 +1518,10 @@ end subroutine quicksort
                  end if                 
       
                  !! Increment angle...
-                 th  = th + cos(tmp2)*dxb/r_mag     
+                 th  = th + cos(tmp2)*dxlocal/r_mag     
               end do   
-                                                       
+                                         
+                                                      
            !! Elliptical blobs
            else
               a0 = blob_coeffs(ib,1);a1 = blob_coeffs(ib,2)        
@@ -1543,8 +1559,70 @@ end subroutine quicksort
         end do              
      end if
 
+     deallocate(Sblob)
      nb=ipart    
 !!
      write(6,*) 'no. of solid boundary particles: ',nb
      return
    end subroutine make_boundary_blobs  
+!! --------------------------------------------------------------
+   subroutine evaluate_blob_perimeters
+     !! Numerically integrate the length of the blob perimeter
+     use kind_parameters
+     use common_parameter
+     use global_variables 
+
+     implicit none
+     integer(ikind) :: ipart,ib,ibc
+     real(rkind) :: x,y,x0,y0,tmp2,r_mag,th,th0
+     real(rkind) :: a0,a1,a2,a3,a4,a5,dstiny
+   
+
+     if(nb_blobs.ne.0)then
+        do ib=1,nb_blobs
+          
+           !! Blobby blobs
+           if(blob_ellipse(ib).eq.0)then
+           
+              !! Initialise counters etc
+              Sblob(ib) = 0.0d0
+              a0 = blob_coeffs(ib,1)     
+              !! Coordinates of start point
+              y0 = 0.0d0
+              x0 = a0
+              do ibc = 2,n_blob_coefs
+                 x0 = x0 + blob_coeffs(ib,ibc)
+              end do
+                           
+              th = 0.0d0 !! theta       
+              dstiny = 0.005d0*dxb       
+              do while(th.le.2.0d0*pi-0.01*dstiny/x0)
+                
+                 !! Evaluate radius
+                 r_mag = blob_coeffs(ib,1)
+                 do ibc=2,n_blob_coefs
+                    r_mag = r_mag + blob_coeffs(ib,ibc)*cos(dble(ibc-1)*th)
+                 end do
+                 
+                 !! Calculate normals
+                 tmp2 = 0.0
+                 do ibc=2,n_blob_coefs
+                    tmp2 = tmp2 - dble(ibc-1)*blob_coeffs(ib,ibc)*sin(dble(ibc-1)*th)
+                 end do                             
+                 tmp2 = -atan(tmp2/r_mag)
+      
+                 !! Increment angle...
+                 th  = th + cos(tmp2)*dstiny/r_mag                      
+                 !! Increment Sblob
+                 Sblob(ib) = Sblob(ib) + dstiny
+              end do                                                                     
+                                                      
+           !! Elliptical blobs
+           else
+             !! Do nothing for now
+           end if                                                  
+        end do              
+     end if
+
+     return
+   end subroutine evaluate_blob_perimeters  

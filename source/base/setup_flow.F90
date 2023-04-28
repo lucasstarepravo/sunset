@@ -70,10 +70,10 @@ contains
      !! e.g. uniform/non-uniform inflow etc.
         
      !! Make a 1D flame: pass X-position,flame_thickness and T_hot
-!     call make_1d_flame(zero,2.0d-4,2.366d3)
+     call make_1d_flame(zero,2.0d-4,2.366d3)
         
      !! Make a 2D gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
-     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)        
+!     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0     
 
      !! Load an existing 1D flame file
 !     call load_flame_file
@@ -135,17 +135,7 @@ contains
 #ifdef mp
      call halo_exchange_divvel
 #endif         
-     
-     !! Set the initial forcing to zero. It will only be changed if PID controller in velcheck is used.
-     driving_force(:) = zero
-
-     !! Profiling - re-zero time accumulators
-     segment_time_local = zero
-     cputimecheck = zero         
-     
-     !! Initialise the time-stepping (necessary for PID controlled stepping)
-     dt = 1.0d-10   
-     
+         
      !! Initialise the variable which holds inflow velocity locally
      if(nb.ne.0)then
         !$omp parallel do
@@ -171,7 +161,30 @@ contains
         end do
      endif
            
-              
+     !! SOME INITIALISATION PARTS ---------------------------------------------      
+     !! Set the initial forcing to zero. It will only be changed if PID controller in velcheck is used.
+     driving_force(:) = zero
+
+     !! Profiling - re-zero time accumulators
+     segment_time_local = zero
+     cputimecheck = zero         
+     
+     !! Initialise the time-stepping (necessary for PID controlled stepping)
+     dt = 1.0d-10   
+           
+     !! Initialise PID controller variables
+     emax_np1=pid_tol;emax_n=pid_tol;emax_nm1=pid_tol
+     
+     !! Initialise time-stepping error normalisation
+     ero_norm = one/one
+     erou_norm = one/(one*u_char)
+     eroE_norm = one/p_ref
+     eroY_norm = one/(one*one)
+
+     !! Initialise PID controller variables for <|u|>
+     eflow_nm1 = one
+     sum_eflow = zero   
+                   
      return
   end subroutine initial_solution   
 !! ------------------------------------------------------------------------------------------------
@@ -644,7 +657,7 @@ contains
      !! Load initial conditions from a dump file
      integer(ikind) :: k,i,j
      real(rkind) :: tmp,tmpro
-     character(70) :: fname  
+     character(70) :: fname,fname2  
 
 #ifdef mp
      k=10000+iproc
@@ -653,19 +666,19 @@ contains
 #endif     
 
      !! Construct the file name:
-     write(fname,'(A16,I5)') './restart/layer_',k
+     write(fname,'(A17,I5)') './restart/fields_',k
+     write(fname2,'(A16,I5)') './restart/nodes_',k
 
-     !! Open the file
-     open(14,file=fname)
-     read(14,*) k
-     if(k.ne.npfb) write(6,*) "WARNING, expecting problem in restart"
-
+     !! Load the "smoothing length" from nodes file
+     open(15,file=fname2)
+     read(15,*) k
+     if(k.ne.npfb) write(6,*) "WARNING, expecting problem in restart. NODES FILE."
      !! Load the initial conditions
      do i=1,npfb
 #ifdef dim3
-        read(14,*) tmp,tmp,tmp,tmp,h(i),k,tmpro,u(i),v(i),w(i),tmp,T(i),hrr(i),Yspec(i,1:nspec)
+        read(15,*) tmp,tmp,tmp,tmp,h(i),k
 #else
-        read(14,*) tmp,tmp,tmp,h(i),k,tmpro,u(i),v(i),tmp,T(i),hrr(i),Yspec(i,1:nspec)
+        read(15,*) tmp,tmp,tmp,h(i),k
 #endif        
         if(k.ne.node_type(i)) then
            write(6,*) "ERROR: Problem in restart file. STOPPING."
@@ -675,8 +688,25 @@ contains
            stop
 #endif
         end if
-        ro(i) = tmpro
      end do
+     close(15)
+
+
+     !! Open the field files
+     open(14,file=fname)
+     read(14,*) k
+     if(k.ne.npfb) write(6,*) "WARNING, expecting problem in restart. FIELDS FILE."
+
+     !! Load the initial conditions
+     do i=1,npfb
+#ifdef dim3
+        read(14,*) tmpro,u(i),v(i),w(i),tmp,T(i),p(i),hrr(i),Yspec(i,1:nspec)
+#else
+        read(14,*) tmpro,u(i),v(i),tmp,T(i),p(i),hrr(i),Yspec(i,1:nspec)
+#endif        
+        ro(i) = tmpro
+     end do      
+     close(14)
      
      !! Re-specify the boundary temperatures
      if(nb.ne.0) then
@@ -685,8 +715,7 @@ contains
            T_bound(j) = T(i)
         end do
      end if
-      
-     close(14)
+
   
      return
   end subroutine load_restart_file

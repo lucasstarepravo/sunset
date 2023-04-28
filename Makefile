@@ -126,7 +126,8 @@ clean:
 	rm -vf ./obj/*.mod
 	rm -vf ./sunset
 	rm -rfv fort.*	
-	rm -vf ./data_out/layer*
+	rm -vf ./data_out/fields*
+	rm -vf ./data_out/nodes*
 	rm -vf ./data_out/flame*
 	rm -vf ./data_out/time.out
 	rm -vf ./data_out/statistics/*.out

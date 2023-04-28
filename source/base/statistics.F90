@@ -35,7 +35,7 @@ contains
      !! and maximum sound speed in domain
      open(unit=192,file='data_out/statistics/dt.out')
      
-     !! Time, total mass within the domain
+     !! Time, total mass within the domain, total volume
      open(unit=193,file='data_out/statistics/masscheck.out')
      
      !! Time, net forces on wall boundaries. Needs modifying on case-by-case basis
@@ -58,14 +58,14 @@ contains
      
      !! Time, heat release rate
      open(unit=200,file='data_out/statistics/heat_release_rate.out')
-
+     
      return     
   end subroutine open_stats_files
 !! ------------------------------------------------------------------------------------------------
-  subroutine statistics_control
+  subroutine statistics_control(m_out_stats)
      !! This routine controls the statistics calculation and output routines.
+     integer(ikind),intent(inout) :: m_out_stats
      integer(ikind) :: i
-     real(rkind) :: tot_mass,tot_vol,tmpro,dVi,tot_mass_tmp,tot_vol_tmp,tot_roE,tot_roE_tmp
      integer(ikind),parameter :: istats_freq = 10
      
      
@@ -73,12 +73,17 @@ contains
      !! This should be done every step if using PID for pressure gradient
 #ifdef pgrad     
      call velocity_control
-#else
-     if(itime.eq.0.or.mod(itime,istats_freq).eq.0) call velocity_control     
 #endif  
      
-     !! Other 
-     if(itime.eq.0.or.mod(itime,istats_freq).eq.0) then    
+     !! All
+     if(itime.eq.0.or.time.gt.m_out_stats*dt_out_stats) then
+        m_out_stats = m_out_stats+1
+
+#ifndef pgrad
+        !! Velocity control
+        call velocity_control     
+#endif
+
         !! Check conservation of mass and energy
         call mass_and_energy_check
      
@@ -204,7 +209,7 @@ contains
      !$omp parallel do private(tmpro,tmpvel,dVi) reduction(+:tot_vel,tot_vol,tot_u)
      do i=1,npfb
         tmpro = ro(i)
-        dVi = s(i)*s(i) !! assume square nodes for now...
+        dVi = vol(i)
 #ifdef dim3
         dVi = dVi*dz
 #endif               
@@ -278,7 +283,7 @@ contains
      tot_hrr = zero
      !$omp parallel do private(dVi) reduction(+:tot_hrr)
      do i=1,npfb
-        dVi = s(i)*s(i) !! assume square nodes for now...
+        dVi = vol(i)
 #ifdef dim3
         dVi = dVi*dz
 #endif        
@@ -322,7 +327,7 @@ contains
      !$omp parallel do private(tmpro,dVi) reduction(+:tot_mass,tot_vol,tot_roE)
      do i=1,npfb
         tmpro = ro(i)
-        dVi = s(i)*s(i) !! assume square nodes for now...
+        dVi = vol(i)
 #ifdef dim3
         dVi = dVi*dz
 #endif        
@@ -354,6 +359,7 @@ contains
         flush(193)
         write(197,*) time/Time_char,tot_roE
         flush(197)
+        
      end if
 #else
      write(193,*) time/Time_char,tot_mass,tot_vol
@@ -383,7 +389,7 @@ contains
         tmpro = one/ro(i)
      
         !! size of volume element
-        dVi = s(i)*s(i) !! assume square nodes for now...
+        dVi = vol(i)
 #ifdef dim3
         dVi = dVi*dz
 #endif        
@@ -471,7 +477,7 @@ contains
            uexact = uexact - 32.0d0*X1*X2
         end do       
         
-        dVi = h(i)*h(i) !! assume square nodes for now...
+        dVi = vol(i)
         local_error = u(i)-uexact
         sum_e = sum_e + local_error**two
         sum_exact = sum_exact + uexact**two
@@ -531,26 +537,26 @@ contains
      !! Evaluate volume averaged enstrophy and also the volume averaged kinetic energy
      !! This routine is designed specifically for 3D Taylor-Green vortex tests.
      integer(ikind) :: i
-     real(rkind) :: srtnorm,sum_enstrophy,vol_i,sum_vol,sum_ke
+     real(rkind) :: srtnorm,sum_enstrophy,dVi,sum_vol,sum_ke
      
      sum_enstrophy = zero
      sum_vol = zero
      sum_ke = zero
-     !$omp parallel do private(srtnorm,vol_i) reduction(+:sum_enstrophy,sum_vol,sum_ke)
+     !$omp parallel do private(srtnorm,dVi) reduction(+:sum_enstrophy,sum_vol,sum_ke)
      do i=1,npfb
      
-        vol_i = s(i)*s(i)
+        dVi = vol(i)
 #ifdef dim3
-        vol_i = vol_i*dz
+        dVi = dVi*dz
 #endif        
         srtnorm = dot_product(gradu(i,:),gradu(i,:)) + &
                   dot_product(gradv(i,:),gradv(i,:)) + &
                   dot_product(gradw(i,:),gradw(i,:))
-        sum_enstrophy = sum_enstrophy + visc(i)*srtnorm*vol_i
-        sum_vol = sum_vol + vol_i
+        sum_enstrophy = sum_enstrophy + visc(i)*srtnorm*dVi
+        sum_vol = sum_vol + dVi
         
         !!
-        sum_ke = sum_ke + ro(i)*(u(i)**two + v(i)**two + w(i)**two)*vol_i
+        sum_ke = sum_ke + ro(i)*(u(i)**two + v(i)**two + w(i)**two)*dVi
      end do
      !$omp end parallel do
      

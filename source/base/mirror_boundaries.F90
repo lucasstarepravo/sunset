@@ -42,7 +42,7 @@ contains
      !! -----:  vrelation(j)=4 means that u(j) = -u(i), v(j) = -v(i)
     real(rkind),dimension(dims) :: rcorn
     real(rkind) :: cdist
-    integer(ikind) :: i,j,imp,k,xbcond_noMPI,ybcond_noMPI
+    integer(ikind) :: i,imp,k,xbcond_noMPI,ybcond_noMPI
     integer(ikind) :: nmirror,nmirror_esti
       
     nmirror_esti = 5*npfb  ! Estimate for max number of mirrors

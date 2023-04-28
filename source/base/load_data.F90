@@ -77,11 +77,12 @@ contains
      
      !! Output frequency (in multiples of characteristic time)
      read(12,*)
-     read(12,*) dt_out
+     read(12,*) dt_out,dt_out_stats
      read(12,*)
      dt_out = dt_out*Time_char
+     dt_out_stats = dt_out_stats*Time_char
         
-     !! Gravity?
+     !! Gravity
      read(12,*)
      read(12,*) grav(:)
      read(12,*)
@@ -136,7 +137,7 @@ contains
      
      !! Read in inflow boundary type
      read(12,*)
-     read(12,*) inflow_type
+     read(12,*) inflow_type,inflow_velocity_control
      read(12,*)
      
      !! Read in wall boundary type

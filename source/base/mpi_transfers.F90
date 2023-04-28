@@ -77,10 +77,18 @@ contains
      integer(ikind) :: ispec
           
      segment_tstart = omp_get_wtime()
-
+#ifdef mp
+     !! Superfluous barrier
+     call MPI_BARRIER( MPI_COMM_WORLD, ierror)   
+#endif
+     !! Profiling
+     segment_tend = omp_get_wtime()
+     segment_time_local(10) = segment_time_local(10) + segment_tend - segment_tstart
+     segment_tstart = omp_get_wtime()
 
 #ifdef mp 
-
+       
+     
      !! u-momentum
      call halo_exchange(rou)
     
@@ -117,9 +125,17 @@ contains
   subroutine halo_exchange_divvel  
      !! If using mpi, this calls routines to transfer divvel between halos. If not using
      !! mpi, it does nothing
-     
-     segment_tstart = omp_get_wtime()
 
+     segment_tstart = omp_get_wtime()
+#ifdef mp
+     !! Superfluous barrier
+     call MPI_BARRIER( MPI_COMM_WORLD, ierror)   
+#endif
+     !! Profiling
+     segment_tend = omp_get_wtime()
+     segment_time_local(10) = segment_time_local(10) + segment_tend - segment_tstart
+     segment_tstart = omp_get_wtime()
+          
 #ifdef mp 
      !! Velocity divergence
      call halo_exchange(divvel)
@@ -307,10 +323,9 @@ contains
   end subroutine processor_mapping
 !! ------------------------------------------------------------------------------------------------
   subroutine build_halos
-     integer(ikind) :: i,nstart,nend,maxhalo,suminhalo,is,ie,k,half_fd_stencil,jproc,jproc_cycle
+     integer(ikind) :: i,suminhalo,k,half_fd_stencil,jproc,jproc_cycle
      integer(ikind) :: maxhalo_UD,maxhalo_LR,maxhalo_FB
      real(rkind) :: x,y,ss_local,halo_fac
-     integer(ikind),dimension(:,:),allocatable :: halo_lists_tmp
      integer(ikind),dimension(:,:),allocatable :: halo_lists_tmp_LR,halo_lists_tmp_UD,halo_lists_tmp_FB
      real(rkind),dimension(:),allocatable :: XL_tmp,XR_tmp,YU_tmp,YD_tmp,ZF_tmp,ZB_tmp
      !! Routine builds a list of nodes which are to be exported as halos for adjacent processors
@@ -813,7 +828,7 @@ contains
      call MPI_ALLREDUCE(maxval(v(1:npfb)),maxphi(2),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)               
      call MPI_ALLREDUCE(maxval(w(1:npfb)),maxphi(3),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
      call MPI_ALLREDUCE(maxval(ro(1:npfb)),maxphi(4),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(maxval(roE(1:npfb)),maxphi(5),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(maxval(p(1:npfb)),maxphi(5),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
      call MPI_ALLREDUCE(maxval(T(1:npfb)),maxphi(6),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
      do ispec=1,nspec
         call MPI_ALLREDUCE(maxval(Yspec(1:npfb,ispec)),maxphi(6+ispec),1,MPI_DOUBLE_PRECISION,MPI_MAX,MPI_COMM_WORLD,ierror)
@@ -823,7 +838,7 @@ contains
      call MPI_ALLREDUCE(minval(v(1:npfb)),minphi(2),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)               
      call MPI_ALLREDUCE(minval(w(1:npfb)),minphi(3),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
      call MPI_ALLREDUCE(minval(ro(1:npfb)),minphi(4),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
-     call MPI_ALLREDUCE(minval(roE(1:npfb)),minphi(5),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
+     call MPI_ALLREDUCE(minval(p(1:npfb)),minphi(5),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
      call MPI_ALLREDUCE(minval(T(1:npfb)),minphi(6),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror)
      do ispec=1,nspec
         call MPI_ALLREDUCE(minval(Yspec(1:npfb,ispec)),minphi(6+ispec),1,MPI_DOUBLE_PRECISION,MPI_MIN,MPI_COMM_WORLD,ierror) 
@@ -839,7 +854,7 @@ contains
      !! Assumes that find_neighbours has already been called...
      integer(ikind),dimension(:),allocatable :: halo_essential_all
      integer(ikind),dimension(:),allocatable :: halo_essential_from,halo_essential,halo_list_tmp
-     integer(ikind) i,j,k,jstart,maxhalo,suminhalo,nhalo_new,tag
+     integer(ikind) i,j,k,suminhalo,nhalo_new,tag
      logical :: xodd,yodd,zodd
 
      !! Identify required halo nodes

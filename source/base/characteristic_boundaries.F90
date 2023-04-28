@@ -419,8 +419,7 @@ contains
 #ifdef ms
         Lchar(5+1:5+nspec)=zero !! No incoming composition waves??
 #endif        
-     end if   
-         
+     end if        
 
   end subroutine specify_characteristics_outflow
 !! ------------------------------------------------------------------------------------------------
@@ -517,31 +516,35 @@ contains
      real(rkind) :: y,u_inflow_start,u_inflow_end
      real(rkind) :: ramp_time,u_inflow_mean
      
-     !! Start and end inflow speeds, and ramp time
-     u_inflow_start = u_char
-     u_inflow_end = u_char
-     ramp_time = 1.0d-4   
+     if(inflow_velocity_control.eq.1) then
+        !! Start and end inflow speeds, and ramp time
+        u_inflow_start = u_char
+        u_inflow_end = u_char
+        ramp_time = 0.2d0*Time_char   
      
-     !! Set the desired mean inflow velocity
-     if(time.le.ramp_time) then
-        u_inflow_mean = u_inflow_start + (u_inflow_end-u_inflow_start)*time/ramp_time
+        !! Set the desired mean inflow velocity
+        if(time.le.ramp_time) then
+           u_inflow_mean = u_inflow_start + (u_inflow_end-u_inflow_start)*time/ramp_time
+        else
+           u_inflow_mean = u_inflow_end
+        end if
+     
+        !! Only update u_inflow_local if it has changed (i.e. time<ramp_time)
+        if(time.le.ramp_time) then
+           !! Loop over all boundary nodes
+           !$omp parallel do private(i,y)
+           do j=1,nb
+              i=boundary_list(j)
+              if(node_type(i).eq.1) then !! Inflows only
+                 y = rp(i,2)
+                 u_inflow_local(j) = u_inflow_mean!*six*(half-y)*(half+y)
+              end if
+           end do
+           !$omp end parallel do
+        end if             
      else
-        u_inflow_mean = u_inflow_end
-     end if
-     
-     !! Only update u_inflow_local if it has changed (i.e. time<ramp_time)
-     if(time.le.ramp_time) then
-        !! Loop over all boundary nodes
-        !$omp parallel do private(i,y)
-        do j=1,nb
-           i=boundary_list(j)
-           if(node_type(i).eq.1) then !! Inflows only
-              y = rp(i,2)
-              u_inflow_local(j) = u_inflow_mean!*six*(half-y)*(half+y)
-           end if
-        end do
-        !$omp end parallel do
-     end if             
+        !! DO NOTHING. u_inflow_local(:) = u_char
+     endif
   
      return
   end subroutine update_u_inflow
