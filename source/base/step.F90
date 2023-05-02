@@ -385,18 +385,21 @@ contains
         !! low-order mixed discretisation at the boundary is less accurate than internally, and
         !! requires a more restrictive time step. For non-uniform resolutions, we usually have
         !! the resolution in the outflow boundary larger than around obstacles in the domain, in which
-        !! circumstances this doesn't make a difference (outflow boundary isn't most restrictive).
-        if(node_type(i).eq.2) then
-           e_acc_ro(i) = e_acc_ro(i)*1.0d2
-           e_acc_rou(i) = e_acc_rou(i)*1.0d2
-           e_acc_rov(i) = e_acc_rov(i)*1.0d2
-           e_acc_row(i) = e_acc_row(i)*1.0d2
+        !! circumstances this isn't necessary (outflow boundary isn't most restrictive). This is controlled by 
+        !! "scale_outflow_errors", which is set in setup_domain.
+        if(scale_outflow_errors.eq.1) then
+           if(node_type(i).eq.2) then
+              e_acc_ro(i) = e_acc_ro(i)*1.0d2
+              e_acc_rou(i) = e_acc_rou(i)*1.0d2
+              e_acc_rov(i) = e_acc_rov(i)*1.0d2
+              e_acc_row(i) = e_acc_row(i)*1.0d2
 #ifndef isoT      
-           e_acc_E(i) = e_acc_E(i)*1.0d2
+              e_acc_E(i) = e_acc_E(i)*1.0d2
 #endif           
 #ifdef ms
-           e_acc_Yspec(i,:) = e_acc_Yspec(i,:)*1.0d2
+              e_acc_Yspec(i,:) = e_acc_Yspec(i,:)*1.0d2
 #endif           
+           end if
         end if
 
         
@@ -527,9 +530,6 @@ contains
      dt_therm = 0.3d0*dt_therm*L_char*L_char
      dt_spec = two*dt_spec*L_char*L_char
                            
-     !! Find smallest node spacing
-     smin = minval(s(1:npfb))*L_char
-
      !! Find most restrictive parabolic constraint
      dt_parabolic = min(dt_visc,min(dt_therm,dt_spec)) 
      

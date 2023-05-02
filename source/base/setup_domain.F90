@@ -72,6 +72,7 @@ contains
      real(rkind),dimension(dims) :: rij
      real(rkind),dimension(:,:),allocatable :: tmp_vec
      integer(ikind) :: nl_ini,nl_end,nl_iniC,nl_endC,nl_ini2,nl_end2
+     real(rkind) :: smin
 
      !! STEP 1: Load IPART (some params, plus list of nodes + boundary normals)
      !! =======================================================================
@@ -272,12 +273,33 @@ contains
               znf_tdiff(j) = .true.      !! No thermal diffusion through outflow
               znf_vdiff(j) = .false.      
               znf_vtdiff(j) = .true.      !! No tangential viscous diffusion through outflow                            
+
            end if     
         end do
      end if               
      
      !! Find neighbours (ready for stencil adaptation)
      call find_neighbours     
+     
+              
+     !! Flag for outflow error scaling: if the resolution at the outflow is the smallest resolution, then
+     !! errors need scaling to control time step
+     scale_outflow_errors = 0
+     smin = minval(s(1:npfb))
+     call global_reduce_min(smin)
+     if(nb.ne.0)then
+        do j=1,nb
+           i=boundary_list(j)
+           if(node_type(i).eq.2) then !! Outflow
+              if(s(i).le.1.01d0*smin) then       !! If outflow resolution is <1.01*smallest resolution
+                 scale_outflow_errors = 1
+              end if
+           end if     
+        end do
+     end if         
+               
+              
+              
      
      return
   end subroutine build_domain

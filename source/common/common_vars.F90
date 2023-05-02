@@ -96,10 +96,11 @@ module common_vars
 
   !! Time-stepping
   real(rkind) :: dt,dt_cfl,dt_parabolic  !! Various time-steps
-  real(rkind) :: umax,smax,cmax,smin                  !! maximum velocity,node-spacing,sound speed
+  real(rkind) :: umax,cmax,smax                  !! maximum velocity,node-spacing,sound speed
   integer(ikind) :: itime,iRKstep
   real(rkind) :: emax_nm1,emax_n,emax_np1  !! errors for PID controller
   real(rkind) :: ero_norm,erou_norm,eroE_norm,eroY_norm
+  integer(ikind) :: scale_outflow_errors
 
   !! P.I.D. controller for velocity
   real(rkind) :: eflow_nm1,eflow_n,sum_eflow !! errors for PID to control <u> (constant-ish flow rate)

@@ -180,6 +180,9 @@ contains
      erou_norm = one/(one*u_char)
      eroE_norm = one/p_ref
      eroY_norm = one/(one*one)
+     
+   
+     
 
      !! Initialise PID controller variables for <|u|>
      eflow_nm1 = one
@@ -712,7 +715,7 @@ contains
      if(nb.ne.0) then
         do j=1,nb
            i=internal_list(j)
-           T_bound(j) = T(i)
+           T_bound(j) = T_ref!T(i)
         end do
      end if
 

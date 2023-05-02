@@ -520,7 +520,7 @@ contains
         !! Start and end inflow speeds, and ramp time
         u_inflow_start = u_char
         u_inflow_end = u_char
-        ramp_time = 0.2d0*Time_char   
+        ramp_time = 1.0d0*Time_char   
      
         !! Set the desired mean inflow velocity
         if(time.le.ramp_time) then
