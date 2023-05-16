@@ -182,8 +182,8 @@ contains
      XL_thisproc = minval(rp(1:npfb,1))
      XR_thisproc = maxval(rp(1:npfb,1))    
      if(iprocY.eq.0.and.nprocsY.gt.1) then
-        YU_thisproc = maxval(rp(floor(0.55*npfb):npfb,2))  !! Adjustments for cyclical columns. 
-        YD_thisproc = minval(rp(1:floor(0.45*npfb),2))       !! Should be oK given node ordering
+        YU_thisproc = maxval(rp(floor(0.75*npfb):npfb,2))  !! Adjustments for cyclical columns. 
+        YD_thisproc = minval(rp(1:floor(0.25*npfb),2))       !! Should be oK given node ordering
      else
         YU_thisproc = maxval(rp(1:npfb,2))
         YD_thisproc = minval(rp(1:npfb,2))
@@ -309,6 +309,7 @@ contains
      integer(ikind) i,j,ii,jj
      
 #ifdef mp     
+     call MPI_BARRIER( MPI_COMM_WORLD, ierror)     
      call refine_halos
 #endif
      !! Shrink arrays to fit number of nodes

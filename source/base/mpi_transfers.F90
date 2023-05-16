@@ -78,7 +78,7 @@ contains
           
      segment_tstart = omp_get_wtime()
 #ifdef mp
-     !! Superfluous barrier
+     !! Superfluous barrier <-- allows me to distinguish between MPI comms and waiting time when profiling.
      call MPI_BARRIER( MPI_COMM_WORLD, ierror)   
 #endif
      !! Profiling

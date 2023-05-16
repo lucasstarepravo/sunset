@@ -411,9 +411,9 @@ end select
   
   !! Write to fort file for quick visualisation
 !  write(31,*) npfb
-  do i=1,npfb
-     write(31,*) xp(i),yp(i),dxp(i)
-  end do
+!  do i=1,npfb
+!     write(31,*) xp(i),yp(i),dxp(i)
+!  end do
   !! Use Octave/Matlab and run  "A=load('fort.31');scatter(A(:,1),A(:,2),1,A(:,3),'filled');colorbar" 
   !! from this directory for instant visualisation.
   
