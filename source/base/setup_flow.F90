@@ -128,34 +128,7 @@ contains
      call calc_divergence(u,v,w,divvel(1:npfb))
 #else
      call calc_divergence(u,v,divvel(1:npfb))     
-#endif        
-
-
-!! TESTING BOUNDARY DERIVATIVES
-     !! Test field in v, exact derivative in u, numerical solution in w
-
-     !! Test field
-     !$omp parallel do
-     do i=1,np
-        u(i) = zero!cos(rp(i,1)*2.0*pi)
-        v(i) = sin(rp(i,2)*2.0*pi)   
-        w(i) = zero
-     end do
-     !$omp end parallel do
-     
-     !! Derivative
-     call calc_divergence(u,v,divvel(1:npfb))
-
-     !! Analytic
-     !$omp parallel do
-     do i=1,npfb
-        u(i) = 2.0d0*pi*cos(rp(i,2)*2.0d0*pi)
-        ro(i) = divvel(i)
-     end do
-     !$omp end parallel do
-!! END TEST     
-     
-
+#endif              
      
      !! Mirrors and halos for divvel                   
      call reapply_mirror_bcs
