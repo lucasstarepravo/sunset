@@ -70,10 +70,10 @@ contains
      !! e.g. uniform/non-uniform inflow etc.
         
      !! Make a 1D flame: pass X-position,flame_thickness and T_hot
-     call make_1d_flame(zero,2.0d-4,2.366d3)
+!     call make_1d_flame(zero,2.0d-4,2.366d3)
         
      !! Make a 2D gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
-!     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0     
+     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0     
 
      !! Load an existing 1D flame file
 !     call load_flame_file
@@ -127,8 +127,35 @@ contains
 #ifdef dim3        
      call calc_divergence(u,v,w,divvel(1:npfb))
 #else
-     call calc_divergence(u,v,divvel(1:npfb))
+     call calc_divergence(u,v,divvel(1:npfb))     
 #endif        
+
+
+!! TESTING BOUNDARY DERIVATIVES
+     !! Test field in v, exact derivative in u, numerical solution in w
+
+     !! Test field
+     !$omp parallel do
+     do i=1,np
+        u(i) = zero!cos(rp(i,1)*2.0*pi)
+        v(i) = sin(rp(i,2)*2.0*pi)   
+        w(i) = zero
+     end do
+     !$omp end parallel do
+     
+     !! Derivative
+     call calc_divergence(u,v,divvel(1:npfb))
+
+     !! Analytic
+     !$omp parallel do
+     do i=1,npfb
+        u(i) = 2.0d0*pi*cos(rp(i,2)*2.0d0*pi)
+        ro(i) = divvel(i)
+     end do
+     !$omp end parallel do
+!! END TEST     
+     
+
      
      !! Mirrors and halos for divvel                   
      call reapply_mirror_bcs
@@ -399,7 +426,7 @@ contains
         ro(i) = P_flame/(Rmix_local*T(i))
         
         !! Velocity
-        u(i) = u_reactants!*six*(half-y)*(half+y)
+        u(i) = u_reactants*0.1d0!*six*(half-y)*(half+y)
         v(i) = zero
         w(i) = zero
                         
@@ -600,10 +627,10 @@ contains
   subroutine hardcode_initial_conditions
      !! Temporary routine to generate initial conditions from some hard-coded functions.
      integer(ikind) :: i,j,k,ispec
-     real(rkind) :: x,y,z,tmp,tmpro
+     real(rkind) :: x,y,z,tmp,tmpro,Rmix_local
      
      !! Values within domain
-     !$OMP PARALLEL DO PRIVATE(x,y,z,tmp,ispec)
+     !$OMP PARALLEL DO PRIVATE(x,y,z,tmp,ispec,Rmix_local)
      do i=1,npfb
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
 !        u(i) = -cos(two*pi*x)*sin(two*pi*y)*cos(two*pi*z/Lz)!*oosqrt2
@@ -623,12 +650,28 @@ contains
         ro(i) = rho_char + tmp
 
 #ifdef ms    
-        tmp = one - half*(one + erf(5.0d0*x))
-        Yspec(i,1) = tmp
+!        tmp = one - half*(one + erf(5.0d0*x))
+        Yspec(i,1:8) = zero
+        Yspec(i,9) = one
 #else
         Yspec(i,1) = one
 #endif         
-
+        u(i) = zero
+        v(i) = zero
+        T(i) = T_ref
+        tmp = exp(-y*y/0.01d0)
+        ro(i) = one + 0.1d0*tmp
+        
+        !! Local mixture gas constant
+        Rmix_local = zero
+        do ispec=1,nspec
+           Rmix_local = Rmix_local + Yspec(i,ispec)*one_over_molar_mass(ispec)
+        end do
+        Rmix_local = Rmix_local*Rgas_universal
+        
+        !! Density
+        p(i) = ro(i)*Rmix_local*T(i)
+        
                    
      end do
      !$OMP END PARALLEL DO

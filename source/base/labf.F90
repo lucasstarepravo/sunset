@@ -399,7 +399,7 @@ contains
      integer(ikind) :: i,j,k,nsize,nsizeG,i1,i2,is,ie,irow,ii,jj,kk
      integer(ikind) :: im1,im2,ip1,ip2
      real(rkind) :: rad,qq,xt,yt,ff1,xn,yn,tmp_n,tmp_t,dx2,dx4,tmp1,x,y,tmp2,dx
-     real(rkind) :: tmp_nn,tmp_tt,tmp_nt
+     real(rkind) :: tmp_nn,tmp_tt,tmp_nt,grads
      real(rkind),dimension(dims) :: rij
      real(rkind),dimension(:,:),allocatable :: amatt,amattt,amatthyp
      real(rkind),dimension(:),allocatable :: gvec,bvect,bvectt,bvecthyp,xvec
@@ -513,13 +513,106 @@ contains
      allocate(amatt(nsizeG,nsizeG),amattt(nsizeG,nsizeG),amatthyp(nsizeG,nsizeG))
      allocate(bvect(nsizeG),bvectt(nsizeG),bvecthyp(nsizeG),xvec(nsizeG),gvec(nsizeG))
      
-     !! Boundary and first rows: set gradients
+     !! Boundaries only, set gradient, grad2 and hyp
+     do jj=1,nb
+        i=boundary_list(jj)
+        amatt=zero;amattt=zero;bvect=zero;bvectt=zero;xvec = zero;gvec = zero
+        amatthyp=zero;bvecthyp=zero
+        xt=-rnorm(i,2);yt=rnorm(i,1)  !! unit tangent vector
+        xn=rnorm(i,1);yn=rnorm(i,2)  !! unit normal vector
+        do k=1,ij_count(i)
+           j=ij_link(k,i)                   
+
+           ii=node_type(j)
+           if(ii.eq.node_type(i))then !! only look through nodes on the same "layer"
+           
+              rij = rp(i,:)-rp(j,:)  !! ij-vector
+              x = -dot_product(rij(1:2),(/xt,yt/)) !! relative coord of j (to i) along tangent
+              y = -dot_product(rij(1:2),(/xn,yn/)) !! relative coord of j (to i) along normal
+              if(i.eq.j) x=zero !! avoid NaN in above line         
+           
+              xvec(1:nsizeG) = monomials1D(x)
+              
+              ff1 = fac(abs(x/h(i)))
+              x = x/h(i)
+           
+              gvec(1:nsizeG) = abfs1D(x,ff1)
+                      
+              do i1=1,nsizeG
+                 do i2=1,nsizeG
+                    amatt(i1,i2) = amatt(i1,i2) + xvec(i1)*gvec(i2)
+                 end do
+              end do            
+           end if        
+        end do
+        amattt = amatt;amatthyp = amatt
+
+        !! Solve system for transverse deriv   
+        bvect(:)=zero;bvect(1)=one;i1=0;i2=0;nsize=nsizeG
+        call dgesv(nsize,1,amatt,nsize,i1,bvect,nsize,i2)  
+
+        !! Solve system for transverse 2nd deriv   
+        bvectt(:)=zero;bvectt(2)=one;i1=0;i2=0;nsize=nsizeG
+        call dgesv(nsize,1,amattt,nsize,i1,bvectt,nsize,i2)      
+
+        !! Solve system for transverse hyperviscous filter   
+        bvecthyp(:)=zero;bvecthyp(4)=-one;i1=0;i2=0;nsize=nsizeG
+        call dgesv(nsize,1,amatthyp,nsize,i1,bvecthyp,nsize,i2)                  
+
+
+        !! Next neighbour loop to calculate weights
+        do k=1,ij_count(i)
+           j=ij_link(k,i)                   
+
+           ii=node_type(j)
+           if(ii.eq.node_type(i))then !! only look through nodes on the same "layer"
+              rij = rp(i,:)-rp(j,:)  !! ij-vector
+              x = -dot_product(rij(1:2),(/xt,yt/)) !! relative coord of j (to i) along tangent
+              y = -dot_product(rij(1:2),(/xn,yn/)) !! relative coord of j (to i) along normal
+              if(i.eq.j) x=zero !! avoid NaN in above line              
+              
+              ff1 = fac(abs(x/h(i)))
+              x = x/h(i)
+           
+              gvec(1:nsizeG) = abfs1D(x,ff1)
+                            
+
+              !! Weights for grad,grad2 and hyp
+              ij_w_grad(2,k,i) = dot_product(bvect,gvec)               
+              ij_wb_grad2(2,k,jj) = dot_product(bvectt,gvec) 
+              ij_w_hyp(k,i) = ij_w_hyp(k,i) + dot_product(bvecthyp,gvec)                            
+           end if    
+           
+        end do
+               
+     end do         
+     
+     
+     !! First rows: set gradients only
      do i=1,npfb
-        if(node_type(i).ge.-1.and.node_type(i).le.2) then
+        if(node_type(i).eq.-1) then
         
+        
+           !! Find boundary parent, and evaluate gradient of resolution in boundary-tangential direction:
+           grads = zero
+           ii=fd_parent(i)           
+           do k=1,ij_count(ii)
+              j=ij_link(k,ii)
+              
+              grads = grads + (s(j)-s(ii))*ij_w_grad(2,k,ii)
+           end do
+           
+           !! Convert the gradient of s into the angle by which the tangent vector is rotated.
+           grads = -atan(grads)
+                   
            amatt=zero;bvect=zero;xvec = zero;gvec = zero
            xt=-rnorm(i,2);yt=rnorm(i,1)  !! unit tangent vector
            xn=rnorm(i,1);yn=rnorm(i,2)  !! unit normal vector
+           
+           !! Rotate tangent vector to account for resolution gradient
+           xt = cos(grads)*(-rnorm(i,2)) - sin(grads)*rnorm(i,1)
+           yt = sin(grads)*(-rnorm(i,2)) + cos(grads)*rnorm(i,1)
+           
            do k=1,ij_count(i)
               j=ij_link(k,i)                   
 
@@ -566,82 +659,24 @@ contains
            
                  gvec(1:nsizeG) = abfs1D(x,ff1)
               
-                 !! Gradients for boundary and first 2 rows
+                 !! Gradients weights
                  ij_w_grad(2,k,i) = dot_product(bvect,gvec)
               
               end if    
            
            end do
+           
+           !! Loop over all neighbours and rotate transverse derivative to be aligned with boundary tangent
+           do k=1,ij_count(i)
+              j=ij_link(k,i)
+              
+              ij_w_grad(2,k,i) = (one/cos(grads))*ij_w_grad(2,k,i) - tan(grads)*ij_w_grad(1,k,i)
+           end do
+           
         end if
      end do
      
-     !! Boundaries only, set grad2 and hyp
-     do jj=1,nb
-        i=boundary_list(jj)
-        amatt=zero;amattt=zero;bvect=zero;bvectt=zero;xvec = zero;gvec = zero
-        amatthyp=zero;bvecthyp=zero
-        xt=-rnorm(i,2);yt=rnorm(i,1)  !! unit tangent vector
-        xn=rnorm(i,1);yn=rnorm(i,2)  !! unit normal vector
-        do k=1,ij_count(i)
-           j=ij_link(k,i)                   
-
-           ii=node_type(j)
-           if(ii.eq.node_type(i))then !! only look through nodes on the same "layer"
-           
-              rij = rp(i,:)-rp(j,:)  !! ij-vector
-              x = -dot_product(rij(1:2),(/xt,yt/)) !! relative coord of j (to i) along tangent
-              y = -dot_product(rij(1:2),(/xn,yn/)) !! relative coord of j (to i) along normal
-              if(i.eq.j) x=zero !! avoid NaN in above line         
-           
-              xvec(1:nsizeG) = monomials1D(x)
-              
-              ff1 = fac(abs(x/h(i)))
-              x = x/h(i)
-           
-              gvec(1:nsizeG) = abfs1D(x,ff1)
-                      
-              do i1=1,nsizeG
-                 do i2=1,nsizeG
-                    amatt(i1,i2) = amatt(i1,i2) + xvec(i1)*gvec(i2)
-                 end do
-              end do            
-           end if        
-        end do
-        amattt = amatt;amatthyp = amatt
-
-        !! Solve system for transverse 2nd deriv   
-        bvectt(:)=zero;bvectt(2)=one;i1=0;i2=0;nsize=nsizeG
-        call dgesv(nsize,1,amattt,nsize,i1,bvectt,nsize,i2)      
-
-        !! Solve system for transverse hyperviscous filter   
-        bvecthyp(:)=zero;bvecthyp(4)=-one;i1=0;i2=0;nsize=nsizeG
-        call dgesv(nsize,1,amatthyp,nsize,i1,bvecthyp,nsize,i2)                  
-
-
-        do k=1,ij_count(i)
-           j=ij_link(k,i)                   
-
-           !! Transverse derivatives...
-           ii=node_type(j)
-           if(ii.eq.node_type(i))then !! only look through nodes on the same "layer"
-              rij = rp(i,:)-rp(j,:)  !! ij-vector
-              x = -dot_product(rij(1:2),(/xt,yt/)) !! relative coord of j (to i) along tangent
-              y = -dot_product(rij(1:2),(/xn,yn/)) !! relative coord of j (to i) along normal
-              if(i.eq.j) x=zero !! avoid NaN in above line              
-              
-              ff1 = fac(abs(x/h(i)))
-              x = x/h(i)
-           
-              gvec(1:nsizeG) = abfs1D(x,ff1)
-                            
-              !! 2nd derivs and hyperviscosity for boundary rows     
-              ij_wb_grad2(2,k,jj) = dot_product(bvectt,gvec) 
-              ij_w_hyp(k,i) = ij_w_hyp(k,i) + dot_product(bvecthyp,gvec)                            
-           end if    
-           
-        end do
-               
-     end do        
+    
        
      !! Clear 1D labfm vectors and matrices       
      deallocate(bvect,bvectt,gvec,xvec,amatt,amattt)
@@ -700,6 +735,8 @@ contains
         end if
      end do
      deallocate(fd_parent)
+     
+!     stop
 
      write(6,*) "finished boundary weights"
      return

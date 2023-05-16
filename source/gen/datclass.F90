@@ -18,27 +18,28 @@ program datgen
 
   real(rkind) :: x,y
 
-  integer ipart,itest
+  integer ipart
   integer i,j,icha,nn,ve_model,ii,jj
   double precision h0,r_mag,yl,D_cyl,S_cyl
-  double precision areafluid,ns,varresratio
   integer xbcond,ybcond
   
   double precision :: a0,a1,a2,a3,a4,a5 !! NACA coefficients
-  double precision :: dydx,temp,tmp2,tmp,xtec,rtec,atec,thtec
+  double precision :: temp,tmp2,tmp
   real(rkind),dimension(2) :: tmpN,rn
   integer(ikind) :: iround,nround,nsearch,ipartrow,ipartrowm1,nnear,npdps,idown,iup,ibc
   logical :: keepgoing,keepgoing2,skip
   real(rkind),dimension(:,:),allocatable :: pdp
-  real(rkind) :: dxmin,dxmax,dist2bound,dxtmp,minpdp
+  real(rkind) :: dist2bound,dxtmp,minpdp
   real(rkind),dimension(:),allocatable :: tmpX
   real(rkind),dimension(:),allocatable :: pdp_x,pdp_y,pdp_dist2
   logical,dimension(:),allocatable :: pdp_active
   integer(ikind),dimension(:),allocatable :: pdp_freeindices
   real(rkind),dimension(5) :: pdp_x_new,pdp_y_new
-  real(rkind) :: thup,thdown,th_increment,sumdG,sumG
+  real(rkind) :: thup,thdown,th_increment
   integer(ikind) :: npdps_new,inew,block_left,block_right,block_new,block_delete,block_end
-  real(rkind) :: b0,b1,b2,b3 !! Coefficients in dx functions
+
+  
+  
 
   write(*,*) 'Cases: '
   write(*,*) '  case 1:  box for Rayleigh-Taylor'
@@ -55,330 +56,34 @@ program datgen
 
   select case (itest) 
 !! ------------------------------------------------------------------------------------------------
-  case(1)   
-      !! EMPTY
+  case(1) !! EMPTY
 !! ------------------------------------------------------------------------------------------------
-  case(2) !! GRID!
-     yl=0.0125d0!0.0125d0  ! channel width
-     xl=1.0d0 ! channel length
-     dx0=xl/1000.0       !15
-     xbcond=0;ybcond=1     
-     
-     nb_patches = 4
-     allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
-     allocate(b_type(nb_patches))
-     b_type(:) = (/ 3, 2, 3, 1/)  
-     b_node(1,:) = (/ -0.5d0*xl, -0.5d0*yl /)
-     b_node(2,:) = (/ 0.5d0*xl, -0.5d0*yl /)
-     b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
-     b_node(4,:) = (/ -0.5d0*xl, 0.5d0*yl /)
-     nb_blobs = 0
-     call make_boundary_edge_vectors
-     xb_min = minval(b_node(:,1));xb_max = maxval(b_node(:,1));yb_min = minval(b_node(:,2));yb_max = maxval(b_node(:,2))
-
-     !! Uniform resolution
-     dxmax = dx0  
-     dxmin = dx0
-     dxb=dx0
-     dx_in=dx0;dx_out=dx0
-     call make_boundary_particles
-     call make_boundary_blobs               
-     ipart = nb   
-     
-     dx = dx0
-     x = xb_min + 5.0*dx
-     do while(x.lt.xb_max-4.5*dx)
-        y = yb_min + 0.5*dx
-        do while(y.lt.yb_max)
-              ipart=ipart+1;xp(ipart)= x;yp(ipart)= y;dxp(ipart) = dx
-           y = y + dx
-        enddo
-        x = x + dx
-     enddo     
-                        
-     npfb = ipart
-     dx0 = maxval(dxp(1:npfb))
-     
-
-     write(*,*) 'nb,npfb= ', nb,npfb,nbio
-       
-
+  case(2) !! EMPTY
 !! ------------------------------------------------------------------------------------------------
   case(3) !! Kolmogorov flow
 
      yl=1.0d0!2.0d0*pi
-     h0=yl
-     xl=1.0d0*yl
-     dx0=yl/100.0!0.025d0
+     xl=yl
+     dx0=xl/100.0d0
      xbcond=1;ybcond=1     
-
-     !   JRCK boundary conditions
+     
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
      allocate(b_type(nb_patches))
      b_type(:) = (/ 3, 3, 3, 3/)  
-     b_node(1,:) = (/ -0.5d0*xl, -0.5d0*yl /)
-     b_node(2,:) = (/ 0.5d0*xl, -0.5d0*yl /)
-     b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
-     b_node(4,:) = (/ -0.5d0*xl, 0.5d0*yl /)
+     b_node(1,:) = (/-0.5d0*xl, -0.5d0*yl /)
+     b_node(2,:) = (/0.5d0*xl, -0.5d0*yl /)
+     b_node(3,:) = (/0.5d0*xl, 0.5d0*yl /)
+     b_node(4,:) = (/-0.5d0*xl, 0.5d0*yl /)
+     nb_blobs = 0;n_blob_coefs=0
 
-     call make_boundary_edge_vectors
+     dxmin = dx0/3.0d0
+     dx_wall=dxmin;dx_in=2.0d0*dx0;dx_out=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...
 
-     xb_min = minval(b_node(:,1));xb_max = maxval(b_node(:,1));yb_min = minval(b_node(:,2));yb_max = maxval(b_node(:,2))
-
-     !! outsource making wall particles... JRCK
-     dxb=dx0;dx_in=dx0;dx_out=dx0
-     call make_boundary_particles
-     ipart = nb   
-
-      ! -- fluid particles-- 
-     dx = dx0
-     x = xb_min + 0.5*dx
-     do while(x.lt.xb_max)
-        y = yb_min + 0.5*dx
-        do while(y.lt.yb_max)
-              ipart=ipart+1;xp(ipart)= x;yp(ipart)= y;dxp(ipart) = dx
-           y = y + dx
-        enddo
-        x = x + dx
-     enddo
-    
-     npfb = ipart
-     write(*,*) 'nb,npfb= ', nb,npfb
 
 !! ------------------------------------------------------------------------------------------------
-case(4) !! Channel flows, propagating front
+case(4) !! blank
 
-     xl=1.0d0 ! channel length
-     h0=xl/20.0d0   !cylinder radius
-     yl=xl/5.0d0  ! channel width
-     dx0=h0/25.0       !15
-     xbcond=0;ybcond=2     
-     
-     nb_patches = 4
-     allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
-     allocate(b_type(nb_patches))
-     b_type(:) = (/ 3, 2, 3, 1/)  
-     b_node(1,:) = (/ -0.5d0*xl, -0.5d0*yl /)
-     b_node(2,:) = (/ 0.5d0*xl, -0.5d0*yl /)
-     b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
-     b_node(4,:) = (/ -0.5d0*xl, 0.5d0*yl /)
-     nb_blobs = 1
-     open(unit=191,file="blob_fcoefs.in")
-     read(191,*) n_blob_coefs
-     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
-     blob_centre(1,:)=(/ -0.2d0*xl,0.0d0/);    
-     do i=1,n_blob_coefs
-        read(191,*) blob_coeffs(1,i)
-     end do
-     close(191)
-     blob_coeffs(1,:) = 0.0d0;blob_coeffs(1,1)=h0
-     blob_rotation(1)=-0.1d0*pi;blob_ellipse(1)=0  
-     
-     call make_boundary_edge_vectors
-
-     xb_min = minval(b_node(:,1));xb_max = maxval(b_node(:,1));yb_min = minval(b_node(:,2));yb_max = maxval(b_node(:,2))
-
-     varresratio = 1.0d0  !! Ratio for scaling near the solid objects
-     dxmax = dx0  
-     dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dx_in=2.0d0*dxmax;dx_out=2.0d0*dxmax  !! dx for solids and in/outs...!! 
-     call make_boundary_particles
-     call make_boundary_blobs               
-     ipart = nb   
-     
-     !! Wall to first growth; region of first growth; region of 2nd growth.
-     b0 = 3.0d0;b1 = 40.0d0;b2 = 40.0d0
-         
-     !! Initialise a line of potential dot points   
-     nsearch = ceiling(yb_max-yb_min)/dxmin/2.0d0
-     allocate(pdp_x(5*nsearch),pdp_y(5*nsearch))
-     npdps = nsearch
-     y=yb_min-0.5d0*dxmin
-     i=0
-     do while (y.lt.yb_max)
-        y = y + dxmin/2.0d0;i=i+1
-        call random_number(temp);temp = (temp -0.5d0)*dxmin;
-        pdp_x(i) = xb_min + temp
-        call random_number(temp);temp = (temp -0.5d0)*dxmin;
-        pdp_y(i) = y 
-     end do          
-     npdps=i         
-     allocate(pdp_dist2(5*nsearch));pdp_dist2=0.0d0   
-        
-     minpdp = minval(pdp_x(1:npdps))
-     do while (minpdp.le.xb_max)  !! Keep going until all PDPs have passed out the end of the domain
-        
-        !! Pick the left-most pdp
-        j=minloc(pdp_x(1:npdps),DIM=1)
-        keepgoing = .true.
-        x=pdp_x(j);y=pdp_y(j)
-        pdp_dist2(1:npdps) = (x-pdp_x(1:npdps))**2.0d0 + (y-pdp_y(1:npdps))**2.0d0
-        
-        !! How far are we from the boundaries?
-        dist2bound = xb_max-xb_min + 100.0d0
-        i=1
-        sumdG=0.0d0;sumG=0.0d0
-        do while(i.le.nb)
-           tmpN(1) = x - xp(i);tmpN(2) = y - yp(i);temp = sqrt(dot_product(tmpN,tmpN))
-           if(i.gt.nbio.and.temp.le.dist2bound) dist2bound = temp
-           i=i+1
-           if(temp.le.4.25*dxp(i-1)) keepgoing = .false. !! Too close to bound, leave it.           
-        end do     
-     
-!! Stretch high-res region downstream of flameholder        
-if((x-blob_centre(1,1)).gt.0.0d0) then
- temp = sqrt((x-blob_centre(1,1))**2.0d0 + (y-blob_centre(1,2))**2.0d0) !! Radial distance from blob centre
- temp = acos((x-blob_centre(1,1))/temp) !! Angle theta
- dxio = dx_out + (dx_in - dx_out)*(1.0d0-exp(-(temp)**4.0d0))
- !! Stretch distribution downstream
-! temp = (x-blob_centre(1,1))/h0
-! temp = max(exp(-temp*temp),0.5d0)
- dist2bound = dist2bound*(1.0d0-0.5d0*exp(-(temp)**4.0d0))
-else
- dxio = dx_in 
-endif            
-        
-        !! And what is the spacing, based on dist2bound?
-        if(dist2bound.le.b0*dx0) then  !! Close - set to dxmin
-           dx = dxmin                     
-        else if(dist2bound.le.b1*dx0)then  !! A bit further out, smoothly vary from dxmin to dx0
-           dx = 0.5d0*(dx0+dxmin) - 0.5d0*(dx0-dxmin)*cos((dist2bound-b0*dx0)*pi/((b1-b0)*dx0))  
-        else if(dist2bound.le.b1*dx0+b2*dxio)then  !! Further still: linearly vary from dx0 to dxio
-           dx = dx0 + (dxio-dx0)*((dist2bound-b1*dx0)/(b2*dxio))
-        else     !! Far out: set to dxio
-           dx = dxio
-        end if       
-      
-               
-        !! Check whether to place a particle here, based on some criteria
-        !! --------------------------------------------------------------
-           !! Are we within the object!!?!?!
-           do i=1,nb_blobs
-              temp = sqrt((x-blob_centre(i,1))**2. + (y-blob_centre(i,2))**2.)
-              if(x-blob_centre(i,1).ge.0.0d0)then
-                 tmp2 = asin((y-blob_centre(i,2))/temp)
-              else
-                 tmp2 = pi-asin((y-blob_centre(i,2))/temp)
-              endif              
-              tmp2 = tmp2 - blob_rotation(i)
-              if(blob_ellipse(i).eq.0)then !! blob is blob
-                 r_mag = blob_coeffs(i,1)
-                 do ibc = 2,n_blob_coefs
-                    r_mag = r_mag + blob_coeffs(i,ibc)*cos(dble(ibc-1)*tmp2) 
-                 end do
-              else              !! blob is ellipse
-                 r_mag = blob_coeffs(i,1)*blob_coeffs(i,2) &
-                 /sqrt(blob_coeffs(i,2)*blob_coeffs(i,2)*cos(tmp2)**2. + &
-                   blob_coeffs(i,1)*blob_coeffs(i,1)*sin(tmp2)**2.)                       
-              end if                      
-              if(temp.le.r_mag)then
-                 keepgoing = .false.
-              end if
-           end do
-           
-           !! Are we too close to a boundary?
-           if(x-0.5d0*dx.le.xb_min.or.x+0.5d0*dx.ge.xb_max.or.y-0.5d0*dx.le.yb_min.or.y+0.5d0*dx.ge.yb_max)then
-              keepgoing = .false.
-           end if            
-                                  
-
-        !! END CRITERIA
-        !! --------------------------------------------------------------
-
-        !! Place a particle here
-        if(keepgoing) then
-           ipart = ipart + 1
-           call random_number(temp);temp = temp -0.5d0;xp(ipart) = pdp_x(j) + temp*dxmin*0.5d0
-           call random_number(temp);temp = temp -0.5d0;yp(ipart) = pdp_y(j) + temp*dxmin*0.5d0
-           dxp(ipart) = dx     
-        end if           
-        
-        !! Deactive all pdps within dx of this pdp
-        !! Search down
-        i=j;keepgoing = .true.
-        do while(keepgoing)
-           i=i-1;
-           if(i.eq.0) then
-              idown = 0
-              thdown = -0.49999999d0*pi
-              keepgoing = .false.
-           else if(pdp_dist2(i).ge.dx*dx) then             
-              idown = i
-              thdown = atan2((pdp_y(idown)-y),(pdp_x(idown)-x))
-              keepgoing = .false.    
- 
-           end if       
-        end do
-        i=j;keepgoing = .true.
-        do while(keepgoing)
-           i=i+1
-           if(i.eq.npdps+1) then
-              iup = npdps+1
-              thup = 0.4999999999d0*pi
-              keepgoing = .false.              
-           else if(pdp_dist2(i).ge.dx*dx) then 
-              iup = i
-              thup = atan2((pdp_y(iup)-y),(pdp_x(iup)-x))              
-              keepgoing = .false.
-           
-           end if
-        end do     
-        
-        !! Temporary store for the new pdps
-        th_increment = (thup-thdown)/5.0d0
-        inew = 0
-        do i=1,5
-           temp = y + dx*sin(thdown + 0.1*(thup-thdown) + dble(i-1)*th_increment)    
-           if(temp.ge.yb_min.and.temp.le.yb_max) then
-              inew = inew + 1
-              pdp_x_new(inew) = x + dx*cos(thdown + 0.1*(thup-thdown) + dble(i-1)*th_increment)
-              pdp_y_new(inew) = temp
-           end if            
-        end do
- 
-
-        block_new = idown + 1
-        block_right = block_new + inew
-        block_delete = iup - idown - 1
-        npdps_new = npdps + inew - block_delete
-
-        !! Shunt indices above pdp of interest
-        if(block_delete.gt.inew) then !! Shunt to LEFT
-           do i=block_right,npdps_new
-              ii = i + block_delete - inew
-              pdp_x(i) = pdp_x(ii);pdp_y(i) = pdp_y(ii)
-           end do
-        end if
-        if(block_delete.lt.inew) then !! Shunt to RIGHT
-           do i=npdps_new,block_right,-1
-              ii = i + block_delete - inew
-              pdp_x(i) = pdp_x(ii);pdp_y(i) = pdp_y(ii)
-           end do
-
-        end if
-                  
-        !! Insert any new pdps
-        if(inew.ne.0) then          
-           pdp_x(block_new:block_new+inew-1) = pdp_x_new(1:inew)
-           pdp_y(block_new:block_new+inew-1) = pdp_y_new(1:inew)        
-        end if       
-
-        npdps = npdps_new
-                  
-                
-        !! How left is the left-most PDP?                 
-        minpdp = minval(pdp_x(1:npdps))
-                
-        write(6,*) ipart,(minval(pdp_x(1:npdps))-xb_min)/(xb_max-xb_min)
-     end do  
-                         
-                                                  
-                        
-     npfb = ipart
-     dx0 = maxval(dxp(1:npfb))
-     
-     write(*,*) 'nb,npfb= ', nb,npfb,nbio
 
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
@@ -398,220 +103,24 @@ case(5) !! Inflow/outflow tube for simple flames
      b_node(4,:) = (/ -0.5d0*xl, 0.5d0*yl /)
      nb_blobs = 0;n_blob_coefs=6
 !     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
-!     b0=2.5d0*h0;b1=b0*sqrt(3.0d0)/2.0d0;b2=b0/2.0d0
 !     blob_centre(1,:)=(/0.d0,0.d0/); !! Central
 !     do i=1,nb_blobs
 !        blob_coeffs(i,:)=h0*(/1.0d0,0.4d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0;blob_ellipse(i)=1
 !     end do
 
-     call make_boundary_edge_vectors
 
-     xb_min = minval(b_node(:,1));xb_max = maxval(b_node(:,1));yb_min = minval(b_node(:,2));yb_max = maxval(b_node(:,2))
+     dxmin = dx0/1.0d0
+     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx0*1.0d0  !! dx for solids and in/outs..
 
-     varresratio = 1.0d0  !! Ratio for scaling near the solid objects
-     dxmax = dx0  
-     dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dx_in=1.0d0*dxmax;dx_out=dx0*1.0d0  !! dx for solids and in/outs..
-     call make_boundary_particles
-     call make_boundary_blobs               
-     ipart = nb   
-     
-     !! Wall to first growth; region of first growth; region of 2nd growth.
-     b0 = 3.0d0;b1 = 50.0d0;b2 = 50.0d0
-         
-     !! Initialise a line of potential dot points   
-     nsearch = ceiling(yb_max-yb_min)/dxmin/2.0d0
-     allocate(pdp_x(5*nsearch),pdp_y(5*nsearch))
-     npdps = nsearch
-     y=yb_min-0.5d0*dxmin
-     i=0
-     do while (y.lt.yb_max)
-        y = y + dxmin/2.0d0;i=i+1
-        call random_number(temp);temp = (temp -0.5d0)*dxmin;
-        pdp_x(i) = xb_min + temp
-        call random_number(temp);temp = (temp -0.5d0)*dxmin;
-        pdp_y(i) = y 
-     end do          
-     npdps=i         
-     allocate(pdp_dist2(5*nsearch));pdp_dist2=0.0d0   
-        
-     minpdp = minval(pdp_x(1:npdps))
-     do while (minpdp.le.xb_max)  !! Keep going until all PDPs have passed out the end of the domain
-        
-        !! Pick the left-most pdp
-        j=minloc(pdp_x(1:npdps),DIM=1)
-        keepgoing = .true.
-        x=pdp_x(j);y=pdp_y(j)
-        pdp_dist2(1:npdps) = (x-pdp_x(1:npdps))**2.0d0 + (y-pdp_y(1:npdps))**2.0d0
-        
-        !! How far are we from the boundaries?
-        dist2bound = xb_max-xb_min + 100.0d0
-        i=1
-        sumdG=0.0d0;sumG=0.0d0
-        do while(i.le.nb)
-           tmpN(1) = x - xp(i);tmpN(2) = y - yp(i);temp = sqrt(dot_product(tmpN,tmpN))
-           if(i.gt.nbio.and.temp.le.dist2bound) dist2bound = temp
-           i=i+1
-           if(temp.le.4.25*dxp(i-1)) keepgoing = .false. !! Too close to bound, leave it.           
-        end do        
-        
-        !! And what is the spacing, based on dist2bound?
-!! Over-ride object tests
-if(abs(x).le.0.075) then
-   dist2bound=0.0d0
-else
-   dist2bound=min(abs(x-0.075),abs(x+0.075))
-!   dist2bound=abs(x+0.4)
-endif   
-   
-        if(dist2bound.le.b0*dx0) then  !! Close - set to dxmin
-           dx = dxmin                     
-        else if(dist2bound.le.b1*dx0)then  !! A bit further out, smoothly vary from dxmin to dx0
-           dx = 0.5d0*(dx0+dxmin) - 0.5d0*(dx0-dxmin)*cos((dist2bound-b0*dx0)*pi/((b1-b0)*dx0))  
-        else if(dist2bound.le.b1*dx0+b2*dx_out)then  !! Further still: linearly vary from dx0 to dx_out
-           dx = dx0 + (dx_out-dx0)*((dist2bound-b1*dx0)/(b2*dx_out))
-        else     !! Far out: set to dx_out
-           dx = dx_out
-        end if               
-      
-               
-        !! Check whether to place a particle here, based on some criteria
-        !! --------------------------------------------------------------
-           !! Are we within the object!!?!?!
-           do i=1,nb_blobs
-              temp = sqrt((x-blob_centre(i,1))**2. + (y-blob_centre(i,2))**2.)
-              if(x-blob_centre(i,1).ge.0.0d0)then
-                 tmp2 = asin((y-blob_centre(i,2))/temp)
-              else
-                 tmp2 = pi-asin((y-blob_centre(i,2))/temp)
-              endif              
-              tmp2 = tmp2 - blob_rotation(i)
-              if(blob_ellipse(i).eq.0)then !! blob is blob
-                 r_mag = blob_coeffs(i,1)
-                 do ibc = 2,n_blob_coefs
-                    r_mag = r_mag + blob_coeffs(i,ibc)*cos(dble(ibc-1)*tmp2) 
-                 end do
-              else              !! blob is ellipse
-                 r_mag = blob_coeffs(i,1)*blob_coeffs(i,2) &
-                 /sqrt(blob_coeffs(i,2)*blob_coeffs(i,2)*cos(tmp2)**2. + &
-                   blob_coeffs(i,1)*blob_coeffs(i,1)*sin(tmp2)**2.)                       
-              end if                      
-              if(temp.le.r_mag)then
-                 keepgoing = .false.
-              end if
-           end do
-           
-           !! Are we too close to a boundary?
-           if(x-0.5d0*dx.le.xb_min.or.x+0.5d0*dx.ge.xb_max.or.y-0.5d0*dx.le.yb_min.or.y+0.5d0*dx.ge.yb_max)then
-              keepgoing = .false.
-           end if            
-                                  
-
-        !! END CRITERIA
-        !! --------------------------------------------------------------
-
-        !! Place a particle here
-        if(keepgoing) then
-           ipart = ipart + 1
-           call random_number(temp);temp = temp -0.5d0;xp(ipart) = pdp_x(j) + temp*dxmin*0.5d0
-           call random_number(temp);temp = temp -0.5d0;yp(ipart) = pdp_y(j) + temp*dxmin*0.5d0
-           dxp(ipart) = dx     
-        end if           
-        
-        !! Deactive all pdps within dx of this pdp
-        !! Search down
-        i=j;keepgoing = .true.
-        do while(keepgoing)
-           i=i-1;
-           if(i.eq.0) then
-              idown = 0
-              thdown = -0.49999999d0*pi
-              keepgoing = .false.
-           else if(pdp_dist2(i).ge.dx*dx) then             
-              idown = i
-              thdown = atan2((pdp_y(idown)-y),(pdp_x(idown)-x))
-              keepgoing = .false.    
- 
-           end if       
-        end do
-        i=j;keepgoing = .true.
-        do while(keepgoing)
-           i=i+1
-           if(i.eq.npdps+1) then
-              iup = npdps+1
-              thup = 0.4999999999d0*pi
-              keepgoing = .false.              
-           else if(pdp_dist2(i).ge.dx*dx) then 
-              iup = i
-              thup = atan2((pdp_y(iup)-y),(pdp_x(iup)-x))              
-              keepgoing = .false.
-           
-           end if
-        end do     
-        
-        !! Temporary store for the new pdps
-        th_increment = (thup-thdown)/5.0d0
-        inew = 0
-        do i=1,5
-           temp = y + dx*sin(thdown + 0.1*(thup-thdown) + dble(i-1)*th_increment)    
-           if(temp.ge.yb_min.and.temp.le.yb_max) then
-              inew = inew + 1
-              pdp_x_new(inew) = x + dx*cos(thdown + 0.1*(thup-thdown) + dble(i-1)*th_increment)
-              pdp_y_new(inew) = temp
-           end if            
-        end do
- 
-
-        block_new = idown + 1
-        block_right = block_new + inew
-        block_delete = iup - idown - 1
-        npdps_new = npdps + inew - block_delete
-
-        !! Shunt indices above pdp of interest
-        if(block_delete.gt.inew) then !! Shunt to LEFT
-           do i=block_right,npdps_new
-              ii = i + block_delete - inew
-              pdp_x(i) = pdp_x(ii);pdp_y(i) = pdp_y(ii)
-           end do
-        end if
-        if(block_delete.lt.inew) then !! Shunt to RIGHT
-           do i=npdps_new,block_right,-1
-              ii = i + block_delete - inew
-              pdp_x(i) = pdp_x(ii);pdp_y(i) = pdp_y(ii)
-           end do
-
-        end if
-                  
-        !! Insert any new pdps
-        if(inew.ne.0) then          
-           pdp_x(block_new:block_new+inew-1) = pdp_x_new(1:inew)
-           pdp_y(block_new:block_new+inew-1) = pdp_y_new(1:inew)        
-        end if       
-
-        npdps = npdps_new
-                  
-                
-        !! How left is the left-most PDP?                 
-        minpdp = minval(pdp_x(1:npdps))
-                
-        write(6,*) ipart,(minval(pdp_x(1:npdps))-xb_min)/(xb_max-xb_min)
-     end do  
-                         
-                                                  
-                        
-     npfb = ipart
-     dx0 = maxval(dxp(1:npfb))
-
-     write(*,*) 'nb,npfb= ', nb,npfb,nbio
      
 !! ------------------------------------------------------------------------------------------------
 case(6) !! Channel flows, propagating front
 
      xl=1.0d0 ! channel length
      h0=xl/40.0d0   !cylinder radius
-     yl=xl/10.0d0!(4.0d0/3.0d0)  ! channel width
+     yl=xl/1.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
      dx0=h0/25.0       !15
-     xbcond=0;ybcond=2     
+     xbcond=0;ybcond=1     
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -632,222 +141,9 @@ case(6) !! Channel flows, propagating front
      close(191)
      blob_coeffs(1,:) = 0.0d0;blob_coeffs(1,1) = 1.0d0
      blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi;blob_ellipse(1)=0
-     
-     call make_boundary_edge_vectors
 
-     xb_min = minval(b_node(:,1));xb_max = maxval(b_node(:,1));yb_min = minval(b_node(:,2));yb_max = maxval(b_node(:,2))
-
-     varresratio = 2.0d0  !! Ratio for scaling near the solid objects
-     dxmax = dx0  
-     dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dx_in=3.0d0*dxmax;dx_out=1.0d0*dxmax  !! dx for solids and in/outs...!! 
-     call make_boundary_particles
-     call make_boundary_blobs               
-     ipart = nb   
-     
-     !! Wall to first growth; region of first growth; region of 2nd growth.
-     b0 = 2.0d0;b1 = 30.0d0;b2 = 50.0d0
-         
-     !! Initialise a line of potential dot points   
-     nsearch = ceiling(yb_max-yb_min)/dxmin/2.0d0
-     allocate(pdp_x(5*nsearch),pdp_y(5*nsearch))
-     npdps = nsearch
-     y=yb_min-0.5d0*dxmin
-     i=0
-     do while (y.lt.yb_max)
-        y = y + dxmin/2.0d0;i=i+1
-        call random_number(temp);temp = (temp -0.5d0)*dxmin;
-        pdp_x(i) = xb_min + temp
-        call random_number(temp);temp = (temp -0.5d0)*dxmin;
-        pdp_y(i) = y 
-     end do          
-     npdps=i         
-     allocate(pdp_dist2(5*nsearch));pdp_dist2=0.0d0   
-        
-     minpdp = minval(pdp_x(1:npdps))
-     do while (minpdp.le.xb_max)  !! Keep going until all PDPs have passed out the end of the domain
-        
-        !! Pick the left-most pdp
-        j=minloc(pdp_x(1:npdps),DIM=1)
-        keepgoing = .true.
-        x=pdp_x(j);y=pdp_y(j)
-        pdp_dist2(1:npdps) = (x-pdp_x(1:npdps))**2.0d0 + (y-pdp_y(1:npdps))**2.0d0
-        
-        !! How far are we from the boundaries?
-        dist2bound = xb_max-xb_min + 100.0d0
-        i=1
-        sumdG=0.0d0;sumG=0.0d0
-        do while(i.le.nb)
-           tmpN(1) = x - xp(i);tmpN(2) = y - yp(i);temp = sqrt(dot_product(tmpN,tmpN))
-           if(i.gt.nbio.and.temp.le.dist2bound) dist2bound = temp
-           i=i+1
-           if(temp.le.4.25*dxp(i-1)) keepgoing = .false. !! Too close to bound, leave it.           
-        end do     
-     
-!! Stretch high-res region downstream of flameholder        
-if((x-blob_centre(1,1)).gt.0.0d0) then
-! temp = sqrt((x-blob_centre(1,1))**2.0d0 + ((abs(blob_centre(1,2))-abs(y))**2.0d0)) !! Radial distance from blob centre
- temp = sqrt((x-blob_centre(1,1))**2.0d0 + ((y-blob_centre(1,2))**2.0d0)) !! Radial distance from blob centre 
- temp = acos((x-blob_centre(1,1))/temp) !! Angle theta
-
- tmp2 = exp(-(0.8d0*temp)**4.0d0) !! Outlet spreading function
- temp = exp(-(2.0d0*temp)**4.0d0)  !! Blob-side spreading function
- 
- r_mag = ((xb_max - x)/(xb_max - blob_centre(1,1)))**0.5d0
-! r_mag = max(0.0d0,((xb_max - x)/(xb_max - blob_centre(1,1)))**0.5d0)
- 
- temp = r_mag*temp + (1.0d0-r_mag)*tmp2
-
- dxio = dx_out + (dx_in - dx_out)*(1.0d0-temp)
- !! Stretch distribution downstream
-! temp = (x-blob_centre(1,1))/h0
-! temp = max(exp(-temp*temp),0.5d0)
- dist2bound = dist2bound*(1.0d0-0.75d0*tmp2**2.0d0)
-else
- dxio = dx_in 
-endif            
-        
-        !! And what is the spacing, based on dist2bound?
-        if(dist2bound.le.b0*dx0) then  !! Close - set to dxmin
-           dx = dxmin                     
-        else if(dist2bound.le.b1*dx0)then  !! A bit further out, smoothly vary from dxmin to dx0
-           dx = 0.5d0*(dx0+dxmin) - 0.5d0*(dx0-dxmin)*cos((dist2bound-b0*dx0)*pi/((b1-b0)*dx0))  
-        else if(dist2bound.le.b1*dx0+b2*dxio)then  !! Further still: linearly vary from dx0 to dxio
-           dx = dx0 + (dxio-dx0)*((dist2bound-b1*dx0)/(b2*dxio))
-        else     !! Far out: set to dxio
-           dx = dxio
-        end if       
-      
-               
-        !! Check whether to place a particle here, based on some criteria
-        !! --------------------------------------------------------------
-           !! Are we within the object!!?!?!
-           do i=1,nb_blobs
-              temp = sqrt((x-blob_centre(i,1))**2. + (y-blob_centre(i,2))**2.)
-              if(x-blob_centre(i,1).ge.0.0d0)then
-                 tmp2 = asin((y-blob_centre(i,2))/temp)
-              else
-                 tmp2 = pi-asin((y-blob_centre(i,2))/temp)
-              endif              
-              tmp2 = tmp2 - blob_rotation(i)
-              if(blob_ellipse(i).eq.0)then !! blob is blob
-                 r_mag = blob_coeffs(i,1)
-                 do ibc = 2,n_blob_coefs
-                    r_mag = r_mag + blob_coeffs(i,ibc)*cos(dble(ibc-1)*tmp2) 
-                 end do
-              else              !! blob is ellipse
-                 r_mag = blob_coeffs(i,1)*blob_coeffs(i,2) &
-                 /sqrt(blob_coeffs(i,2)*blob_coeffs(i,2)*cos(tmp2)**2. + &
-                   blob_coeffs(i,1)*blob_coeffs(i,1)*sin(tmp2)**2.)                       
-              end if                      
-              if(temp.le.r_mag)then
-                 keepgoing = .false.
-              end if
-           end do
-           
-           !! Are we too close to a boundary?
-           if(x-0.5d0*dx.le.xb_min.or.x+0.5d0*dx.ge.xb_max.or.y-0.5d0*dx.le.yb_min.or.y+0.5d0*dx.ge.yb_max)then
-              keepgoing = .false.
-           end if            
-                                  
-
-        !! END CRITERIA
-        !! --------------------------------------------------------------
-
-        !! Place a particle here
-        if(keepgoing) then
-           ipart = ipart + 1
-           call random_number(temp);temp = temp -0.5d0;xp(ipart) = pdp_x(j) + temp*dxmin*0.5d0
-           call random_number(temp);temp = temp -0.5d0;yp(ipart) = pdp_y(j) + temp*dxmin*0.5d0
-           dxp(ipart) = dx     
-        end if           
-        
-        !! Deactive all pdps within dx of this pdp
-        !! Search down
-        i=j;keepgoing = .true.
-        do while(keepgoing)
-           i=i-1;
-           if(i.eq.0) then
-              idown = 0
-              thdown = -0.49999999d0*pi
-              keepgoing = .false.
-           else if(pdp_dist2(i).ge.dx*dx) then             
-              idown = i
-              thdown = atan2((pdp_y(idown)-y),(pdp_x(idown)-x))
-              keepgoing = .false.    
- 
-           end if       
-        end do
-        i=j;keepgoing = .true.
-        do while(keepgoing)
-           i=i+1
-           if(i.eq.npdps+1) then
-              iup = npdps+1
-              thup = 0.4999999999d0*pi
-              keepgoing = .false.              
-           else if(pdp_dist2(i).ge.dx*dx) then 
-              iup = i
-              thup = atan2((pdp_y(iup)-y),(pdp_x(iup)-x))              
-              keepgoing = .false.
-           
-           end if
-        end do     
-        
-        !! Temporary store for the new pdps
-        th_increment = (thup-thdown)/5.0d0
-        inew = 0
-        do i=1,5
-           temp = y + dx*sin(thdown + 0.1*(thup-thdown) + dble(i-1)*th_increment)    
-           if(temp.ge.yb_min.and.temp.le.yb_max) then
-              inew = inew + 1
-              pdp_x_new(inew) = x + dx*cos(thdown + 0.1*(thup-thdown) + dble(i-1)*th_increment)
-              pdp_y_new(inew) = temp
-           end if            
-        end do
- 
-
-        block_new = idown + 1
-        block_right = block_new + inew
-        block_delete = iup - idown - 1
-        npdps_new = npdps + inew - block_delete
-
-        !! Shunt indices above pdp of interest
-        if(block_delete.gt.inew) then !! Shunt to LEFT
-           do i=block_right,npdps_new
-              ii = i + block_delete - inew
-              pdp_x(i) = pdp_x(ii);pdp_y(i) = pdp_y(ii)
-           end do
-        end if
-        if(block_delete.lt.inew) then !! Shunt to RIGHT
-           do i=npdps_new,block_right,-1
-              ii = i + block_delete - inew
-              pdp_x(i) = pdp_x(ii);pdp_y(i) = pdp_y(ii)
-           end do
-
-        end if
-                  
-        !! Insert any new pdps
-        if(inew.ne.0) then          
-           pdp_x(block_new:block_new+inew-1) = pdp_x_new(1:inew)
-           pdp_y(block_new:block_new+inew-1) = pdp_y_new(1:inew)        
-        end if       
-
-        npdps = npdps_new
-                  
-                
-        !! How left is the left-most PDP?                 
-        minpdp = minval(pdp_x(1:npdps))
-                
-        write(6,*) ipart,(minval(pdp_x(1:npdps))-xb_min)/(xb_max-xb_min)
-     end do  
-                         
-                                                  
-                        
-     npfb = ipart
-     dx0 = maxval(dxp(1:npfb))
-     
-     write(*,*) 'nb,npfb= ', nb,npfb,nbio
-
+     dxmin = dx0/1.0d0
+     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=1.0d0*dx0  !! dx for solids and in/outs...!! 
 !! ------------------------------------------------------------------------------------------------
 case(7) !! Something periodic
 
@@ -882,200 +178,11 @@ case(7) !! Something periodic
         blob_coeffs(i,:)=h0*(/1.0d0,1.0d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0;blob_ellipse(i)=1
      end do
 
-     call make_boundary_edge_vectors
+     dxmin = dx0/3.0d0
+     dx_wall=dxmin;dx_in=2.0d0*dx0;dx_out=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...
 
-     xb_min = minval(b_node(:,1));xb_max = maxval(b_node(:,1));yb_min = minval(b_node(:,2));yb_max = maxval(b_node(:,2))
-
-     varresratio = 3.0d0  !! Ratio for scaling near the solid objects
-     dxmax = dx0  
-     dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dx_in=2.0d0*dxmax;dx_out=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...
-     call make_boundary_particles
-     call make_boundary_blobs               
-     ipart = nb   
-     
-     b0 = 2.0d0;b1 = 40.0d0;b2 = 30.0d0
-         
-     !! Initialise a line of potential dot points   
-     nsearch = ceiling(yb_max-yb_min)/dxmin/2.0d0
-     allocate(pdp_x(10*nsearch),pdp_y(10*nsearch))
-     npdps = nsearch
-     y=yb_min-0.5d0*dxmin
-     i=0
-     do while (y.lt.yb_max)
-        y = y + dxmin/2.0d0;i=i+1
-        call random_number(temp);temp = (temp -0.5d0)*dxmin;
-        pdp_x(i) = xb_min + temp
-        call random_number(temp);temp = (temp -0.5d0)*dxmin;
-        pdp_y(i) = y 
-     end do          
-     npdps=i         
-     allocate(pdp_dist2(10*nsearch));pdp_dist2=0.0d0   
-        
-     minpdp = minval(pdp_x(1:npdps))
-     do while (minpdp.le.xb_max)  !! Keep going until all PDPs have passed out the end of the domain
-        
-        !! Pick the left-most pdp
-        j=minloc(pdp_x(1:npdps),DIM=1)
-        keepgoing = .true.
-        x=pdp_x(j);y=pdp_y(j)
-        pdp_dist2(1:npdps) = (x-pdp_x(1:npdps))**2.0d0 + (y-pdp_y(1:npdps))**2.0d0
-        
-        !! How far are we from the boundaries?
-        dist2bound = xb_max-xb_min + 100.0d0
-        i=1
-        sumdG=0.0d0;sumG=0.0d0
-        do while(i.le.nb)
-           tmpN(1) = x - xp(i);tmpN(2) = y - yp(i);temp = sqrt(dot_product(tmpN,tmpN))
-           if(i.gt.nbio.and.temp.le.dist2bound) dist2bound = temp
-           i=i+1
-           if(temp.le.4.25*dxp(i-1)) keepgoing = .false. !! Too close to bound, leave it.           
-        end do        
-        
-        !! And what is the spacing, based on dist2bound?
-        if(dist2bound.le.b0*dx0) then  !! Close - set to dxmin
-           dx = dxmin                     
-        else if(dist2bound.le.b1*dx0)then  !! A bit further out, smoothly vary from dxmin to dx0
-           dx = 0.5d0*(dx0+dxmin) - 0.5d0*(dx0-dxmin)*cos((dist2bound-b0*dx0)*pi/((b1-b0)*dx0))  
-        else if(dist2bound.le.b1*dx0+b2*dx_in)then  !! Further still: linearly vary from dx0 to dx_in
-           dx = dx0 + (dx_in-dx0)*((dist2bound-b1*dx0)/(b2*dx_in))
-        else     !! Far out: set to dx_in
-           dx = dx_in
-        end if       
-      
-               
-        !! Check whether to place a particle here, based on some criteria
-        !! --------------------------------------------------------------
-           !! Are we within the object!!?!?!
-           do i=1,nb_blobs
-              temp = sqrt((x-blob_centre(i,1))**2. + (y-blob_centre(i,2))**2.)
-              if(x-blob_centre(i,1).ge.0.0d0)then
-                 tmp2 = asin((y-blob_centre(i,2))/temp)
-              else
-                 tmp2 = pi-asin((y-blob_centre(i,2))/temp)
-              endif              
-              tmp2 = tmp2 - blob_rotation(i)
-              if(blob_ellipse(i).eq.0)then !! blob is blob
-                 r_mag = blob_coeffs(i,1)
-                 do ibc = 2,n_blob_coefs
-                    r_mag = r_mag + blob_coeffs(i,ibc)*cos(dble(ibc)*tmp2) 
-                 end do
-              else              !! blob is ellipse
-                 r_mag = blob_coeffs(i,1)*blob_coeffs(i,2) &
-                 /sqrt(blob_coeffs(i,2)*blob_coeffs(i,2)*cos(tmp2)**2. + &
-                   blob_coeffs(i,1)*blob_coeffs(i,1)*sin(tmp2)**2.)                       
-              end if                      
-              if(temp.le.r_mag)then
-                 keepgoing = .false.
-              end if
-           end do
-           
-           !! Are we too close to a boundary?
-           if(x-0.5d0*dx.le.xb_min.or.x+0.5d0*dx.ge.xb_max.or.y-0.5d0*dx.le.yb_min.or.y+0.5d0*dx.ge.yb_max)then
-              keepgoing = .false.
-           end if            
-                                  
-
-        !! END CRITERIA
-        !! --------------------------------------------------------------
-
-        !! Place a particle here
-        if(keepgoing) then
-           ipart = ipart + 1
-           call random_number(temp);temp = temp -0.5d0;xp(ipart) = pdp_x(j) + temp*dxmin*0.5d0
-           call random_number(temp);temp = temp -0.5d0;yp(ipart) = pdp_y(j) + temp*dxmin*0.5d0
-           dxp(ipart) = dx     
-        end if           
-        
-        !! Deactive all pdps within dx of this pdp
-        !! Search down
-        i=j;keepgoing = .true.
-        do while(keepgoing)
-           i=i-1;
-           if(i.eq.0) then
-              idown = 0
-              thdown = -0.49999999d0*pi
-              keepgoing = .false.
-           else if(pdp_dist2(i).ge.dx*dx) then             
-              idown = i
-              thdown = atan2((pdp_y(idown)-y),(pdp_x(idown)-x))
-              keepgoing = .false.    
- 
-           end if       
-        end do
-        i=j;keepgoing = .true.
-        do while(keepgoing)
-           i=i+1
-           if(i.eq.npdps+1) then
-              iup = npdps+1
-              thup = 0.4999999999d0*pi
-              keepgoing = .false.              
-           else if(pdp_dist2(i).ge.dx*dx) then 
-              iup = i
-              thup = atan2((pdp_y(iup)-y),(pdp_x(iup)-x))              
-              keepgoing = .false.
-           
-           end if
-        end do     
-        
-        !! Temporary store for the new pdps
-        th_increment = (thup-thdown)/5.0d0
-        inew = 0
-        do i=1,5
-           temp = y + dx*sin(thdown + 0.1*(thup-thdown) + dble(i-1)*th_increment)    
-           if(temp.ge.yb_min.and.temp.le.yb_max) then
-              inew = inew + 1
-              pdp_x_new(inew) = x + dx*cos(thdown + 0.1*(thup-thdown) + dble(i-1)*th_increment)
-              pdp_y_new(inew) = temp
-           end if            
-        end do
- 
-
-        block_new = idown + 1
-        block_right = block_new + inew
-        block_delete = iup - idown - 1
-        npdps_new = npdps + inew - block_delete
-
-        !! Shunt indices above pdp of interest
-        if(block_delete.gt.inew) then !! Shunt to LEFT
-           do i=block_right,npdps_new
-              ii = i + block_delete - inew
-              pdp_x(i) = pdp_x(ii);pdp_y(i) = pdp_y(ii)
-           end do
-        end if
-        if(block_delete.lt.inew) then !! Shunt to RIGHT
-           do i=npdps_new,block_right,-1
-              ii = i + block_delete - inew
-              pdp_x(i) = pdp_x(ii);pdp_y(i) = pdp_y(ii)
-           end do
-
-        end if
-                  
-        !! Insert any new pdps
-        if(inew.ne.0) then          
-           pdp_x(block_new:block_new+inew-1) = pdp_x_new(1:inew)
-           pdp_y(block_new:block_new+inew-1) = pdp_y_new(1:inew)        
-        end if       
-
-        npdps = npdps_new
-                  
-                
-        !! How left is the left-most PDP?                 
-        minpdp = minval(pdp_x(1:npdps))
-                
-        write(6,*) ipart,(minval(pdp_x(1:npdps))-xb_min)/(xb_max-xb_min)
-     end do  
-                         
-                                                  
-                        
-     npfb = ipart
-     dx0 = maxval(dxp(1:npfb))
-     
-
-     write(*,*) 'nb,npfb= ', nb,npfb,nbio
 !! ------------------------------------------------------------------------------------------------
-case(8) !! Something periodic
-
+case(8)
      xl = 1.0d0        
      D_cyl = xl/20.0 !! cylinder diameter
      S_cyl = D_cyl*1.2d0 !! cylinder spacing
@@ -1107,19 +214,22 @@ case(8) !! Something periodic
         blob_coeffs(i,:)=h0*(/1.0d0,1.0d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0;blob_ellipse(i)=1
      end do
 
-     call make_boundary_edge_vectors
 
+
+     dxmin = dx0/3.0d0
+     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=4.0d0*dx0  !! dx for solids and in/outs!! Ratio for scaling far field...     
+     
+!! ------------------------------------------------------------------------------------------------     
+end select
+     
+     !! Create the domain
+     call make_boundary_edge_vectors
      xb_min = minval(b_node(:,1));xb_max = maxval(b_node(:,1));yb_min = minval(b_node(:,2));yb_max = maxval(b_node(:,2))
 
-     varresratio = 3.0d0  !! Ratio for scaling near the solid objects
-     dxmax = dx0  
-     dxmin = dx0/varresratio
-     dxb=dx0/varresratio;dx_in=4.0d0*dxmax;dx_out=4.0d0*dxmax  !! dx for solids and in/outs!! Ratio for scaling far field...
+     !! Create the boundary nodes
      call make_boundary_particles
      call make_boundary_blobs               
      ipart = nb   
-     
-     b0 = 2.0d0;b1 = 50.0d0;b2 = 50.0d0
          
      !! Initialise a line of potential dot points   
      nsearch = ceiling(yb_max-yb_min)/dxmin/2.0d0
@@ -1149,26 +259,16 @@ case(8) !! Something periodic
         !! How far are we from the boundaries?
         dist2bound = xb_max-xb_min + 100.0d0
         i=1
-        sumdG=0.0d0;sumG=0.0d0
         do while(i.le.nb)
            tmpN(1) = x - xp(i);tmpN(2) = y - yp(i);temp = sqrt(dot_product(tmpN,tmpN))
            if(i.gt.nbio.and.temp.le.dist2bound) dist2bound = temp
            i=i+1
            if(temp.le.4.25*dxp(i-1)) keepgoing = .false. !! Too close to bound, leave it.           
-        end do        
-        
-        !! And what is the spacing, based on dist2bound?
-        if(dist2bound.le.b0*dx0) then  !! Close - set to dxmin
-           dx = dxmin                     
-        else if(dist2bound.le.b1*dx0)then  !! A bit further out, smoothly vary from dxmin to dx0
-           dx = 0.5d0*(dx0+dxmin) - 0.5d0*(dx0-dxmin)*cos((dist2bound-b0*dx0)*pi/((b1-b0)*dx0))  
-        else if(dist2bound.le.b1*dx0+b2*dx_in)then  !! Further still: linearly vary from dx0 to dx_in
-           dx = dx0 + (dx_in-dx0)*((dist2bound-b1*dx0)/(b2*dx_in))
-        else     !! Far out: set to dx_in
-           dx = dx_in
-        end if       
-      
-               
+        end do     
+     
+        !! Calculate the resolution locally
+        call get_resolution(x,y,dist2bound,dx)
+                     
         !! Check whether to place a particle here, based on some criteria
         !! --------------------------------------------------------------
            !! Are we within the object!!?!?!
@@ -1183,7 +283,7 @@ case(8) !! Something periodic
               if(blob_ellipse(i).eq.0)then !! blob is blob
                  r_mag = blob_coeffs(i,1)
                  do ibc = 2,n_blob_coefs
-                    r_mag = r_mag + blob_coeffs(i,ibc)*cos(dble(ibc)*tmp2) 
+                    r_mag = r_mag + blob_coeffs(i,ibc)*cos(dble(ibc-1)*tmp2) 
                  end do
               else              !! blob is ellipse
                  r_mag = blob_coeffs(i,1)*blob_coeffs(i,2) &
@@ -1296,12 +396,8 @@ case(8) !! Something periodic
      npfb = ipart
      dx0 = maxval(dxp(1:npfb))
      
-
      write(*,*) 'nb,npfb= ', nb,npfb,nbio
-!! ------------------------------------------------------------------------------------------------
-  
 
-  end select
 !! ------------------------------------------------------------------------------------------------
 !! Re-order nodes (from left to right)
   
@@ -1314,7 +410,7 @@ case(8) !! Something periodic
   ! 
   
   !! Write to fort file for quick visualisation
-  write(31,*) npfb
+!  write(31,*) npfb
   do i=1,npfb
      write(31,*) xp(i),yp(i),dxp(i)
   end do
@@ -1414,7 +510,7 @@ end subroutine quicksort
 
      implicit none
      integer(ikind) :: ipart,ib,ibm1
-     real(rkind) :: x,y,m_be,tmp,tmp2
+     real(rkind) :: x,y,m_be,tmp,tmp2,dx_local,temp
      integer(ikind) :: nround,iround
      real(rkind),dimension(2) :: nrm
    
@@ -1426,7 +522,7 @@ end subroutine quicksort
      allocate(dxp(npar))
      allocate(node_type(npar));node_type=999     
 
-     !! Wall particles
+     !! Wall/inflow/outflow particles
      do ib=1,nb_patches  ! loop over all boundary patches
         ibm1 = mod(ib+nb_patches-2,nb_patches)+1
         if(abs(b_type(ib)).ne.3)then  ! if it is a wall, inflow or outflow patch
@@ -1441,9 +537,23 @@ end subroutine quicksort
               x = b_node(ib,1) + tmp*b_edge(ib,1)
               y = b_node(ib,2) + tmp*b_edge(ib,2)
               xp(ipart) = x;yp(ipart) = y
-              tmp = tmp + dxio/m_be  ! note, in future we should allow for dx.ne.dy here
+              
+           
+              !! Hard-coding local dx              
+              if(b_type(ib).ne.0) then  !! Inflow or outflow
+!                 temp = sqrt((x-blob_centre(1,1))**2.0d0 + ((y-blob_centre(1,2))**2.0d0)) 
+!                 temp = acos((x-blob_centre(1,1))/temp) !! Angle theta
+!                 tmp2 = exp(-(0.8d0*temp)**4.0d0) !! Outlet spreading function
+!                 dx_local = dx_out + (dx_in - dx_out)*(1.0d0-tmp2)
+                 call get_resolution(x,y,1.0d10,dx_local)     
+              else
+                 dx_local = dxio
+              end if
+              
+              
+              tmp = tmp + dx_local/m_be  ! note, in future we should allow for dx.ne.dy here
               xnorm(ipart) = nrm(1);ynorm(ipart) = nrm(2)
-              dxp(ipart)=dxio
+              dxp(ipart)=dx_local
               node_type(ipart) = b_type(ib) !! Set node-type so we know if it's a wall, inflow or outflow...
            end do
         end if
@@ -1455,6 +565,83 @@ end subroutine quicksort
      write(6,*) 'no. of solid boundary particles: ',nb
      return
    end subroutine make_boundary_particles
+!! ------------------------------------------------------------------------------------------------
+   subroutine get_resolution(x,y,bdist,dx_local)
+     use kind_parameters
+     use common_parameter
+     use global_variables 
+     implicit none
+
+     real(rkind),intent(in) :: x,y
+     real(rkind),intent(in) :: bdist
+     real(rkind),intent(out) :: dx_local
+     real(rkind) :: temp,tmp2,r_mag,d2b_local
+     real(rkind) :: xhat,yhat
+
+     !! Set dxio to match the end of the domain we're in
+     if(x.le.0.0d0) then
+        dxio = dx_in
+     else
+        dxio = dx_out
+     end if
+     
+     !! Copy bdist to local
+     d2b_local = bdist
+
+
+     if(itest.eq.6) then
+        xhat = x - blob_centre(1,1)
+        yhat = y - blob_centre(1,2)
+        !! Stretch high-res region downstream of flameholder        
+        if((x-blob_centre(1,1)).gt.0.0d0) then
+     
+ 
+!           temp = sqrt(xhat**2.0d0 + (yhat**2.0d0)) !! Radial distance from blob centre 
+!           temp = acos(xhat/temp) !! Angle theta
+!           tmp2 = exp(-(2.0d0*temp)**4.0d0) !! Outlet spreading function
+!           temp = exp(-(2.0d0*temp)**4.0d0)  !! Blob-side spreading function
+
+           r_mag = ((xb_max - x)/(xb_max - blob_centre(1,1)))**2.0d0  !! Scale between blob and outlet (0=outlet)
+!           temp = r_mag*temp + (1.0d0-r_mag)*tmp2  !! Linear variation between tmp2 and temp
+
+           temp = exp(-(8.0d0*yhat)**4.0d0) !! Blob-side spreading function
+           tmp2 = exp(-(4.0d0*yhat)**4.0d0) !! Outflow-side spreading function
+           temp = r_mag*temp + (1.0d0-r_mag)*tmp2 !! Linear variation between blob-side and outflow-side
+           
+           dxio = dx_out + (dx_in - dx_out)*(1.0d0-temp)
+
+        else
+           r_mag = sqrt(xhat**2.0d0 + yhat**2.0d0)
+           temp = exp(-(8.0d0*r_mag)**4.0d0)
+           dxio = dx_out + (dx_in - dx_out)*(1.0d0-temp)
+        endif    
+
+     else if(itest.eq.5) then
+        !! Over-ride object tests
+        if(abs(x).le.0.075) then
+           d2b_local=0.0d0
+        else
+           d2b_local=min(abs(x-0.075),abs(x+0.075))
+           !   dist2bound=abs(x+0.4)
+        endif          
+     end if
+        
+     !! And what is the spacing, based on dist2bound?
+     if(d2b_local.le.b0*dx0) then  !! Close - set to dxmin
+        dx_local = dxmin                     
+     else if(d2b_local.le.b1*dx0)then  !! A bit further out, smoothly vary from dxmin to dx0
+        dx_local = 0.5d0*(dx0+dxmin) - 0.5d0*(dx0-dxmin)*cos((d2b_local-b0*dx0)*pi/((b1-b0)*dx0))  
+     else if(d2b_local.le.b1*dx0+b2*dxio)then  !! Further still: linearly vary from dx0 to dxio
+        dx_local = dx0 + (dxio-dx0)*((d2b_local-b1*dx0)/(b2*dxio))
+     else     !! Far out: set to dxio
+        dx_local = dxio
+     end if  
+
+
+      
+      
+      return
+   end subroutine get_resolution
 !! ------------------------------------------------------------------------------------------------
    subroutine make_boundary_blobs
      use kind_parameters
@@ -1479,7 +666,7 @@ end subroutine quicksort
            if(blob_ellipse(ib).eq.0)then
            
               !! Estimate approx number of nodes round the blob              
-              nb = floor(Sblob(ib)/dxb)
+              nb = floor(Sblob(ib)/dx_wall)
 
               !! Revise node spacing to get integer number round blob
               dxlocal = Sblob(ib)/dble(nb)                      
@@ -1503,7 +690,7 @@ end subroutine quicksort
                  !! If the position is within the domain, create a particle
                  if(x+x0.ge.xb_min.and.x+x0.lt.xb_max.and.y+y0.ge.yb_min.and.y+y0.lt.yb_max)then              
                     ipart = ipart + 1 
-                    xp(ipart)=x0 + x;yp(ipart)=y0 + y;dxp(ipart)=dxb
+                    xp(ipart)=x0 + x;yp(ipart)=y0 + y;dxp(ipart)=dx_wall
          
                     !! Calculate normals
                     tmp2 = 0.0
@@ -1529,7 +716,7 @@ end subroutine quicksort
            
            
               th = 0.0d0 !! theta
-              do while(th.le.2.0d0*pi-0.25*dxb/a0)
+              do while(th.le.2.0d0*pi-0.25*dx_wall/a0)
 
                  !! Position node
                  th_sh = th - blob_rotation(ib)
@@ -1540,7 +727,7 @@ end subroutine quicksort
                  if(x+x0.ge.xb_min.and.x+x0.lt.xb_max.and.y+y0.ge.yb_min.and.y+y0.lt.yb_max)then              
                     ipart = ipart + 1 
                     xp(ipart)=x0 + x;yp(ipart)=y0 + y
-                    dxp(ipart)=dxb
+                    dxp(ipart)=dx_wall
          
                     !! Normals
                     tmp2 = (a0*a1**3. -a1*a0**3.)*cos(th_sh)*sin(th_sh) &
@@ -1553,7 +740,7 @@ end subroutine quicksort
       
                  !! Increment angle...
                  
-                 th  = th + cos(tmp2)*dxb/r_mag     
+                 th  = th + cos(tmp2)*dx_wall/r_mag     
               end do                                            
            end if                                                  
         end do              
@@ -1595,7 +782,7 @@ end subroutine quicksort
               end do
                            
               th = 0.0d0 !! theta       
-              dstiny = 0.005d0*dxb       
+              dstiny = 0.005d0*dx_wall       
               do while(th.le.2.0d0*pi-0.01*dstiny/x0)
                 
                  !! Evaluate radius
