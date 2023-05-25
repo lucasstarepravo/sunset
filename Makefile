@@ -12,6 +12,7 @@
 # pgrad      Drive the flow with a pressure gradient and P.I.D control                 (default: 0)
 # tdtp       Temperature dependent transport properties (1) or constant (0)            (default: 0)
 # flout      Output the flame structure (1) or don't (0)                               (default: 0)
+# allout     If 3D, output the entire domain (1) or just a slice (0)                   (default: 1)
 # -------------------------------------------------------------------------------------------------
 #
 # EXAMPLE USAGE:
@@ -93,6 +94,11 @@ ifeq ($(flout),1)
 FFLAGS += -Doutput_flame
 endif
 
+# Output entire domain?
+ifneq ($(allout),0)
+FFLAGS += -Dallout
+endif
+
 LDFLAGS := -fopenmp -m64 -lopenblas 
 
 # Identify directories
@@ -105,6 +111,7 @@ OBJ_FILES := obj/kind_parameters.o obj/common_parameter.o obj/common_vars.o
 OBJ_FILES += obj/rbfs.o obj/mirror_boundaries.o obj/derivatives.o 
 OBJ_FILES += obj/mpi_transfers.o obj/transport.o obj/thermodynamics.o
 OBJ_FILES += obj/neighbours.o obj/output.o obj/statistics.o 
+OBJ_FILES += obj/turbulence.o
 OBJ_FILES += obj/load_data.o obj/setup_domain.o obj/setup_flow.o
 OBJ_FILES += obj/labf.o obj/fd.o obj/chemistry.o
 OBJ_FILES += obj/characteristic_boundaries.o obj/rhs.o

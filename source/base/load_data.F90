@@ -38,7 +38,6 @@ contains
      read(12,*)
      
      !! Set Z-length-scale and characteristic time-scale
-     Lz = L_char*0.025!2.0d0*pi*L_char   !! Hard-coded 2pi
      Time_char = L_char/u_char
      
      

@@ -88,9 +88,9 @@ case(4) !! blank
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.0125d0!0.0125d0  ! channel width
+     yl=0.25d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/1000.0       !15
+     dx0=xl/250.0       !15
      xbcond=0;ybcond=1
      
      nb_patches = 4
@@ -109,8 +109,8 @@ case(5) !! Inflow/outflow tube for simple flames
 !     end do
 
 
-     dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx0*1.0d0  !! dx for solids and in/outs..
+     dxmin = dx0/2.0d0
+     dx_wall=dxmin;dx_in=2.0d0*dx0;dx_out=dx0*2.0d0  !! dx for solids and in/outs..
 
      
 !! ------------------------------------------------------------------------------------------------
@@ -183,44 +183,44 @@ case(7) !! Something periodic
 
 !! ------------------------------------------------------------------------------------------------
 case(8)
-     xl = 1.0d0        
-     D_cyl = xl/20.0 !! cylinder diameter
-     S_cyl = D_cyl*1.2d0 !! cylinder spacing
-     h0=D_cyl/2.0d0      !cylinder radius     
-     yl=2.0d0*S_cyl ! box height
-     dx0=D_cyl/50.0       !75
+!! Channel flows, propagating front
+
+     xl=1.0d0 ! channel length
+     h0=xl/40.0d0   !cylinder radius
+     yl=h0*9.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
+     dx0=h0/25.0       !15
      xbcond=0;ybcond=1     
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
      allocate(b_type(nb_patches))
      b_type(:) = (/ 3, 2, 3, 1/)  
-     b_node(1,:) = (/-0.5d0*xl, -0.5d0*yl /)
-     b_node(2,:) = (/0.5d0*xl, -0.5d0*yl /)
-     b_node(3,:) = (/0.5d0*xl, 0.5d0*yl /)
-     b_node(4,:) = (/-0.5d0*xl, 0.5d0*yl /)
-     nb_blobs = 7;n_blob_coefs=6
+     b_node(1,:) = (/ -0.225d0*xl, -0.5d0*yl /)
+     b_node(2,:) = (/ 0.775d0*xl, -0.5d0*yl /)
+     b_node(3,:) = (/ 0.775d0*xl, 0.5d0*yl /)
+     b_node(4,:) = (/ -0.225d0*xl, 0.5d0*yl /)
+     nb_blobs=3
+     open(unit=191,file="blob_fcoefs.in")
+     read(191,*) n_blob_coefs
      allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
-     blob_centre(1,:) = (/0.0d0,0.0d0/)   !! Row 0
-     blob_centre(2,:) = (/0.0d0,-S_cyl/)
-     blob_centre(3,:) = (/0.0d0,S_cyl/)
-     blob_centre(4,:) = (/S_cyl*sqrt(3.0d0)/2.0d0,-0.5d0*S_cyl/) !! Row 1/2
-     blob_centre(5,:) = (/S_cyl*sqrt(3.0d0)/2.0d0,0.5d0*S_cyl/)
-     blob_centre(6,:) = (/-S_cyl*sqrt(3.0d0)/2.0d0,-0.5d0*S_cyl/) !! Row -1/2
-     blob_centre(7,:) = (/-S_cyl*sqrt(3.0d0)/2.0d0,0.5d0*S_cyl/)
-                          
-     
+     blob_centre(1,:)=(/ 0.0d0, 0.0d0/);
+     blob_centre(2,:)=(/ 0.0d0,-3.0d0*h0/);
+     blob_centre(3,:)=(/ 0.0d0, 3.0d0*h0/);          
+     do i=1,n_blob_coefs
+        read(191,*) blob_coeffs(1,i)
+     end do
+     close(191)
      do i=1,nb_blobs
-        blob_coeffs(i,:)=h0*(/1.0d0,1.0d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0;blob_ellipse(i)=1
+        blob_coeffs(i,:) = 0.0d0;blob_coeffs(i,1) = 1.0d0 !! Hard-code for cylinders...
+        blob_coeffs(i,:) = blob_coeffs(i,:)*h0;blob_rotation(i)=-0.0d0*pi;blob_ellipse(i)=0
      end do
 
-
-
-     dxmin = dx0/3.0d0
-     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=4.0d0*dx0  !! dx for solids and in/outs!! Ratio for scaling far field...     
+     dxmin = dx0/1.0d0
+     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=1.0d0*dx0  !! dx for solids and in/outs...!!      
      
 !! ------------------------------------------------------------------------------------------------     
 end select
+!! ------------------------------------------------------------------------------------------------     
      
      !! Create the domain
      call make_boundary_edge_vectors
@@ -529,7 +529,10 @@ end subroutine quicksort
            m_be = dsqrt(dot_product(b_edge(ib,:),b_edge(ib,:)))
            nrm(1)=-b_edge(ib,2)/m_be;nrm(2)=b_edge(ib,1)/m_be
            if(b_type(ib).eq.1) dxio = dx_in
-           if(b_type(ib).eq.2) dxio = dx_out
+           if(b_type(ib).eq.2) then
+              dxio = dx_out
+              call get_resolution(xb_max,zero,1.0d10,dxio)
+           end if
            if(b_type(ib).eq.0) dxio = dx_wall
            tmp = 0.5d0*dxio/m_be
            do while(tmp.lt.1.0-1.0d-10)   ! move along the patch in increments of dx
@@ -541,10 +544,6 @@ end subroutine quicksort
            
               !! Hard-coding local dx              
               if(b_type(ib).ne.0) then  !! Inflow or outflow
-!                 temp = sqrt((x-blob_centre(1,1))**2.0d0 + ((y-blob_centre(1,2))**2.0d0)) 
-!                 temp = acos((x-blob_centre(1,1))/temp) !! Angle theta
-!                 tmp2 = exp(-(0.8d0*temp)**4.0d0) !! Outlet spreading function
-!                 dx_local = dx_out + (dx_in - dx_out)*(1.0d0-tmp2)
                  call get_resolution(x,y,1.0d10,dx_local)     
               else
                  dx_local = dxio
@@ -623,7 +622,19 @@ end subroutine quicksort
         else
            d2b_local=min(abs(x-0.075),abs(x+0.075))
            !   dist2bound=abs(x+0.4)
-        endif          
+        endif      
+        
+     else if(itest.eq.8) then   
+        xhat = x - blob_centre(1,1)
+        yhat = y - blob_centre(1,2)
+        !! Stretch high-res region downstream of flameholders        
+        if((x-blob_centre(1,1)).gt.0.0d0) then
+     
+           r_mag = ((xhat)/(xb_max - blob_centre(1,1)))**3.0d0  !! Scale between blob and outlet (0=outlet)
+          
+           dxio = dx_out + (dx_in - dx_out)*r_mag!(1.0d0-temp)
+
+        endif               
      end if
         
      !! And what is the spacing, based on dist2bound?

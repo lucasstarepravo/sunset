@@ -17,7 +17,7 @@ module common_vars
 
   !! Control parameters 
   real(rkind) :: L_char,U_char          !! read from file
-  real(rkind) :: Lz,Time_char  !! build from L_char,U_char
+  real(rkind) :: Time_char  !! build from L_char,U_char
   real(rkind), dimension(dims) :: grav !! Gravity    
   real(rkind) :: rho_char,T_ref,visc_ref,p_ref,phi_in
   real(rkind) :: dt_out,dt_out_stats !! Time interval between outputs  
@@ -89,7 +89,7 @@ module common_vars
 
 
   !! Variables related to stencil sizes 
-  real(rkind) :: h0,sup_size,h3,h2
+  real(rkind) :: h0,sup_size,h3,h2,smin_global
 
   !! Parameters related to time and some forces etc
   real(rkind) :: time,time_end !! Start/current, and end time
@@ -124,7 +124,7 @@ module common_vars
   !! Parents and boundaries... 
   integer(ikind),dimension(:),allocatable :: irelation,vrelation  ! used for periodic and symmetric boundaries
   real(rkind) :: xmin,xmax,ymin,ymax  !! Global domain size (required for NRBCs)
-  real(rkind) :: L_domain_x,L_domain_y
+  real(rkind) :: L_domain_x,L_domain_y,L_domain_z
   integer(ikind) :: xbcond,ybcond !! BC flags for "simple" geometries without boundary nodes...
   integer(ikind),dimension(:),allocatable :: btype !! What type of BC is node i?
   integer(ikind),dimension(:),allocatable :: fd_parent !! pointer to the boundary node which is parent 

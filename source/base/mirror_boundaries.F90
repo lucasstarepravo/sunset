@@ -229,6 +229,7 @@ contains
     do i=npfb+1,np
        node_type(i) = node_type(irelation(i)) !! Copy the node type (we know it's ghost node because i>npfb
        h(i) = h(irelation(i))  !! Copy the "smoothing length"
+       s(i) = s(irelation(i))  !! Copy the node spacing
 #ifdef dim3
        zlayer_index_global(i) = zlayer_index_global(irelation(i)) !! Copy the global z-layer index
 #endif       

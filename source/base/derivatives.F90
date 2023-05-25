@@ -85,7 +85,8 @@ contains
           j = ij_link(k,i) 
           lap_tmp = lap_tmp + phi(j)*ij_w_lap(k,i)
        end do
-       lapphi(i) = lap_tmp - phi(i)*ij_w_lap_sum(i)
+       lapphi(i) = lap_tmp - phi(i)*ij_w_lap_sum(i)         
+
     end do
     !$OMP END PARALLEL DO
     

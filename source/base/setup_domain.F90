@@ -79,9 +79,12 @@ contains
      open(13,file='IPART')
      read(13,*) nb,npfb,dummy      !! dummy is largest s(i) in domain...
      read(13,*) xmin,xmax,ymin,ymax
+
      !! Set the domain lengths
      L_domain_x = (xmax - xmin)*L_char
      L_domain_y = (ymax - ymin)*L_char
+     L_domain_z = L_domain_y
+
      
      read(13,*) xbcond,ybcond
      !! Calculate some useful constants
@@ -183,12 +186,12 @@ contains
      XR_thisproc = maxval(rp(1:npfb,1))    
      if(iprocY.eq.0.and.nprocsY.gt.1) then
         YU_thisproc = maxval(rp(floor(0.75*npfb):npfb,2))  !! Adjustments for cyclical columns. 
-        YD_thisproc = minval(rp(1:floor(0.25*npfb),2))       !! Should be oK given node ordering
+        YD_thisproc = minval(rp(1:floor(0.25*npfb),2))       !! Should be oK given node ordering - but...
+        !! potential for problems in really non-uniform geometries. Need a more robust solution
      else
         YU_thisproc = maxval(rp(1:npfb,2))
         YD_thisproc = minval(rp(1:npfb,2))
      end if
-
      
 !write(6,*) "iproc",iproc,"YU,YD",YU_thisproc,YD_thisproc
      
@@ -286,7 +289,10 @@ contains
      !! errors need scaling to control time step
      scale_outflow_errors = 0
      smin = minval(s(1:npfb))
+#ifdef mp     
      call global_reduce_min(smin)
+#endif     
+     smin_global = smin
      if(nb.ne.0)then
         do j=1,nb
            i=boundary_list(j)
@@ -360,33 +366,38 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 !! ------------------------------------------------------------------------------------------------
   subroutine build_3rd_dimension
      integer(ikind) :: nm,i,k,iz,ilayerm1
-     real(rkind) :: dz_local,Lz_dimensionless
+     real(rkind) :: dz_local,L_domain_z_dimensionless
      real(rkind),dimension(:,:),allocatable :: rptmp,rnormtmp
      real(rkind),dimension(:),allocatable :: htmp,stmp
      integer(ikind),dimension(:),allocatable :: node_typetmp,fd_parenttmp
      
-     !! z spacing
-     dz_local = half*(minval(s(1:npfb))+maxval(s(1:npfb)))  !! Match mean resolution
-     dz_local = dsqrt(half*(minval(s(1:npfb))**2.0 + maxval(s(1:npfb))**2.0)) !! Match mean resolution (area weighted)
+     !! Set z spacing to match mean of x-y spacing.
+     dz_local = zero
+     !$omp parallel do reduction(+:dz_local)
+     do i=1,npfb
+        dz_local = dz_local + s(i) !! raise s(i) to a power to shift type of mean
+     end do
+     !$omp end parallel do
+     
 #ifdef mp
      call MPI_ALLREDUCE(dz_local,dz,1,MPI_DOUBLE_PRECISION,MPI_SUM,MPI_COMM_WORLD,ierror)    
-     dz = dz/dble(nprocs)                
+     dz = dz/dble(npfb_global)                
 #else
-     dz = dz_local
+     dz = dz_local/dble(npfb)
 #endif     
 
      !! Set the dimensionless extent of the z-domain
-     Lz_dimensionless = Lz/L_char
+     L_domain_z_dimensionless = L_domain_z/L_char
 
-     !! Extent of domain in Z dimension = Lz
-     nz = ceiling(Lz_dimensionless/dz/dble(nprocsZ))
-     dz = Lz_dimensionless/dble(nz)/dble(nprocsZ)
+     !! Extent of domain in Z dimension = L_domain_z
+     nz = ceiling(L_domain_z_dimensionless/dz/dble(nprocsZ))
+     dz = L_domain_z_dimensionless/dble(nz)/dble(nprocsZ)
      nz_global = nz*nprocsZ
                         
      !! Minimum number in z is ij_count_fd/2 + 2
      if(nz.lt.ij_count_fd/2 + 2) then
         nz = ij_count_fd/2 + 2
-        dz = Lz_dimensionless/dble(ij_count_fd/2 + 2)
+        dz = L_domain_z_dimensionless/dble(ij_count_fd/2 + 2)
      end if
      
      write(6,*) "iproc",iproc,"Z-domain number and spacing",nz_global,dz

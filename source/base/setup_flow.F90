@@ -15,6 +15,7 @@ module setup_flow
 #ifdef mp
   use mpi_transfers
 #endif    
+  use turbulence
   implicit none
   
   real(rkind),dimension(:),allocatable :: Yspec_reactants,Yspec_products
@@ -70,13 +71,13 @@ contains
      !! e.g. uniform/non-uniform inflow etc.
         
      !! Make a 1D flame: pass X-position,flame_thickness and T_hot
-!     call make_1d_flame(zero,2.0d-4,2.366d3)
+!     call make_1d_flame(0.0d0,2.0d-4,2.366d3)
         
      !! Make a 2D gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
-     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0     
+!     call make_2d_gaussian_hotspot(0.045d0,zero,2.0d-4,2.5d3)   !-0.23d0     
 
      !! Load an existing 1D flame file
-!     call load_flame_file
+     call load_flame_file
 
      !! A messy routine to play with for other initial conditions
 !     call hardcode_initial_conditions     
@@ -88,9 +89,13 @@ contains
      !! RESTART OPTION. 
      call load_restart_file
 
+#endif
+
      !! Un-comment this to (re-)ignite a restarting simulation
 !     call superimpose_2d_gaussian_hotspot(-0.22d0,zero,2.0d-4,2.5d3)
-#endif
+
+     !! Add some turbulence to the velocity field
+     call make_turbulent_velocity_field(2.0d-4,5.0d0*u_char)
      !! =======================================================================
      
      !! Convert from velocity to momentum and Y to roY
@@ -148,7 +153,8 @@ contains
         !$omp end parallel do        
      end if
      
-     !! Initialise the variable holding the inflow species
+#ifdef ms     
+     !! Initialise the variable holding the inflow species     
      if(nb.ne.0) then
         allocate(Yspec_inflow(nspec))
         do j=1,nb
@@ -160,33 +166,30 @@ contains
            end if
         end do
      endif
+#endif     
            
-     !! SOME INITIALISATION PARTS ---------------------------------------------      
-     !! Set the initial forcing to zero. It will only be changed if PID controller in velcheck is used.
-     driving_force(:) = zero
-
+     !! SOME ADDITIONAL INITIALISATION STUFF ------------------------------------------------------
      !! Profiling - re-zero time accumulators
      segment_time_local = zero
      cputimecheck = zero         
      
-     !! Initialise the time-stepping (necessary for PID controlled stepping)
+     !! Pre-set the time-stepping (necessary for PID controlled stepping)
      dt = 1.0d-10   
            
      !! Initialise PID controller variables
      emax_np1=pid_tol;emax_n=pid_tol;emax_nm1=pid_tol
      
-     !! Initialise time-stepping error normalisation
-     ero_norm = one/one
-     erou_norm = one/(one*u_char)
-     eroE_norm = one/p_ref
-     eroY_norm = one/(one*one)
-     
-   
+     !! Initialise time-stepping error normalisation based on expected magnitudes
+     ero_norm = one/one !! Unity density
+     erou_norm = one/(one*u_char)  !! Characteristic velocity
+     eroE_norm = one/p_ref         !! Energy of the order of pressure
+     eroY_norm = one/(one*one)     !! Unity mass fraction
      
 
      !! Initialise PID controller variables for <|u|>
      eflow_nm1 = one
      sum_eflow = zero   
+     driving_force(:) = zero !! Will only be changed if using PID controller
                    
      return
   end subroutine initial_solution   
@@ -278,7 +281,7 @@ contains
      !! Temperatures, pressures and velocity from reference
      T_reactants = T_ref     
      P_flame = p_ref
-     u_reactants = u_char
+     u_reactants = u_char*0.1d0
 
      !! Inflow mixture gas constant
      Rmix_local = zero
@@ -330,7 +333,7 @@ contains
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! wall initial conditions
               u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
-              T(i) = T_reactants
+!              T(i) = T_reactants
            end if                 
            if(node_type(i).eq.1) then !! inflow initial conditions
 !              u(i)=u_char
@@ -378,7 +381,10 @@ contains
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
         
         !! Gaussian progress variable
-        c = exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y)/fl_thck)**two)        
+        c = exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y)/fl_thck)**two) &
+          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y + 0.075d0)/fl_thck)**two) &
+          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y - 0.075d0)/fl_thck)**two)
+        
         
         !! Temperature profile
         T(i) = T_reactants + (T_hot - T_reactants)*c
@@ -412,7 +418,7 @@ contains
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! wall initial conditions
               u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
-              T(i) = T_reactants
+!              T(i) = T_reactants
            end if                 
            if(node_type(i).eq.1) then !! inflow initial conditions
 !              u(i)=u_char
@@ -606,8 +612,8 @@ contains
      !$OMP PARALLEL DO PRIVATE(x,y,z,tmp,ispec,Rmix_local)
      do i=1,npfb
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
-!        u(i) = -cos(two*pi*x)*sin(two*pi*y)*cos(two*pi*z/Lz)!*oosqrt2
-!        v(i) = sin(two*pi*x)*cos(two*pi*y)*cos(two*pi*z/Lz)    !!c c
+!        u(i) = -cos(two*pi*x)*sin(two*pi*y)*cos(two*pi*z/L_domain_z)!*oosqrt2
+!        v(i) = sin(two*pi*x)*cos(two*pi*y)*cos(two*pi*z/L_domain_z)    !!c c
         !! old
 !        tmp = -half*half*(cos(two*x) + cos(two*y))/csq  !! Modify for not(isoT)
 
@@ -656,7 +662,7 @@ contains
            if(node_type(i).eq.0) then !! wall initial conditions
               u(i)=zero;v(i)=zero;w(i)=zero
 
-              tmp = T_ref*(one + 0.01*sin(two*pi*rp(i,3)/Lz))
+              tmp = T_ref*(one + 0.01*sin(two*pi*rp(i,3)/L_domain_z))
               T_bound(j) = tmp !! Might want changing                
               T(i) = T_bound(j)
            end if                 

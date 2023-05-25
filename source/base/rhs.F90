@@ -160,6 +160,8 @@ contains
         tmp_scal = dot_product(tmp_vec,gradro(i,:))
 
         rhs_ro(i) = -ro(i)*divvel(i) - tmp_scal   
+        
+  
      end do
      !$omp end parallel do
 
@@ -231,7 +233,7 @@ contains
         do i=1,npfb
            !! Store inverse of density and temperature
            tmpro = one/ro(i)
-           tmpT=one/T(i)
+           tmpT=one/T(i)        
            
            !! grad(lnT) + grad(lnro)
            mxav_store1(i,:) = tmpT*gradT(i,:) + tmpro*gradro(i,:)
@@ -245,7 +247,8 @@ contains
                           
            !!(1/roR0T)*(lap(p) - gradp.(grad(lnT)+grad(lnro)))               
            mxav_store4(i) = (tmpro*tmpT/Rgas_universal)*(mxav_store4(i) - dot_product(gradp(i,:),mxav_store1(i,:)))
-           
+
+
         end do
         !$omp end parallel do 
      else

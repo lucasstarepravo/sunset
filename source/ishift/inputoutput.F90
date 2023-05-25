@@ -267,7 +267,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
   end subroutine setup_domain
 !! ------------------------------------------------------------------------------------------------  
   subroutine output_newnodes
-     integer(ikind) :: i,n,j
+     integer(ikind) :: i,n,j,k
      real(rkind) :: max_x,min_x,max_y,min_y,max_s,block_size_x,block_size_y
      
      n= npfb - 4*nb
@@ -277,11 +277,11 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      write(212,*) xbcond,ybcond
      write(212,*) nprocsX,nprocsY,nprocsZ
   
-     !! Indices of each column 
+     !! Write out stard and end indices of each column (repeated for decomposition in z)
      write(212,*) nprocs*nprocsZ
-     do j=1,nprocsZ
+     do k=1,nprocsZ
         do i=1,nprocs
-           write(212,*) (j-1)*n + nstart(i),(j-1)*n + nend(i)
+           write(212,*) nstart(i),nend(i)
            
            !! Check scales of this processor block. 
            !! N.B. this is not valid for the cyclic blocks at the start of each column!!
@@ -312,10 +312,9 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      end do
      deallocate(nstart,nend)
      
-     do j=1,nprocsZ       
-        do i=1,n
-           write(212,*) x(i),y(i),nt(i),xn(i),yn(i),ds(i)
-        end do
+     !! Write out slice  
+     do i=1,n
+        write(212,*) x(i),y(i),nt(i),xn(i),yn(i),ds(i)
      end do
      
      deallocate(x,y,xn,yn,ds,nt)

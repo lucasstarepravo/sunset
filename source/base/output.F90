@@ -168,10 +168,12 @@ contains
      real(rkind) :: tmpT,xn,yn,tmpro,tmpVort
 
      !! Only output from the first sheet
+#ifdef allout
+     nprocsout = nprocsX*nprocsY*nprocsZ   
+#else
      if(iprocZ.eq.0)then     
         nprocsout = nprocsX*nprocsY
-!if(.true.)then     
-!nprocsout = nprocsX*nprocsY*nprocsZ
+#endif
 
 
         !! Calculate the vorticity 
@@ -232,7 +234,11 @@ contains
         end if 
      
         !! Local number nodes output
-        np_out_local = npfb_layer 
+#ifdef allout        
+        np_out_local = npfb
+#else
+        np_out_local = npfb_layer
+#endif
         
         !! Number of species out
 !        nspec_out = 1
@@ -250,8 +256,7 @@ contains
            tmpT = zero
 #endif           
  
-           !! Pass something to tmpVort (we use vorticity to output other things sometimes during
-           !! debugging...)
+           !! Pass something to tmpVort (we use vorticity to output other things sometimes during debugging...)
            tmpVort = vort(i)
                 
            !! Pass heat release rate to alpha_out?
@@ -274,8 +279,9 @@ contains
                
         !! Also output the nodes/discretisation if it is output #1
         if(n_out.eq.1) call output_nodes(np_out_local)                       
-                   
+#ifndef allout                   
      end if
+#endif     
 
      !! Write the time,dump number and # nodes to file
 #ifdef dim3
