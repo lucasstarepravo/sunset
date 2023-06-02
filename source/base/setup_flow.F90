@@ -74,7 +74,7 @@ contains
 !     call make_1d_flame(0.0d0,2.0d-4,2.366d3)
         
      !! Make a 2D gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
-!     call make_2d_gaussian_hotspot(0.045d0,zero,2.0d-4,2.5d3)   !-0.23d0     
+!     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
 
      !! Load an existing 1D flame file
      call load_flame_file
@@ -95,7 +95,7 @@ contains
 !     call superimpose_2d_gaussian_hotspot(-0.22d0,zero,2.0d-4,2.5d3)
 
      !! Add some turbulence to the velocity field
-     call make_turbulent_velocity_field(2.0d-4,5.0d0*u_char)
+     call make_turbulent_velocity_field(6.0d-4,5.0d0*u_char)
      !! =======================================================================
      
      !! Convert from velocity to momentum and Y to roY
@@ -381,9 +381,9 @@ contains
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
         
         !! Gaussian progress variable
-        c = exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y)/fl_thck)**two) &
-          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y + 0.075d0)/fl_thck)**two) &
-          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y - 0.075d0)/fl_thck)**two)
+        c = exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y)/fl_thck)**two)! &
+!          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y + 0.075d0)/fl_thck)**two) &
+!          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y - 0.075d0)/fl_thck)**two)
         
         
         !! Temperature profile
@@ -405,7 +405,7 @@ contains
         ro(i) = P_flame/(Rmix_local*T(i))
         
         !! Velocity
-        u(i) = u_reactants*0.1d0!*six*(half-y)*(half+y)
+        u(i) = u_reactants!*six*(half-y)*(half+y)
         v(i) = zero
         w(i) = zero
                         

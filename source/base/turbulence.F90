@@ -50,7 +50,7 @@ contains
      call set_velocity_field_to_random
   
      !! Apply some diffusion until we get to the required lengthscales
-     call diffuse_velocity_field
+     call diffuse_velocity_field     
      
      !! Scale the turbulent velocity field to give the desired turbulence statistics
      call scale_velocity_field
@@ -213,8 +213,8 @@ contains
       deallocate(lapu,lapv,lapw)
   
      return
-  end subroutine diffuse_velocity_field  
-!! ------------------------------------------------------------------------------------------------
+  end subroutine diffuse_velocity_field
+!! ------------------------------------------------------------------------------------------------  
   subroutine set_velocity_field_to_random
      !! Initialises the velocity field to random numbers
      integer(ikind) :: i,randseed

@@ -88,7 +88,7 @@ case(4) !! blank
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.25d0!0.0125d0  ! channel width
+     yl=0.5d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
      dx0=xl/250.0       !15
      xbcond=0;ybcond=1
@@ -120,7 +120,7 @@ case(6) !! Channel flows, propagating front
      h0=xl/40.0d0   !cylinder radius
      yl=xl/1.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
      dx0=h0/25.0       !15
-     xbcond=0;ybcond=1     
+     xbcond=0;ybcond=2     
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -139,10 +139,10 @@ case(6) !! Channel flows, propagating front
         read(191,*) blob_coeffs(1,i)
      end do
      close(191)
-     blob_coeffs(1,:) = 0.0d0;blob_coeffs(1,1) = 1.0d0
+!     blob_coeffs(1,:) = 0.0d0;blob_coeffs(1,1) = 1.0d0
      blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi;blob_ellipse(1)=0
 
-     dxmin = dx0/1.0d0
+     dxmin = dx0/2.0d0
      dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=1.0d0*dx0  !! dx for solids and in/outs...!! 
 !! ------------------------------------------------------------------------------------------------
 case(7) !! Something periodic
@@ -616,11 +616,15 @@ end subroutine quicksort
         endif    
 
      else if(itest.eq.5) then
+
         !! Over-ride object tests
-        if(abs(x).le.0.075) then
+        temp = 0.025 !! size of refined region
+        tmp2 = -0.1d0 !! location of refined region
+        tmp2 = x - tmp2 !! Location relative to finest resolution centre
+        if(abs(tmp2).le.temp) then
            d2b_local=0.0d0
         else
-           d2b_local=min(abs(x-0.075),abs(x+0.075))
+           d2b_local=min(abs(tmp2-temp),abs(tmp2+temp))
            !   dist2bound=abs(x+0.4)
         endif      
         

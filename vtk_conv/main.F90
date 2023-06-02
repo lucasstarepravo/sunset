@@ -3,7 +3,7 @@ program main
   implicit none
 
   integer :: n,i,nthreads,np,npp,ngrab,Nframes,iframe,i_loop_finish,N_start,ii,iii,i_PART_counter
-  integer,parameter :: np_max = 2100010
+  integer,parameter :: np_max = 8100010
   integer, parameter :: i_PART_counter_max=20000
   character chartemp*40, name_orig*40
   character name_vtu*40, name_vtu2*12, name_vtu3*9

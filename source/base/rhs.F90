@@ -194,7 +194,7 @@ contains
      real(rkind),dimension(:,:,:),allocatable :: gradYspec
      real(rkind),dimension(:,:),allocatable :: grad2Yspec
      integer(ikind) :: i,j,ispec
-     real(rkind),dimension(dims) :: roVY,gradroDY
+     real(rkind),dimension(dims) :: roVY,gradroDY,body_force
      real(rkind) :: tmp_scal,lapYspec_tmp,tmpY,divroVY,enthalpy,dcpdT,cpispec,tmpro,tmpT,roDY
      real(rkind),dimension(:,:),allocatable :: speciessum_roVY,speciessum_hgradY
      real(rkind),dimension(:),allocatable :: speciessum_divroVY,speciessum_hY
@@ -469,7 +469,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
      end do
      
      !! Run over all nodes on final time to add terms to energy equation
-     !$omp parallel do
+     !$omp parallel do private(body_force)
      do i=1,npfb
         !! Additional terms for energy equation
 #ifndef isoT                                     
@@ -481,6 +481,11 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
 
         !! Add cp(mix)*gradT*sum_over_species(roVY) 
         store_diff_E(i) = store_diff_E(i) - cp(i)*dot_product(gradT(i,:),speciessum_roVY(i,:))
+
+        !! Body force molecular diffusion heating term
+        body_force = tmpro*grav + driving_force
+        store_diff_E(i) = store_diff_E(i) - dot_product(body_force,speciessum_roVY(i,:))
+
                                                
 #endif                                               
      end do
