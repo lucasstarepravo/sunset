@@ -20,7 +20,7 @@ module inputoutput
   !! Local hovs for shifting
   real(rkind),parameter :: hovs_local = 2.5d0
   
-  real(rkind),parameter :: coef_diffusion=0.4d0
+  real(rkind),parameter :: coef_diffusion=0.2d0 !0.4d0
   integer(ikind),parameter :: maxiters_diffusion = 200
 
 contains
@@ -358,7 +358,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      !! load balancing.
   
      integer(ikind) :: i,kk,nband_mean,nptmp,nl_ini,nl_end,ii,nblock,ll,j
-     integer(ikind) :: nshift
+     integer(ikind) :: nshift,meanband,varband
      logical :: keepgoing       
      
      !! How many particles (total) need sorting
@@ -423,7 +423,23 @@ write(6,*) "Shifting iteration",ll,"of ",kk
            end do
         
         end do     
+     
+        if(.false.)then
+           !! Evaluate mean and variance:
+           meanband = 0
+           varband = 0
+           do kk=1,nprocsX
+              meanband = meanband + effective_nband(kk)
+           end do
+           meanband = floor(dble(meanband)/dble(nprocsX))
+           do kk=1,nprocsX
+              varband = varband + (effective_nband(kk)-meanband)**2
+           end do
+           varband = floor(sqrt(dble(varband)/dble(nprocsX)))
         
+           write(6,*) "Iteration number, mean and variance:",j,meanband,varband
+        end if
+          
         j=j+1
         if(j.gt.maxiters_diffusion) keepgoing=.false.
      

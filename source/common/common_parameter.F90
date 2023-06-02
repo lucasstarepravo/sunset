@@ -14,18 +14,19 @@ module common_parameter
   !! Numbers --------------------------------------------------------------------------------------
   real(rkind), parameter :: pi=3.141592653589793238462643383279502884197d0
   real(rkind), parameter :: pi4 = pi**4.0
-  real(rkind), parameter :: oosqrt2 = 1.0d0/dsqrt(2.0d0)
-  real(rkind), parameter :: fourthirds = 4.0d0/3.0d0
-  real(rkind), parameter :: onethird = 1.0d0/3.0d0
-  real(rkind), parameter :: twothirds = 2.0d0/3.0d0
   real(rkind), parameter :: zero = 0.0d0
   real(rkind), parameter :: one = 1.0d0
   real(rkind), parameter :: two = 2.0d0
+  real(rkind), parameter :: three = 3.0d0
   real(rkind), parameter :: four = two*two
   real(rkind), parameter :: half = one/two  
   real(rkind), parameter :: quarter = half*half  
-  real(rkind), parameter :: six=6.0d0
+  real(rkind), parameter :: six=two*three
+  real(rkind), parameter :: fourthirds = four/three
+  real(rkind), parameter :: onethird = one/three
+  real(rkind), parameter :: twothirds = two/three
   real(rkind), parameter :: oosix = one/six
+  real(rkind), parameter :: oosqrt2 = one/dsqrt(two)
   real(rkind), parameter :: verysmall = 1.0d-30
   real(rkind), parameter :: verylarge = 1.0d30
   real(rkind), parameter :: quitesmall = 1.0d-12
