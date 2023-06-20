@@ -34,7 +34,7 @@ contains
      !! Allocate arrays for properties - primary
      allocate(rou(np),rov(np),row(np),ro(np),roE(np),divvel(np))
      allocate(Yspec(np,nspec))
-     rou=zero;rov=zero;row=zero;ro=zero;roE=one;Yspec=one;divvel=zero
+     rou=zero;rov=zero;row=zero;ro=one;roE=one;Yspec=one;divvel=zero
 
      !! Secondary properties
      allocate(T(np));T=T_ref
@@ -95,7 +95,7 @@ contains
 !     call superimpose_2d_gaussian_hotspot(-0.22d0,zero,2.0d-4,2.5d3)
 
      !! Add some turbulence to the velocity field
-!     call make_turbulent_velocity_field(1.0d-3,5.0d0*u_char)
+!     call make_turbulent_velocity_field(6.9d-4,5.0d0*u_char)
      !! =======================================================================
      
      !! Convert from velocity to momentum and Y to roY
@@ -111,8 +111,8 @@ contains
      !$omp end parallel do   
               
      !! Set energy from ro,u,Y,T
-     call initialise_energy      
-
+     call initialise_energy     
+     
      !! Mirrors and halos                        
      call reapply_mirror_bcs
 #ifdef mp
@@ -153,7 +153,7 @@ contains
         !$omp end parallel do        
      end if
      
-#ifdef ms     
+!#ifdef ms     
      !! Initialise the variable holding the inflow species     
      if(nb.ne.0) then
         allocate(Yspec_inflow(nspec))
@@ -166,7 +166,7 @@ contains
            end if
         end do
      endif
-#endif     
+!#endif     
            
      !! SOME ADDITIONAL INITIALISATION STUFF ------------------------------------------------------
      !! Profiling - re-zero time accumulators
@@ -281,7 +281,7 @@ contains
      !! Temperatures, pressures and velocity from reference
      T_reactants = T_ref     
      P_flame = p_ref
-     u_reactants = u_char*0.1d0
+     u_reactants = u_char
 
      !! Inflow mixture gas constant
      Rmix_local = zero
@@ -611,17 +611,20 @@ contains
      !! Values within domain
      !$OMP PARALLEL DO PRIVATE(x,y,z,tmp,ispec,Rmix_local)
      do i=1,npfb
-        x = rp(i,1);y=rp(i,2);z=rp(i,3)
-!        u(i) = -cos(two*pi*x)*sin(two*pi*y)*cos(two*pi*z/L_domain_z)!*oosqrt2
-!        v(i) = sin(two*pi*x)*cos(two*pi*y)*cos(two*pi*z/L_domain_z)    !!c c
-        !! old
-!        tmp = -half*half*(cos(two*x) + cos(two*y))/csq  !! Modify for not(isoT)
+!        x = rp(i,1);y=rp(i,2);z=rp(i,3)
+        x = rp(i,3)-pi;y=rp(i,2);z=-rp(i,1) !! swap coords, and shift so x=-pi is on the front face        
 
         !! TG 3D Re1600 as in Cant 2022, Sandam 2017 etc (ish)
-        u(i) = -cos(x)*sin(y)*cos(z)!*oosqrt2
+!        u(i) = -cos(x)*sin(y)*cos(z)!*oosqrt2
+!        v(i) = sin(x)*cos(y)*cos(z)    !!c c
+!        w(i) = zero!u(i);u(i)=zero
+        
+        w(i) = -cos(x)*sin(y)*cos(z)!*oosqrt2  !! Swap coords
         v(i) = sin(x)*cos(y)*cos(z)    !!c c
-        w(i) = zero!u(i);u(i)=zero
-        tmp = Rgas_universal*one_over_molar_mass(1)*T_ref  !! RT0
+        u(i) = zero!u(i);u(i)=zero
+        
+        
+        tmp = Rgas_universal*one_over_molar_mass(1)*T_ref  !! RT0        
         tmp = rho_char*U_char*U_char/tmp   !! roUU/RT0
         tmp = -tmp*(one/16.0d0)*(cos(two*x)+cos(two*y))*(two+cos(two*z))        
         T(i) = T_ref
@@ -630,16 +633,15 @@ contains
 
 #ifdef ms    
 !        tmp = one - half*(one + erf(5.0d0*x))
-        Yspec(i,1:8) = zero
-        Yspec(i,9) = one
+        Yspec(i,:) = one
 #else
         Yspec(i,1) = one
 #endif         
-        u(i) = zero
-        v(i) = zero
-        T(i) = T_ref
-        tmp = exp(-y*y/0.01d0)
-        ro(i) = one + 0.1d0*tmp
+!        u(i) = zero
+!        v(i) = zero
+ !       T(i) = T_ref
+ !       tmp = exp(-y*y/0.01d0)
+ !       ro(i) = one + 0.1d0*tmp
         
         !! Local mixture gas constant
         Rmix_local = zero
@@ -654,6 +656,8 @@ contains
                    
      end do
      !$OMP END PARALLEL DO
+     
+    
      
      !! Values on boundaries
      if(nb.ne.0)then

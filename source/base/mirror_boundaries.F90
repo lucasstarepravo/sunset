@@ -282,11 +282,11 @@ contains
         delta_roE = ro(i)*dot_product(grav,rij)!/gammagasm1  MODIFY
          
         roE(j) = roE(i) + delta_roE
-#ifdef ms
+!#ifdef ms
         do ispec=1,nspec
            Yspec(j,ispec)=Yspec(i,ispec)
         end do
-#endif        
+!#endif        
         
         !! Velocity divergence
         divvel(j)=divvel(i)

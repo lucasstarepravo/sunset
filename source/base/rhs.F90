@@ -118,8 +118,8 @@ contains
 
      !! Calculate chemical production rates and add these to rhs of species equation
 #ifdef react     
-     call calculate_chemical_production_rate
-!     call calculate_chemical_production_rate_dummy      
+!     call calculate_chemical_production_rate
+     call calculate_chemical_production_rate_dummy      
 #endif     
 
      !! Evaluate RHS for boundaries
@@ -132,7 +132,7 @@ contains
       
           
      !! If we want to calculate total dissipation rate
-     if(.false..and.iRKstep.eq.1) then
+     if(.true..and.iRKstep.eq.1) then
         call check_enstrophy
      end if    
      
@@ -667,8 +667,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
               f_visc_w = f_visc_w + gradvisc(i,1)*(gradu(i,3)+gradw(i,1)) &
                                   + gradvisc(i,2)*(gradv(i,3)+gradw(i,2)) &
                                   + gradvisc(i,3)*(fourthirds*gradw(i,3) - twothirds*(gradu(i,1)+gradv(i,2)))     
-#endif 
-              
+             
               !! Zero normal flux normal stress divergence
               if(znf_vdiff(j)) then
                  !! dtau_nn/dn = 0
@@ -682,12 +681,10 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
 !                 f_visc_w = f_visc_w -grad2uvec(j,3) - grad2ucross(j,2)
 
                  !! zero non-uniform viscosity contribution to dtau_jn/dn for j=2,3 
-#ifdef tdtp
                  f_visc_v = f_visc_v - gradvisc(i,1)*(gradu(i,2)+gradv(i,1)) 
                  f_visc_w = f_visc_w - gradvisc(i,1)*(gradu(i,3)+gradw(i,1)) 
-#endif 
               end if
-     
+#endif      
               !! Body force
               body_force_u = tmpro*grav(1) + driving_force(1)
               body_force_v = tmpro*grav(2) + driving_force(2)

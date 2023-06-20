@@ -80,7 +80,7 @@ contains
         do iorder = 1,polyorder_cp+1
            dfT_coef_C(iorder) = dble(iorder)*fT_coef_C(iorder)
         end do
-        
+                
         !! Initial guess for T is current temperature..
         T_tmp = T(i)
         
@@ -97,7 +97,7 @@ contains
               fT = (fT + fT_coef_C(iorder))*T_tmp
               dfT = dfT*T_tmp + dfT_coef_C(iorder)
            end do
-           fT = fT + fT_coef_C0
+           fT = fT + fT_coef_C0           
         
            !! Calculate new T
            deltaT = - fT/(dfT)
@@ -119,7 +119,7 @@ contains
         !! Find the maximum number of iterations over this processor and sum of iterations
         maxiters = max(NRiters,maxiters)
         sumiters = sumiters + NRiters
-        
+
         !! Evaluate the specific heat capacity of the mixture
         cp(i) = zero
         do ispec=1,nspec

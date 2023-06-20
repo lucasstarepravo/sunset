@@ -62,7 +62,7 @@ program datgen
 !! ------------------------------------------------------------------------------------------------
   case(3) !! Kolmogorov flow
 
-     yl=1.0d0!2.0d0*pi
+     yl=2.0d0*pi
      xl=yl
      dx0=xl/100.0d0
      xbcond=1;ybcond=1     
@@ -77,8 +77,8 @@ program datgen
      b_node(4,:) = (/-0.5d0*xl, 0.5d0*yl /)
      nb_blobs = 0;n_blob_coefs=0
 
-     dxmin = dx0/3.0d0
-     dx_wall=dxmin;dx_in=2.0d0*dx0;dx_out=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...
+     dxmin = dx0/1.0d0
+     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...
 
 
 !! ------------------------------------------------------------------------------------------------
@@ -88,9 +88,9 @@ case(4) !! blank
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.5d0!0.0125d0  ! channel width
+     yl=0.4d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/250.0       !15
+     dx0=xl/300.0       !15
      xbcond=0;ybcond=1
      
      nb_patches = 4
@@ -109,8 +109,8 @@ case(5) !! Inflow/outflow tube for simple flames
 !     end do
 
 
-     dxmin = dx0/2.0d0
-     dx_wall=dxmin;dx_in=2.0d0*dx0;dx_out=dx0*2.0d0  !! dx for solids and in/outs..
+     dxmin = dx0/1.0d0
+     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx0*1.0d0  !! dx for solids and in/outs..
 
      
 !! ------------------------------------------------------------------------------------------------
@@ -118,7 +118,7 @@ case(6) !! Hong-Im flameholder setup
 
      xl=1.0d0 ! channel length
      h0=xl/40.0d0   !cylinder radius
-     yl=xl/10.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
+     yl=xl/2.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
      dx0=h0/25.0       !15
      xbcond=0;ybcond=2     
      
@@ -139,11 +139,11 @@ case(6) !! Hong-Im flameholder setup
         read(191,*) blob_coeffs(1,i)
      end do
      close(191)
-!     blob_coeffs(1,:) = 0.0d0;blob_coeffs(1,1) = 1.0d0
+     blob_coeffs(1,:) = 0.0d0;blob_coeffs(1,1) = 1.0d0
      blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi;blob_ellipse(1)=0
 
-     dxmin = dx0/2.0d0
-     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=1.0d0*dx0  !! dx for solids and in/outs...!! 
+     dxmin = dx0/1.0d0
+     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=3.0d0*dx0  !! dx for solids and in/outs...!! 
 !! ------------------------------------------------------------------------------------------------
 case(7) !! Something periodic
 
@@ -186,7 +186,7 @@ case(8) !! Array of triangles
 
      xl=1.0d0 ! channel length
      h0=xl/40.0d0   !cylinder radius
-     yl=xl/10.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
+     yl=xl/5.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
      dx0=h0/25.0       !15
      xbcond=0;ybcond=2     
      
@@ -194,40 +194,34 @@ case(8) !! Array of triangles
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
      allocate(b_type(nb_patches))
      b_type(:) = (/ 3, 2, 3, 1/)  
-     b_node(1,:) = (/ -0.25d0*xl, -0.5d0*yl /)
-     b_node(2,:) = (/ 0.75d0*xl, -0.5d0*yl /)
-     b_node(3,:) = (/ 0.75d0*xl, 0.5d0*yl /)
-     b_node(4,:) = (/ -0.25d0*xl, 0.5d0*yl /)
-     nb_blobs=6
+     b_node(1,:) = (/ -0.5d0*xl, -0.5d0*yl /)
+     b_node(2,:) = (/ 0.5d0*xl, -0.5d0*yl /)
+     b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
+     b_node(4,:) = (/ -0.5d0*xl, 0.5d0*yl /)
+     nb_blobs=3
      open(unit=191,file="blob_fcoefs.in")
      read(191,*) n_blob_coefs
      allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
      do i=1,n_blob_coefs
         read(191,*) blob_coeffs(1,i)
+        blob_coeffs(2,i) = blob_coeffs(1,i)
+        blob_coeffs(3,i) = blob_coeffs(1,i)        
      end do
      close(191)
-     !! Copy to other blobs
-     do i=2,nb_blobs
-        blob_coeffs(i,:) = blob_coeffs(1,:)
-     end do
-
-     blob_centre(1,:)=(/ 0.0d0*h0,-0.0d0*yl/);     
-     blob_centre(2,:)=(/-0.4d0*h0,-0.5d0*yl/);     
-     blob_centre(3,:)=(/-0.4d0*h0, 0.5d0*yl/);                          
+     blob_centre(1,:)=(/ -0.275d0*xl,-0.0d0*yl/);
      blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi;blob_ellipse(1)=0
-     blob_coeffs(2,:) = blob_coeffs(2,:)*h0;blob_rotation(2)= 1.0d0*pi;blob_ellipse(2)=0
-     blob_coeffs(3,:) = blob_coeffs(3,:)*h0;blob_rotation(3)= 1.0d0*pi;blob_ellipse(3)=0          
-     blob_centre(4,:)=(/ 2.0d0*h0,-0.0d0*yl/);     
-     blob_centre(5,:)=(/ 1.6d0*h0,-0.5d0*yl/);     
-     blob_centre(6,:)=(/ 1.6d0*h0, 0.5d0*yl/);                          
-     blob_coeffs(4,:) = blob_coeffs(4,:)*h0;blob_rotation(4)= 0.0d0*pi;blob_ellipse(4)=0
-     blob_coeffs(5,:) = blob_coeffs(5,:)*h0;blob_rotation(5)= 1.0d0*pi;blob_ellipse(5)=0
-     blob_coeffs(6,:) = blob_coeffs(6,:)*h0;blob_rotation(6)= 1.0d0*pi;blob_ellipse(6)=0          
+
+     blob_centre(2,:)=(/ -0.275d0*xl,-0.0d0*yl/); !!XXXXXXXXXX
+     blob_coeffs(2,:) = blob_coeffs(2,:)*h0;blob_rotation(2)=-0.0d0*pi;blob_ellipse(2)=0
+     blob_centre(3,:)=(/ -0.275d0*xl,-0.0d0*yl/);
+     blob_coeffs(3,:) = blob_coeffs(3,:)*h0;blob_rotation(3)=-0.0d0*pi;blob_ellipse(3)=0
+
+         
 
 
 
      dxmin = dx0/2.0d0
-     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=1.0d0*dx0  !! dx for solids and in/outs...!!     
+     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=3.0d0*dx0  !! dx for solids and in/outs...!!     
      
 !! ------------------------------------------------------------------------------------------------     
 end select
@@ -332,13 +326,14 @@ end select
               idown = 0
               thdown = -0.49999999d0*pi
               keepgoing = .false.
-           else if(pdp_dist2(i).ge.dx*dx) then             
+           else if(pdp_dist2(i).ge.dx*dx) then      !! Distance??        
               idown = i
               thdown = atan2((pdp_y(idown)-y),(pdp_x(idown)-x))
               keepgoing = .false.    
  
            end if       
         end do
+        !! Search up
         i=j;keepgoing = .true.
         do while(keepgoing)
            i=i+1
@@ -346,7 +341,7 @@ end select
               iup = npdps+1
               thup = 0.4999999999d0*pi
               keepgoing = .false.              
-           else if(pdp_dist2(i).ge.dx*dx) then 
+           else if(pdp_dist2(i).ge.dx*dx) then !! Distance
               iup = i
               thup = atan2((pdp_y(iup)-y),(pdp_x(iup)-x))              
               keepgoing = .false.
@@ -630,7 +625,7 @@ end subroutine quicksort
 
         !! Over-ride object tests
         temp = 0.025 !! size of refined region
-        tmp2 = -0.1d0 !! location of refined region
+        tmp2 = -0.0d0 !! location of refined region
         tmp2 = x - tmp2 !! Location relative to finest resolution centre
         if(abs(tmp2).le.temp) then
            d2b_local=0.0d0
@@ -642,14 +637,18 @@ end subroutine quicksort
      else if(itest.eq.8) then   
         xhat = x - blob_centre(1,1)
         yhat = y - blob_centre(1,2)
-        !! Stretch high-res region downstream of flameholders        
+        !! Stretch high-res region downstream of flameholder        
         if((x-blob_centre(1,1)).gt.0.0d0) then
-     
-           r_mag = ((xhat)/(xb_max - blob_centre(1,1)))**3.0d0  !! Scale between blob and outlet (0=outlet)
-          
-           dxio = dx_out + (dx_in - dx_out)*r_mag!(1.0d0-temp)
-
-        endif               
+           r_mag = ((xb_max - x)/(xb_max - blob_centre(1,1)))**2.0d0  !! Scale between blob and outlet (0=outlet)
+           temp = exp(-(8.0d0*yhat)**4.0d0) !! Blob-side spreading function
+           tmp2 = exp(-(4.0d0*yhat)**4.0d0) !! Outflow-side spreading function
+           temp = r_mag*temp + (1.0d0-r_mag)*tmp2 !! Linear variation between blob-side and outflow-side
+           dxio = dx_out + (dx_in - dx_out)*(1.0d0-temp)
+        else
+           r_mag = sqrt(xhat**2.0d0 + yhat**2.0d0)
+           temp = exp(-(8.0d0*r_mag)**4.0d0)
+           dxio = dx_out + (dx_in - dx_out)*(1.0d0-temp)
+        endif                
      end if
         
      !! And what is the spacing, based on dist2bound?

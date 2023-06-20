@@ -154,9 +154,9 @@ contains
      real(rkind) :: dt_diff
      real(rkind),dimension(:),allocatable :: lapu,lapv,lapw
        
-     !! Evaluate time-step and number of iterations
-     dt_diff = 0.15d0*(min(smin_global,dz)*L_char)**two
-     nt_diff = 1 + L_turb*L_turb/(two*pi*dt_diff)
+     !! Evaluate time-step and number of iterations    
+     dt_diff = 0.1d0*(min(smin_global,dz)*L_char)**two
+     nt_diff = 1 + floor(L_turb*L_turb/(two*pi*dt_diff))
       
      !! Space for RHS
      allocate(lapu(npfb),lapv(npfb),lapw(npfb))
@@ -206,7 +206,7 @@ contains
         end do
         !$omp end parallel do            
         
-        if(iproc.eq.0) write(6,*) "Diffusion progress:",100.0d0*dble(it_diff)/dble(nt_diff),"%."
+        if(iproc.eq.0) write(6,*) "Diffusion progress:",100.0d0*dble(it_diff)/dble(nt_diff),"%."!,maxval(u),minval(u)
         
       end do
       

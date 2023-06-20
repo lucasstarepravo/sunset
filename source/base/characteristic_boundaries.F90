@@ -189,6 +189,7 @@ contains
      Lchar(5+1:5+nspec) = zero !! At present just assume inflow is far enough from flame...
 #endif    
 
+
 #endif                   
          
 
@@ -236,8 +237,9 @@ contains
      !! Fixed temperature option       
      Lchar(2) = (gammagas-one)*(Lchar(1)+Lchar(5))/c/c &
 #ifdef react
-              - tmpro*(gammagas-one)*sumoverspecies_homega(j)/p(i) !&
+              - tmpro*(gammagas-one)*sumoverspecies_homega(j)/p(i) &
 #endif     
+              + zero
 !              - gammagasm1*tmpro*gradb_v(2) &   !! trans 1 term
 !              - gammagasm1*tmpro*gradb_w(3)     !! Trans 2 term 
               ! + (ro/T)*dT/dt
@@ -323,8 +325,9 @@ contains
 
         Lchar(5) = (p(i)-P_inflow)*nscbc_coeff*c*(one)/two/L_domain_x &      !! Track p_inflow
 #ifdef react
-                 - half*(gammagas-one)*sumoverspecies_homega(j) !&                 !! Source terms
+                 - half*(gammagas-one)*sumoverspecies_homega(j) &                 !! Source terms
 #endif
+                 + zero
 !                 - half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2))  & !! transverse 1 conv. terms
 !                 - half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))    !! transverse 2 conv. terms  
              
@@ -519,7 +522,7 @@ contains
      if(inflow_velocity_control.eq.1) then
         !! Start and end inflow speeds, and ramp time
         u_inflow_start = u_char
-        u_inflow_end = u_char
+        u_inflow_end = two*u_char
         ramp_time = half*Time_char   
      
         !! Set the desired mean inflow velocity

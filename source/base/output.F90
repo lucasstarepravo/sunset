@@ -242,8 +242,7 @@ contains
         
         !! Number of species out
 !        nspec_out = 1
-        nspec_out = nspec 
-         
+        nspec_out = nspec          
         
         !! Write the main dump files
         open(unit = 20,file=fname)  

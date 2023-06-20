@@ -107,12 +107,12 @@ contains
      !! Energy
      call halo_exchange(roE)
 #endif
-#ifdef ms     
+!#ifdef ms     
      !! Species
      do ispec=1,nspec 
         call halo_exchange(Yspec(:,ispec))
      end do
-#endif     
+!#endif     
 
 #endif     
 
