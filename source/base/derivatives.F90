@@ -104,8 +104,6 @@ contains
     !$OMP END PARALLEL DO
 #endif    
 
-  
-
     !! Profiling
     segment_tend = omp_get_wtime()
     segment_time_local(5) = segment_time_local(5) + segment_tend - segment_tstart
