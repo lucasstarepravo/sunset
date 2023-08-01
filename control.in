@@ -4,13 +4,13 @@
 0.01d0
 
 !! Characteristic velocity scale (U_char)
-20.0d0
+0.39d0
 
 !! Start and end time (in multiples of L_char/Uchar)
-0.0d0 20.0d0
+0.0d0 1.0d0
 
 !! Output period (in multiples of L_char/U_char), stats output period
-1.0d0 1.0d-4
+1.0d-3 1.0d-4
 
 !! Gravity vector (grav)
 0.0d0 0.0d0 0.0d0
@@ -40,7 +40,7 @@
 7.0d-1
 
 !! INFLOWS type (non-reflecting (0), hard (1), inout (2)) and velocity control (fixed (0), variable (1))
-0 1
+0 0
 
 !! WALLS: adiabatic(0) or isothermal (1)
 0

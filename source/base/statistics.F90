@@ -59,6 +59,9 @@ contains
      !! Time, heat release rate
      open(unit=200,file='data_out/statistics/heat_release_rate.out')
      
+     !! Time, volume integrated kinetic energy
+     open(unit=201,file='data_out/statistics/ke.out')
+     
      return     
   end subroutine open_stats_files
 !! ------------------------------------------------------------------------------------------------
@@ -320,11 +323,12 @@ contains
   subroutine mass_and_energy_check
      !! This subroutine calculates the total mass and total energy in the domain.
      integer(ikind) :: i
-     real(rkind) :: tot_mass,tot_vol,tmpro,dVi,tot_mass_tmp,tot_vol_tmp,tot_roE,tot_roE_tmp
+     real(rkind) :: tot_mass,tot_vol,tmpro,dVi,tot_roE
+     real(rkind) :: tot_ke
     
    
-     tot_mass = zero;tot_vol = zero;tot_roE = zero
-     !$omp parallel do private(tmpro,dVi) reduction(+:tot_mass,tot_vol,tot_roE)
+     tot_mass = zero;tot_vol = zero;tot_roE = zero;tot_ke=zero
+     !$omp parallel do private(tmpro,dVi) reduction(+:tot_mass,tot_vol,tot_roE,tot_ke)
      do i=1,npfb
         tmpro = ro(i)
         dVi = vol(i)
@@ -336,29 +340,35 @@ contains
 #ifndef isoT
         tot_roE = tot_roE + dVi*roE(i)
 #endif        
+        tot_ke = tot_ke + half*tmpro*(u(i)*u(i) + v(i)*v(i) + w(i)*w(i))*dVi
      end do
      !$omp end parallel do
      
      !! Scale to make dimensional
 #ifdef dim3
-     tot_mass = tot_mass*L_char**3.0d0
-     tot_vol = tot_vol*L_char**3.0d0
-     tot_roE = tot_roE*L_char**3.0d0          
+     tot_mass = tot_mass*L_char**three
+     tot_vol = tot_vol*L_char**three
+     tot_roE = tot_roE*L_char**three         
+     tot_ke = tot_ke*L_char**three
 #else
      tot_mass = tot_mass*L_char**two
      tot_vol = tot_vol*L_char**two
-     tot_roE = tot_roE*L_char**two          
+     tot_roE = tot_roE*L_char**two
+     tot_ke = tot_ke*L_char**two          
 #endif     
      
 #ifdef mp
      call global_reduce_sum(tot_mass)
      call global_reduce_sum(tot_vol)
-     call global_reduce_sum(tot_roE)          
+     call global_reduce_sum(tot_roE)  
+     call global_reduce_sum(tot_ke)        
      if(iproc.eq.0)then
         write(193,*) time/Time_char,tot_mass,tot_vol
         flush(193)
         write(197,*) time/Time_char,tot_roE
         flush(197)
+        write(201,*) time/Time_char,tot_ke
+        flush(201)
         
      end if
 #else
@@ -366,6 +376,8 @@ contains
      flush(193)
      write(197,*) time/Time_char,tot_roE
      flush(197)
+     write(201,*) time/Time_char,tot_ke
+     flush(201)
 #endif
 
      return

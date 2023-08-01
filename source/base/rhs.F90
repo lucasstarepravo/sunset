@@ -118,8 +118,8 @@ contains
 
      !! Calculate chemical production rates and add these to rhs of species equation
 #ifdef react     
-!     call calculate_chemical_production_rate
-     call calculate_chemical_production_rate_dummy      
+     call calculate_chemical_production_rate
+!     call calculate_chemical_production_rate_dummy      
 #endif     
 
      !! Evaluate RHS for boundaries
@@ -920,7 +920,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
   subroutine filter_variables
      !! This routine calls the specific filtering routine (within derivatives module) for each
      !! variable - ro,u,v,w,roE,Yspec - and forces certain values on boundaries as required.
-     integer(ikind) :: ispec
+     integer(ikind) :: ispec,i
      real(rkind),dimension(:),allocatable :: filter_correction
       
      segment_tstart = omp_get_wtime()
@@ -945,6 +945,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
 
      !! Filter mass fractions
 #ifdef ms
+if(.false.)then !! Original filter correction method
      !! Initialise filter correction term
      allocate(filter_correction(np))
      filter_correction(1:npfb) = ro(1:npfb)
@@ -969,6 +970,34 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
      
      !! Deallocate space
      deallocate(filter_correction)     
+else  !! Modified (weighted) filter correction method
+     !! Initialise filter correction term
+     allocate(filter_correction(np))
+     filter_correction(1:npfb) = zero
+
+     !! Loop over species
+     do ispec=1,nspec
+     
+        !! Filter this species roY
+        call calc_filtered_var(Yspec(:,ispec))
+ 
+        !! Add this species contribution to filter correction term
+        filter_correction(1:npfb) = filter_correction(1:npfb) + Yspec(1:npfb,ispec)
+     end do
+    
+    
+     !! Apply filter correction term to each species
+     do ispec=1,nspec
+        !$omp parallel do
+        do i=1,npfb
+           Yspec(i,ispec) = Yspec(i,ispec)*ro(i)/filter_correction(i)
+        end do
+        !$omp end parallel do
+     end do
+     
+     !! Deallocate space
+     deallocate(filter_correction)     
+endif     
 #endif   
    
      

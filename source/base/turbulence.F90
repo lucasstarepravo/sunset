@@ -21,6 +21,7 @@ module turbulence
 
   real(rkind),dimension(:),allocatable :: u_noturb,v_noturb,w_noturb
   real(rkind) :: L_turb,u_turb
+  integer(ikind) :: randseed
 
 
 contains
@@ -36,21 +37,26 @@ contains
      u_turb = uturb_in
   
   
-     !! Store the existing velocity field
+     !! Store the existing velocity field and zero u,v,w
      allocate(u_noturb(npfb),v_noturb(npfb),w_noturb(npfb))
      !$omp parallel do
      do i=1,npfb
-        u_noturb(i) = u(i)
-        v_noturb(i) = v(i)
-        w_noturb(i) = w(i)                
+        u_noturb(i) = u(i);u(i) = zero
+        v_noturb(i) = v(i);v(i) = zero
+        w_noturb(i) = w(i);w(i) = zero    
      end do
      !$omp end parallel do
      
-     !! Initialise the velocity field to something random
-     call set_velocity_field_to_random
+     !! Initialise random number gen
+     randseed = 0
+#ifdef mp
+     randseed = randseed + iproc
+#endif     
+     call srand(randseed)
+
   
      !! Apply some diffusion until we get to the required lengthscales
-     call diffuse_velocity_field     
+     call noise_and_diffuse_velocity_field     
      
      !! Scale the turbulent velocity field to give the desired turbulence statistics
      call scale_velocity_field
@@ -60,7 +66,11 @@ contains
      do i=1,npfb
         u(i) = u(i) + u_noturb(i)
         v(i) = v(i) + v_noturb(i)
+#ifdef fim3
         w(i) = w(i) + w_noturb(i)                
+#else
+        w(i) = w_noturb(i)
+#endif        
      end do
      !$omp end parallel do
      deallocate(u_noturb)
@@ -146,13 +156,14 @@ contains
      return
   end subroutine scale_velocity_field
 !! ------------------------------------------------------------------------------------------------  
-  subroutine diffuse_velocity_field
+  subroutine noise_and_diffuse_velocity_field
      use derivatives
      use mpi_transfers
      !! Applies diffusion to a velocity field
      integer(ikind) :: it_diff,nt_diff,i,j
-     real(rkind) :: dt_diff
+     real(rkind) :: dt_diff,tot_vol,u_mean,v_mean,w_mean,dVi
      real(rkind),dimension(:),allocatable :: lapu,lapv,lapw
+     real(rkind) :: randscaling
        
      !! Evaluate time-step and number of iterations    
      dt_diff = 0.1d0*(min(smin_global,dz)*L_char)**two
@@ -163,6 +174,10 @@ contains
      
      !! Loop over time-steps
      do it_diff = 1,nt_diff
+     
+        !! Add some random noise to the velocity field
+        randscaling = (one/dble(it_diff))**10.0d0
+        call add_random_to_velocity_field(randscaling)
     
         !! Update mirrors and halos
         !$omp parallel do private(i)
@@ -183,13 +198,52 @@ contains
         call calc_laplacian(w,lapw)                
                
         !! Update - 1st order time-stepping is fine
-        !$omp parallel do 
+        !! Also evaluate mean velocity components
+        u_mean = zero;v_mean = zero;w_mean = zero;tot_vol = zero
+        !$omp parallel do private(dVi) reduction(+:u_mean,v_mean,w_mean,tot_vol)
         do i=1,npfb
+        
+           !! Update
            u(i) = u(i) + dt_diff*lapu(i)
            v(i) = v(i) + dt_diff*lapv(i)
            w(i) = w(i) + dt_diff*lapw(i)                      
+ 
+           !! Node volume           
+           dVi = vol(i)
+#ifdef dim3
+           dVi = dVi*dz
+#endif            
+
+           !! Augment sums
+           u_mean = u_mean + u(i)*dVi
+           v_mean = v_mean + v(i)*dVi
+           w_mean = w_mean + w(i)*dVi
+           tot_vol = tot_vol + dVi
+
+
         end do
         !$omp end parallel do
+ 
+        !! Reduce to find means        
+#ifdef mp     
+        call global_reduce_sum(u_mean)
+        call global_reduce_sum(v_mean)
+        call global_reduce_sum(w_mean)
+        call global_reduce_sum(tot_vol)          
+#endif      
+        u_mean = u_mean/tot_vol
+        v_mean = v_mean/tot_vol
+        w_mean = w_mean/tot_vol
+
+        !! Subtract mean
+        !$omp parallel do 
+        do i=1,npfb
+           u(i) = u(i) - u_mean
+           v(i) = v(i) - v_mean
+           w(i) = w(i) - w_mean                
+        end do
+        !$omp end parallel do
+              
         
         !! Impose boundary conditions
         !$omp parallel do private(i)
@@ -213,20 +267,14 @@ contains
       deallocate(lapu,lapv,lapw)
   
      return
-  end subroutine diffuse_velocity_field
+  end subroutine noise_and_diffuse_velocity_field
 !! ------------------------------------------------------------------------------------------------  
-  subroutine set_velocity_field_to_random
-     !! Initialises the velocity field to random numbers
-     integer(ikind) :: i,randseed
+  subroutine add_random_to_velocity_field(rscal)
+     !! Adds some random noise to the velocity field
+     real(rkind),intent(in) :: rscal !! scales the random field
+     integer(ikind) :: i
      real(rkind) :: rnum,dVi
-     
-     !! Set the seed
-     randseed = 0
-#ifdef mp
-     randseed = randseed + iproc
-#endif     
-     call srand(randseed)
-     
+
      !$omp parallel do private(rnum,dVi)
      do i=1,npfb    
         dVi = vol(i)
@@ -236,15 +284,15 @@ contains
         dVi = one/sqrt(dVi)       
      
         rnum = rand()!call random_number(rnum)
-        u(i) = (two*rnum - one)*dVi
+        u(i) = u(i) + rscal*(two*rnum - one)*dVi
         rnum = rand()!call random_number(rnum)
-        v(i) = (two*rnum - one)*dVi
+        v(i) = v(i) + rscal*(two*rnum - one)*dVi
         rnum = rand()!call random_number(rnum)
-        w(i) = (two*rnum - one)*dVi        
+        w(i) = w(i) + rscal*(two*rnum - one)*dVi        
      end do
      !$omp end parallel do      
   
      return
-  end subroutine set_velocity_field_to_random 
+  end subroutine add_random_to_velocity_field 
 !! ------------------------------------------------------------------------------------------------        
 end module turbulence
