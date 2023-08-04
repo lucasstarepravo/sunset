@@ -74,10 +74,13 @@ contains
 !     call make_1d_flame(0.0d0,2.0d-4,2.366d3)
         
      !! Make a 2D gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
-!     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
+     call make_2d_gaussian_hotspot(0.1d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
 
      !! Load an existing 1D flame file
-     call load_flame_file
+!     call load_flame_file
+
+     !! Make a no-flow domain
+!     call make_noflow
 
      !! A messy routine to play with for other initial conditions
 !     call hardcode_initial_conditions     
@@ -95,7 +98,7 @@ contains
 !     call superimpose_2d_gaussian_hotspot(-0.22d0,zero,2.0d-4,2.5d3)
 
      !! Add some turbulence to the velocity field
-     call make_turbulent_velocity_field(6.9d-4,5.0d0*u_char)
+!     call make_turbulent_velocity_field(6.9d-4,5.0d0*u_char)
      !! =======================================================================
      
      !! Convert from velocity to momentum and Y to roY
@@ -363,7 +366,7 @@ contains
      !! Temperatures, pressures and velocity from reference
      T_reactants = T_ref     
      P_flame = p_ref
-     u_reactants = u_char
+     u_reactants = zero!u_char!*0.2d0
 
      !! Inflow mixture gas constant
      Rmix_local = zero
@@ -381,7 +384,7 @@ contains
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
         
         !! Gaussian progress variable
-        c = exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y)/fl_thck)**two)! &
+        c = exp(-((x-f_loc_x)/fl_thck)**two)! - ((y-f_loc_y)/fl_thck)**two)! &
 !          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y + 0.075d0)/fl_thck)**two) &
 !          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y - 0.075d0)/fl_thck)**two)
         
@@ -405,6 +408,7 @@ contains
         ro(i) = P_flame/(Rmix_local*T(i))
         
         !! Velocity
+        y=y/(ymax-ymin)
         u(i) = u_reactants!*six*(half-y)*(half+y)
         v(i) = zero
         w(i) = zero
@@ -432,6 +436,67 @@ contains
     
      return
   end subroutine make_2d_gaussian_hotspot
+!! ------------------------------------------------------------------------------------------------
+  subroutine make_noflow
+     !! Initialise the flow with no-flow, (or maybe uniform flow)
+     integer(ikind) :: i,ispec,j
+     real(rkind) :: Rmix_local,x,y,z,ro_inflow
+
+
+     !! Inflow mixture gas constant
+     Rmix_local = zero
+     do ispec=1,nspec
+        Rmix_local = Rmix_local + Yspec_reactants(ispec)*one_over_molar_mass(ispec)
+     end do
+     Rmix_local = Rmix_local*Rgas_universal     
+
+     !! Inflow density based on reference pressure and temperature
+     ro_inflow = p_ref/(Rmix_local*T_ref)
+    
+     !! Loop over all nodes and impose values
+     !$omp parallel do private(x,y,z,Rmix_local,ispec)
+     do i=1,npfb
+        x = rp(i,1);y=rp(i,2);z=rp(i,3)
+              
+        !! Temperature profile
+        T(i) = T_ref
+        
+        !! Composition - reactants everywhere
+        do ispec = 1,nspec
+           Yspec(i,ispec) = Yspec_reactants(ispec)
+        end do
+              
+        !! Density
+        ro(i) = ro_inflow
+        
+        !! Velocity
+        u(i) = u_char!zero
+        v(i) = zero
+        w(i) = zero
+                        
+     end do
+     !$omp end parallel do
+     
+     !! Special impose values on boundaries
+     if(nb.ne.0)then
+        do j=1,nb
+           i=boundary_list(j)
+           if(node_type(i).eq.0) then !! wall initial conditions
+              u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
+!              T(i) = T_reactants
+           end if                 
+           if(node_type(i).eq.1) then !! inflow initial conditions
+!              u(i)=u_char
+           end if
+           if(node_type(i).eq.2) then !! outflow initial conditions
+              !! Do nothing
+           end if
+           T_bound(j) = T(i)
+        end do
+     end if
+    
+     return
+  end subroutine make_noflow  
 !! ------------------------------------------------------------------------------------------------  
   subroutine superimpose_2d_gaussian_hotspot(f_loc_x,f_loc_y,flame_thickness,T_hot)
      !! Make a hot spot for ignition, superimposed on the existing ro,U,T,Yspec fields

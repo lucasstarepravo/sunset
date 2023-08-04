@@ -853,7 +853,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
  
        !! OUTFLOW BOUNDARY 
        else if(node_type(i).eq.2) then   
-          call specify_characteristics_outflow(j,L(j,:))       
+          call specify_characteristics_outflow(j,L(j,:),gradro(i,:),gradp(i,:),gradu(i,:),gradv(i,:),gradw(i,:))       
        end if          
     end do
     !$omp end parallel do

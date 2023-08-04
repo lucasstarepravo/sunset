@@ -149,7 +149,7 @@ contains
               - v(i)*gradb_v(2) - w(i)*gradb_v(3) - gradb_p(2)/ro(i) !! transverse terms
      Lchar(4) = w(i)*nscbc_coeff*c/L_domain_x &        !! track w=zero
               + rhs_row(i)                           !! rhs_w contains transverse and visc terms needed
-     Lchar(5) = (u(i)-u_inflow_local(j))*nscbc_coeff*(one-u(i)/c)*c*c*one/L_domain_x &     !! Track u_inflow
+     Lchar(5) = (u(i)-u_inflow_local(j))*nscbc_coeff*(one-Ma)*c*c*one/L_domain_x &     !! Track u_inflow
               - half*(v(i)*gradb_p(2)+p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2)) &    !! transverse 1 conv. terms
               - half*(w(i)*gradb_p(3)+p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))      !! transverse 2 conv. terms 
 #ifdef ms
@@ -177,7 +177,7 @@ contains
      Lchar(4) = w(i)*nscbc_coeff*c/L_domain_x &        !! track w=zero
               - v(i)*gradb_w(2) - w(i)*gradb_w(3) - gradb_p(3)/ro(i) !! transverse terms
 
-     Lchar(5) = (u(i)-u_inflow_local(j))*nscbc_coeff*(one-u(i)/c)*c*c*one/L_domain_x &      !! Track u_inflow
+     Lchar(5) = (u(i)-u_inflow_local(j))*nscbc_coeff*(one-Ma)*c*c*one/L_domain_x &      !! Track u_inflow
 #ifdef react
               - half*(gammagas-one)*sumoverspecies_homega(j) &                 !! Source terms
 #endif
@@ -299,7 +299,7 @@ contains
         Lchar(2) = zero   !! No entropy in isothermal flows
         !Lchar(3) is outgoing
         !Lchar(4) is outgoing
-        Lchar(5) (p(i)-p_inflow)*nscbc_coeff*c*(one)/two/L_domain_x     !! track p_outflow
+        Lchar(5) (p(i)-p_inflow)*nscbc_coeff*c*(one-Ma*Ma)/two/L_domain_x     !! track p_outflow
         !Lchar(5+1:5+nspec) is outgoing     
      end if        
 #else
@@ -323,13 +323,24 @@ contains
         Lchar(4) = w(i)*nscbc_coeff*c/L_domain_x &        !! track w=zero
                  - v(i)*gradb_w(2) - w(i)*gradb_w(3) - gradb_p(3)/ro(i) !! transverse terms
 
-        Lchar(5) = (p(i)-P_inflow)*nscbc_coeff*c*(one)/two/L_domain_x &      !! Track p_inflow
+        Lchar(5) = (u(i)-u_inflow_local(j))*nscbc_coeff*(one-Ma)*c*c*one/L_domain_x &      !! Track u_inflow
 #ifdef react
                  - half*(gammagas-one)*sumoverspecies_homega(j) &                 !! Source terms
 #endif
-                 + zero
-!                 - half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2))  & !! transverse 1 conv. terms
-!                 - half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))    !! transverse 2 conv. terms  
+                 - half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2))  & !! transverse 1 conv. terms
+                 - half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))    !! transverse 2 conv. terms  
+
+!! 4/8/23 - noticed what seems to be a bug, but can't remember. Commented for now and replaced
+!! wit hthe above 6 lines. Will delete in due course.
+!!        Lchar(5) = (p(i)-P_inflow)*nscbc_coeff*c*(one-Ma*Ma)/two/L_domain_x &      !! Track p_inflow
+!!#ifdef react
+!!                 - half*(gammagas-one)*sumoverspecies_homega(j) &                 !! Source terms
+!!#endif
+!!                 + zero
+!!!                 - (one-Ma)*half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2)+ &
+!!!                   tmpro*c*v(i)*gradb_u(2))  & !! transverse 1 conv. terms
+!!!                 - (one-Ma)*half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3)+ &
+!!!                   tmpro*c*w(i)*gradb_u(3))    !! transverse 2 conv. terms  
              
 #ifdef ms
         !! TBC, include tracking, transverse and source terms for flame-inflow interactions
@@ -342,7 +353,7 @@ contains
         !Lchar(3) is outgoing
         !Lchar(4) is outgoing
         !Lchar(5+1:5+nspec) is outgoing 
-        Lchar(5) = (p(i)-p_inflow)*nscbc_coeff*c*(one)/two/L_domain_x &        !! track p_outflow
+        Lchar(5) = (p(i)-p_inflow)*nscbc_coeff*c*(one-Ma*Ma)/two/L_domain_x &        !! track p_outflow
 #ifdef react
                  - half*(gammagas-one)*sumoverspecies_homega(j) &
 #endif
@@ -354,8 +365,9 @@ contains
 
   end subroutine specify_characteristics_inflow_outflow
 !! ------------------------------------------------------------------------------------------------
-  subroutine specify_characteristics_outflow(j,Lchar)
+  subroutine specify_characteristics_outflow(j,Lchar,gradb_ro,gradb_p,gradb_u,gradb_v,gradb_w)
      integer(ikind),intent(in) :: j
+     real(rkind),dimension(:),intent(in) :: gradb_ro,gradb_p,gradb_u,gradb_v,gradb_w          
      real(rkind),dimension(:),intent(inout) :: Lchar
      integer(ikind) :: i,ispec
      real(rkind) :: tmpro,c,gammagasm1,gammagas
@@ -376,10 +388,10 @@ contains
 #ifdef isoT
      !! ISOTHERMAL FLOWS, PARTIALLY NON-REFLECTING
      if(u(i).lt.c) then
-        Lchar(1) = (p(i)-p_outflow)*nscbc_coeff*c*(one)/two/L_domain_x! &                      !! track p_outflow
-                 !- (one-u(i)/c)*half*(v(i)*gradb_p(2) + &
+        Lchar(1) = (p(i)-p_outflow)*nscbc_coeff*c*(one-Ma*Ma)/two/L_domain_x! &                      !! track p_outflow
+                 !- (one-Ma)*half*(v(i)*gradb_p(2) + &
                  !                     p(i)*gradb_v(2)-tmpro*c*v(i)*gradb_u(2)) & !!transverse 1 conv. terms
-                 !- (one-u(i)/c)*half*(w(i)*gradb_p(3) + &
+                 !- (one-Ma)*half*(w(i)*gradb_p(3) + &
                  !                     p(i)*gradb_w(3)-tmpro*c*w(i)*gradb_u(3))   !! transverse 2 conv. terms
      end if
      Lchar(2) = zero   !! No entropy in isothermal flows
@@ -393,15 +405,15 @@ contains
      if(u(i).le.c) then !! Subsonic. If supersonic, just use L1 from definition...
      
         gammagas = cp(i)/(cp(i)-Rgas_mix(i))     
-        Lchar(1) = (p(i)-p_outflow)*nscbc_coeff*c*(one)/two/L_domain_x &                               !! track p_outflow
+        Lchar(1) = (p(i)-p_outflow)*nscbc_coeff*c*(one-Ma*Ma)/two/L_domain_x &                               !! track p_outflow
 #ifdef react
                  - half*(gammagas-one)*sumoverspecies_homega(j) &
 #endif
                  !! N.B. It's more stable to just follow Sutherland 2003 and neglect transverse terms
-                 + zero!- (one-u(i)/c)*half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2) - &
-                 !                     tmpro*c*v(i)*gradb_u(2)) & !! trans1 conv.
-                 !- (one-u(i)/c)*half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3) - &
-                 !                     tmpro*c*w(i)*gradb_u(3))   !! trasn2 conv.
+                 +zero!- (one-Ma)*half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2) - &
+!                                      tmpro*c*v(i)*gradb_u(2)) !& !! trans1 conv.
+!                 - (one-Ma)*half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3) - &
+!                                      tmpro*c*w(i)*gradb_u(3))   !! trans2 conv.
     
       
 
@@ -522,7 +534,7 @@ contains
      if(inflow_velocity_control.eq.1) then
         !! Start and end inflow speeds, and ramp time
         u_inflow_start = u_char
-        u_inflow_end = u_char
+        u_inflow_end = 1.5d0*u_char
         ramp_time = half*Time_char   
      
         !! Set the desired mean inflow velocity
@@ -539,8 +551,8 @@ contains
            do j=1,nb
               i=boundary_list(j)
               if(node_type(i).eq.1) then !! Inflows only
-                 y = rp(i,2)
-                 u_inflow_local(j) = u_inflow_mean!*six*(half-y)*(half+y)
+                 y = rp(i,2)/(ymax-ymin)
+                 u_inflow_local(j) = u_inflow_mean*six*(half-y)*(half+y)
               end if
            end do
            !$omp end parallel do

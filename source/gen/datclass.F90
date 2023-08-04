@@ -88,9 +88,9 @@ case(4) !! blank
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.5d0!0.0125d0  ! channel width
+     yl=0.125d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/300.0       !15
+     dx0=xl/200.0       !15
      xbcond=0;ybcond=1
      
      nb_patches = 4
@@ -110,7 +110,7 @@ case(5) !! Inflow/outflow tube for simple flames
 
 
      dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=2.0d0*dx0;dx_out=dx0*2.0d0  !! dx for solids and in/outs..
+     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx0*1.0d0  !! dx for solids and in/outs..
 
      
 !! ------------------------------------------------------------------------------------------------
@@ -119,8 +119,8 @@ case(6) !! Hong-Im flameholder setup
      xl=1.0d0 ! channel length
      h0=xl/40.0d0   !cylinder radius
      yl=xl/10.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
-     dx0=h0/25.0       !15
-     xbcond=0;ybcond=2     
+     dx0=h0/25.0!25.0       !15
+     xbcond=0;ybcond=3     
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -143,7 +143,7 @@ case(6) !! Hong-Im flameholder setup
      blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi;blob_ellipse(1)=0
 
      dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=3.0d0*dx0  !! dx for solids and in/outs...!! 
+     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=1.2d0*dx0  !! dx for solids and in/outs...!! 
 !! ------------------------------------------------------------------------------------------------
 case(7) !! Something periodic
 

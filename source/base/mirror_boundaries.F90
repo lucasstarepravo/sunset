@@ -40,6 +40,7 @@ contains
      !! -----:  vrelation(j)=2 means that u(j) = -u(i), v(j) =  v(i)
      !! -----:  vrelation(j)=3 means that u(j) =  u(i), v(j) = -v(i)
      !! -----:  vrelation(j)=4 means that u(j) = -u(i), v(j) = -v(i)
+     !! -----:  z is always periodic, so w(j) = w(i) always.
     real(rkind),dimension(dims) :: rcorn
     real(rkind) :: cdist
     integer(ikind) :: i,imp,k,xbcond_noMPI,ybcond_noMPI
