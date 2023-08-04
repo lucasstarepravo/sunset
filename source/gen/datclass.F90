@@ -114,7 +114,7 @@ case(5) !! Inflow/outflow tube for simple flames
 
      
 !! ------------------------------------------------------------------------------------------------
-case(6) !! Hong-Im flameholder setup
+case(6) !! Hong Im flameholder setup
 
      xl=1.0d0 ! channel length
      h0=xl/40.0d0   !cylinder radius
@@ -143,7 +143,7 @@ case(6) !! Hong-Im flameholder setup
      blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi;blob_ellipse(1)=0
 
      dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=1.2d0*dx0  !! dx for solids and in/outs...!! 
+     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.0d0*dx0  !! dx for solids and in/outs...!! 
 !! ------------------------------------------------------------------------------------------------
 case(7) !! Something periodic
 
@@ -551,6 +551,7 @@ end subroutine quicksort
            
               !! Hard-coding local dx              
               if(b_type(ib).ne.0) then  !! Inflow or outflow
+                 tmp2 = sqrt(0.27d0**2.0d0 + y*y)
                  call get_resolution(x,y,1.0d10,dx_local)     
               else
                  dx_local = dxio
@@ -601,14 +602,7 @@ end subroutine quicksort
         !! Stretch high-res region downstream of flameholder        
         if((x-blob_centre(1,1)).gt.0.0d0) then
      
- 
-!           temp = sqrt(xhat**2.0d0 + (yhat**2.0d0)) !! Radial distance from blob centre 
-!           temp = acos(xhat/temp) !! Angle theta
-!           tmp2 = exp(-(2.0d0*temp)**4.0d0) !! Outlet spreading function
-!           temp = exp(-(2.0d0*temp)**4.0d0)  !! Blob-side spreading function
-
            r_mag = ((xb_max - x)/(xb_max - blob_centre(1,1)))**2.0d0  !! Scale between blob and outlet (0=outlet)
-!           temp = r_mag*temp + (1.0d0-r_mag)*tmp2  !! Linear variation between tmp2 and temp
 
            temp = exp(-(8.0d0*yhat)**4.0d0) !! Blob-side spreading function
            tmp2 = exp(-(4.0d0*yhat)**4.0d0) !! Outflow-side spreading function
@@ -617,6 +611,8 @@ end subroutine quicksort
            dxio = dx_out + (dx_in - dx_out)*(1.0d0-temp)
 
         else
+           tmp2 = ((blob_centre(1,1)-x)/(blob_centre(1,1)-xb_min))**2.0d0
+           d2b_local = d2b_local*(1.5d0*tmp2 + 1.0d0*(1.0d0-tmp2))
            r_mag = sqrt(xhat**2.0d0 + yhat**2.0d0)
            temp = exp(-(8.0d0*r_mag)**4.0d0)
            dxio = dx_out + (dx_in - dx_out)*(1.0d0-temp)

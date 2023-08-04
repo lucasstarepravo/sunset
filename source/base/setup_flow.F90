@@ -74,7 +74,7 @@ contains
 !     call make_1d_flame(0.0d0,2.0d-4,2.366d3)
         
      !! Make a 2D gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
-     call make_2d_gaussian_hotspot(0.1d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
+     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
 
      !! Load an existing 1D flame file
 !     call load_flame_file
@@ -366,7 +366,7 @@ contains
      !! Temperatures, pressures and velocity from reference
      T_reactants = T_ref     
      P_flame = p_ref
-     u_reactants = zero!u_char!*0.2d0
+     u_reactants = u_char*0.2d0
 
      !! Inflow mixture gas constant
      Rmix_local = zero
@@ -384,7 +384,7 @@ contains
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
         
         !! Gaussian progress variable
-        c = exp(-((x-f_loc_x)/fl_thck)**two)! - ((y-f_loc_y)/fl_thck)**two)! &
+        c = exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y)/fl_thck)**two)! &
 !          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y + 0.075d0)/fl_thck)**two) &
 !          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y - 0.075d0)/fl_thck)**two)
         
@@ -409,7 +409,7 @@ contains
         
         !! Velocity
         y=y/(ymax-ymin)
-        u(i) = u_reactants!*six*(half-y)*(half+y)
+        u(i) = u_reactants*six*(half-y)*(half+y)  !! comment/uncomment for parabolic profile
         v(i) = zero
         w(i) = zero
                         
