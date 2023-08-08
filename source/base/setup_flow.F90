@@ -80,7 +80,7 @@ contains
 !     call load_flame_file
 
      !! Make a no-flow domain
-!     call make_noflow
+     call make_noflow
 
      !! A messy routine to play with for other initial conditions
 !     call hardcode_initial_conditions     
@@ -98,7 +98,7 @@ contains
 !     call superimpose_2d_gaussian_hotspot(-0.22d0,zero,2.0d-4,2.5d3)
 
      !! Add some turbulence to the velocity field
-!     call make_turbulent_velocity_field(6.9d-4,5.0d0*u_char)
+     call make_turbulent_velocity_field(6.9d-4,5.0d0*u_char)
      !! =======================================================================
      
      !! Convert from velocity to momentum and Y to roY

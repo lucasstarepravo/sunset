@@ -122,6 +122,7 @@ contains
      !$omp end parallel do
      
      !! Evaluate the variance
+     if(.false.)then !! Do it on individual velocity components     
      u_var = zero;v_var = zero;w_var = zero
      !$omp parallel do private(dVi) reduction(+:u_var,v_var,w_var)
      do i=1,npfb
@@ -151,6 +152,31 @@ contains
         w(i) = u_turb*w(i)/sqrt(w_var)
      end do
      !$omp end parallel do
+     else
+     u_var = zero
+     !$omp parallel do private(dVi) reduction(+:u_var)
+     do i=1,npfb
+        dVi = vol(i)
+#ifdef dim3
+        dVi = dVi*dz        
+#endif        
+        u_var = u_var + (u(i)*u(i) + v(i)*v(i) + w(i)*w(i))*dVi
+     end do
+     !$omp end parallel do
+#ifdef mp     
+     call global_reduce_sum(u_var)
+#endif      
+     u_var = u_var/tot_vol
+  
+     !! Re-scale to give unity variance
+     !$omp parallel do
+     do i=1,npfb
+        u(i) = u_turb*u(i)/sqrt(u_var)
+        v(i) = u_turb*v(i)/sqrt(u_var)
+        w(i) = u_turb*w(i)/sqrt(u_var)
+     end do
+     !$omp end parallel do     
+     end if
 
      if(iproc.eq.0) write(6,*) "Variances:",u_var,v_var,w_var     
   
@@ -397,7 +423,6 @@ contains
       
       deallocate(lapx,lapy,lapz)
       
-     !! Evaluate gradients
      !! Update mirrors and halos
      !$omp parallel do private(i)
      do j=npfb+1,np_nohalo
@@ -414,6 +439,8 @@ contains
      call halo_exchange(psiy)
 #endif             
      call halo_exchange(psiz)      
+
+     !! Evaluate gradients
      allocate(gradx(npfb,dims),grady(npfb,dims),gradz(npfb,dims))
 #ifdef dim3
      call calc_gradient(psix,gradx)

@@ -533,7 +533,7 @@ contains
      
      if(inflow_velocity_control.eq.1) then
         !! Start and end inflow speeds, and ramp time
-        u_inflow_start = 0.2d0*u_char
+        u_inflow_start = u_char
         u_inflow_end = u_char
         ramp_time = half*Time_char   
      
