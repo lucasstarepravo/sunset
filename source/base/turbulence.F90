@@ -59,6 +59,7 @@ contains
      !! Apply some diffusion until we get to the required lengthscales
 !     call noise_and_diffuse_velocity_field
      call noise_and_diffuse_psi
+     call noise_and_diffuse_velocity_field     
      
      !! Scale the turbulent velocity field to give the desired turbulence statistics
      call scale_velocity_field
@@ -68,7 +69,7 @@ contains
      do i=1,npfb
         u(i) = u(i) + u_noturb(i)
         v(i) = v(i) + v_noturb(i)
-#ifdef fim3
+#ifdef dim3
         w(i) = w(i) + w_noturb(i)                
 #else
         w(i) = w_noturb(i)
@@ -85,7 +86,7 @@ contains
      !! Scale the velocity field to give the desired turbulence characteristics
      integer(ikind) :: i
      real(rkind) :: u_mean,v_mean,w_mean,tot_vol,dVi
-     real(rkind) :: u_var,v_var,w_var
+     real(rkind) :: u_var
      
      !! Evaluate the mean velocity
      u_mean = zero;v_mean = zero;w_mean = zero;tot_vol = zero
@@ -122,37 +123,6 @@ contains
      !$omp end parallel do
      
      !! Evaluate the variance
-     if(.false.)then !! Do it on individual velocity components     
-     u_var = zero;v_var = zero;w_var = zero
-     !$omp parallel do private(dVi) reduction(+:u_var,v_var,w_var)
-     do i=1,npfb
-        dVi = vol(i)
-#ifdef dim3
-        dVi = dVi*dz        
-#endif        
-        u_var = u_var + u(i)*u(i)*dVi
-        v_var = v_var + v(i)*v(i)*dVi
-        w_var = w_var + w(i)*w(i)*dVi                
-     end do
-     !$omp end parallel do
-#ifdef mp     
-     call global_reduce_sum(u_var)
-     call global_reduce_sum(v_var)
-     call global_reduce_sum(w_var)
-#endif      
-     u_var = u_var/tot_vol
-     v_var = v_var/tot_vol
-     w_var = w_var/tot_vol
-  
-     !! Re-scale to give unity variance
-     !$omp parallel do
-     do i=1,npfb
-        u(i) = u_turb*u(i)/sqrt(u_var)
-        v(i) = u_turb*v(i)/sqrt(v_var)
-        w(i) = u_turb*w(i)/sqrt(w_var)
-     end do
-     !$omp end parallel do
-     else
      u_var = zero
      !$omp parallel do private(dVi) reduction(+:u_var)
      do i=1,npfb
@@ -176,17 +146,187 @@ contains
         w(i) = u_turb*w(i)/sqrt(u_var)
      end do
      !$omp end parallel do     
-     end if
 
-     if(iproc.eq.0) write(6,*) "Variances:",u_var,v_var,w_var     
+     if(iproc.eq.0) write(6,*) "Variance:",u_var     
   
   
      return
   end subroutine scale_velocity_field
+!! ------------------------------------------------------------------------------------------------        
+  subroutine noise_and_diffuse_psi
+     use derivatives
+     use mpi_transfers
+     !! Applies diffusion to a velocity field
+     integer(ikind) :: it_diff,nt_diff,i,j
+     real(rkind) :: dt_diff,tot_vol,x_mean,y_mean,z_mean,dVi
+     real(rkind),dimension(:),allocatable :: lapx,lapy,lapz
+     real(rkind),dimension(:,:),allocatable :: gradx,grady,gradz
+     real(rkind) :: randscaling,rnum,oosqrtv
+       
+     !! Evaluate time-step and number of iterations    
+     dt_diff = 0.1d0*(min(smin_global,dz)*L_char)**two
+     nt_diff = 1 + floor(L_turb*L_turb/(two*pi*dt_diff))
+      
+     !! Space for RHS
+     allocate(lapx(npfb),lapy(npfb),lapz(npfb))
+     allocate(psix(np),psiy(np),psiz(np))
+     psix=zero;psiy=zero;psiz=zero
+     
+     !! Loop over time-steps
+     do it_diff = 1,nt_diff+10
+                                 
+        !! Evaluate Laplacian
+#ifdef dim3
+        call calc_laplacian(psix,lapx)
+        call calc_laplacian(psiy,lapy)
+#endif        
+        call calc_laplacian(psiz,lapz)                
+
+        !! Set the amplitude of the random noise                 
+        if(it_diff.le.nt_diff-1) then
+           randscaling = (dble(nt_diff-it_diff)/dble(nt_diff))**1.0d0
+        else
+           randscaling = zero
+        endif
+                 
+                             
+        !! Update - 1st order time-stepping is fine
+        x_mean=zero;y_mean=zero;z_mean=zero;tot_vol=zero
+        !$omp parallel do private(dVi,rnum,oosqrtv) reduction(+:x_mean,y_mean,z_mean,tot_vol)
+        do i=1,npfb
+           !! Node volume           
+           dVi = vol(i)
+#ifdef dim3
+           dVi = dVi*dz
+#endif            
+           oosqrtv = one/sqrt(dVi)
+                   
+           !! Update
+#ifdef dim3
+           rnum = rand();psix(i) = psix(i) + dt_diff*lapx(i) + randscaling*(two*rnum-one)*oosqrtv
+           rnum = rand();psiy(i) = psiy(i) + dt_diff*lapy(i) + randscaling*(two*rnum-one)*oosqrtv
+#endif
+           rnum = rand();psiz(i) = psiz(i) + dt_diff*lapz(i) + randscaling*(two*rnum-one)*oosqrtv           
+
+           !! Calculate means
+#ifdef dim3           
+           x_mean = x_mean + psix(i)*dVi
+           y_mean = y_mean + psiy(i)*dVi
+#endif           
+           z_mean = z_mean + psiz(i)*dVi                                      
+           tot_vol = tot_vol + dVi                    
+
+        end do
+        !$omp end parallel do            
+        
+        !! Reduce to find means        
+#ifdef mp     
+#ifdef dim3
+        call global_reduce_sum(x_mean)
+        call global_reduce_sum(y_mean)
+#endif
+        call global_reduce_sum(z_mean)
+        call global_reduce_sum(tot_vol)          
+#endif      
+        x_mean = x_mean/tot_vol
+        y_mean = y_mean/tot_vol
+        z_mean = z_mean/tot_vol
+        
+        !! Remove mean from psi
+        !$omp parallel do
+        do i=1,npfb
+#ifdef dim3
+           psix(i) = psix(i) - x_mean
+           psiy(i) = psiy(i) - y_mean
+#endif           
+           psiz(i) = psiz(i) - z_mean
+        end do
+        !$omp end parallel do        
+        
+        !! Impose boundary conditions
+        !$omp parallel do private(i)
+        do j=1,nb
+           i=boundary_list(j)
+           if(node_type(i).eq.0) then !! Walls
+              psix(i) = zero;psiy(i) = zero;psiz(i) = zero           
+           else if(node_type(i).eq.1) then !! Inflow
+              psix(i) = zero;psiy(i) = zero;psiz(i) = zero           
+           else if(node_type(i).eq.2) then !! Outflow
+              psix(i) = zero;psiy(i) = zero;psiz(i) = zero           
+           end if
+
+        end do
+        !$omp end parallel do            
+        
+       
+        !! Update mirrors and halos
+        !$omp parallel do private(i)
+        do j=npfb+1,np_nohalo
+           i=irelation(j)
+#ifdef dim3
+           psix(j) = psix(i)
+           psiy(j) = psiy(i)
+#endif           
+           psiz(j) = psiz(i)
+        end do        
+        !$omp end parallel do
+#ifdef dim3
+        call halo_exchange(psix)
+        call halo_exchange(psiy)        
+#endif
+        call halo_exchange(psiz)
+                
+        
+        if(iproc.eq.0) write(6,*) "Diffusion progress:",100.0d0*dble(it_diff)/dble(nt_diff),"%."
+        
+      end do
+      
+      deallocate(lapx,lapy,lapz)
+   
+     !! Evaluate gradients
+     allocate(gradx(npfb,dims),grady(npfb,dims),gradz(npfb,dims))
+#ifdef dim3
+     call calc_gradient(psix,gradx)
+     call calc_gradient(psiy,grady)
+#endif     
+     call calc_gradient(psiz,gradz)
+     
+     !! Evaluate the velocity
+     !$omp parallel do
+     do i=1,npfb
+#ifdef dim3
+        u(i) = gradz(i,2) - grady(i,3)
+        v(i) = gradx(i,3) - gradz(i,1)
+        w(i) = grady(i,1) - gradx(i,2)
+#else
+        u(i) = gradz(i,2)
+        v(i) = -gradz(i,1)
+        w(i) = zero
+#endif
+     
+     end do
+     !$omp end parallel do
+     
+     !! Set u,v,w on boundaries
+     !$omp parallel do private(i)
+     do j=1,nb
+        i=boundary_list(j)
+        if(node_type(i).eq.0) then
+           u(i) = zero;v(i) = zero;w(i) = zero
+        end if
+     end do
+     !$omp end parallel do
+      
+     deallocate(psix,psiy,psiz,gradx,grady,gradz)
+  
+     return
+  end subroutine noise_and_diffuse_psi
+!! ------------------------------------------------------------------------------------------------ 
 !! ------------------------------------------------------------------------------------------------  
   subroutine noise_and_diffuse_velocity_field
      use derivatives
      use mpi_transfers
+     use mirror_boundaries    
      !! Applies diffusion to a velocity field
      integer(ikind) :: it_diff,nt_diff,i,j
      real(rkind) :: dt_diff,tot_vol,u_mean,v_mean,w_mean,dVi
@@ -196,6 +336,7 @@ contains
      !! Evaluate time-step and number of iterations    
      dt_diff = 0.1d0*(min(smin_global,dz)*L_char)**two
      nt_diff = 1 + floor(L_turb*L_turb/(two*pi*dt_diff))
+     nt_diff = 1 + floor((three**two)*10.0d0/(two*pi)) !! three**two sets the cut-off lengthscale = 3*smin
       
      !! Space for RHS
      allocate(lapu(npfb),lapv(npfb),lapw(npfb))
@@ -204,18 +345,11 @@ contains
      do it_diff = 1,nt_diff
      
         !! Add some random noise to the velocity field
-        randscaling = (one/dble(it_diff))**10.0d0
-        call add_random_to_velocity_field(randscaling)
+!        randscaling = zero!(one/dble(it_diff))**10.0d0
+!        call add_random_to_velocity_field(randscaling)
     
         !! Update mirrors and halos
-        !$omp parallel do private(i)
-        do j=npfb+1,np_nohalo
-           i=irelation(j)
-           u(j) = u(i)
-           v(j) = v(i)
-           w(j) = w(i)
-        end do        
-        !$omp end parallel do
+        call mirror_bcs_vel_only
         call halo_exchange(u)
         call halo_exchange(v)        
         call halo_exchange(w)
@@ -322,151 +456,5 @@ contains
   
      return
   end subroutine add_random_to_velocity_field 
-!! ------------------------------------------------------------------------------------------------        
-  subroutine noise_and_diffuse_psi
-     use derivatives
-     use mpi_transfers
-     !! Applies diffusion to a velocity field
-     integer(ikind) :: it_diff,nt_diff,i,j
-     real(rkind) :: dt_diff,tot_vol,u_mean,v_mean,w_mean,dVi
-     real(rkind),dimension(:),allocatable :: lapx,lapy,lapz
-     real(rkind),dimension(:,:),allocatable :: gradx,grady,gradz
-     real(rkind) :: randscaling,rnum
-       
-     !! Evaluate time-step and number of iterations    
-     dt_diff = 0.1d0*(min(smin_global,dz)*L_char)**two
-     nt_diff = 1 + floor(L_turb*L_turb/(two*pi*dt_diff))
-      
-     !! Space for RHS
-     allocate(lapx(npfb),lapy(npfb),lapz(npfb))
-     allocate(psix(np),psiy(np),psiz(np))
-     psix=zero;psiy=zero;psiz=zero
-     
-     !! Loop over time-steps
-     do it_diff = 1,nt_diff
-     
-        !! Add some random noise to psi
-        randscaling = (one/dble(it_diff))**10.0d0
-        !$omp parallel do private(rnum,dVi)
-        do i=1,npfb    
-           dVi = vol(i)
-#ifdef dim3
-           dVi = dVi*dz
-#endif       
-           dVi = one/sqrt(dVi)       
-
-#ifdef dim3     
-           rnum = rand();psix(i) = psix(i) + randscaling*(two*rnum-one)*dVi
-           rnum = rand();psiy(i) = psiy(i) + randscaling*(two*rnum-one)*dVi
-#endif           
-           rnum = rand();psiz(i) = psiz(i) + randscaling*(two*rnum-one)*dVi                      
-        end do
-        !$omp end parallel do             
-    
-        !! Update mirrors and halos
-        !$omp parallel do private(i)
-        do j=npfb+1,np_nohalo
-           i=irelation(j)
-#ifdef dim3
-           psix(j) = psix(i)
-           psiy(j) = psiy(i)
-#endif           
-           psiz(j) = psiz(i)
-        end do        
-        !$omp end parallel do
-#ifdef dim3
-        call halo_exchange(psix)
-        call halo_exchange(psiy)        
-#endif
-        call halo_exchange(psiz)
-                          
-        !! Evaluate RHS
-#ifdef dim3
-        call calc_laplacian(psix,lapx)
-        call calc_laplacian(psiy,lapy)
-#endif        
-        call calc_laplacian(psiz,lapz)                
-               
-        !! Update - 1st order time-stepping is fine
-        !$omp parallel do 
-        do i=1,npfb
-        
-           !! Update
-#ifdef dim3
-           psix(i) = psix(i) + dt_diff*lapx(i)
-           psiy(i) = psiy(i) + dt_diff*lapy(i)
-#endif
-           psiz(i) = psiz(i) + dt_diff*lapz(i)                      
- 
-
-        end do
-        !$omp end parallel do            
-        
-        !! Impose boundary conditions
-        !$omp parallel do private(i)
-        do j=1,nb
-           i=boundary_list(j)
-           if(node_type(j).eq.0) then !! Walls
-           
-           else if(node_type(j).eq.1) then !! Inflow
-           
-           else if(node_type(j).eq.2) then !! Outflow
-         
-           end if
-           psix(i) = zero;psiy(i) = zero;psiz(i) = zero  
-        end do
-        !$omp end parallel do            
-        
-        if(iproc.eq.0) write(6,*) "Diffusion progress:",100.0d0*dble(it_diff)/dble(nt_diff),"%."
-        
-      end do
-      
-      deallocate(lapx,lapy,lapz)
-      
-     !! Update mirrors and halos
-     !$omp parallel do private(i)
-     do j=npfb+1,np_nohalo
-        i=irelation(j)
-#ifdef dim3
-        psix(j) = psix(i)
-        psiy(j) = psiy(i)
-#endif        
-        psiz(j) = psiz(i)
-     end do        
-     !$omp end parallel do
-#ifdef dim3
-     call halo_exchange(psix)
-     call halo_exchange(psiy)
-#endif             
-     call halo_exchange(psiz)      
-
-     !! Evaluate gradients
-     allocate(gradx(npfb,dims),grady(npfb,dims),gradz(npfb,dims))
-#ifdef dim3
-     call calc_gradient(psix,gradx)
-     call calc_gradient(psiy,grady)
-#endif     
-     call calc_gradient(psiz,gradz)
-     
-     !! Evaluate the velocity
-     !$omp parallel do
-     do i=1,npfb
-#ifdef dim3
-        u(i) = gradz(i,2) - grady(i,3)
-        v(i) = gradx(i,3) - gradz(i,1)
-        w(i) = grady(i,1) - gradx(i,2)
-#else
-        u(i) = gradz(i,2)
-        v(i) = -gradz(i,1)
-        w(i) = zero
-#endif
-     
-     end do
-     !$omp end parallel do
-      
-     deallocate(psix,psiy,psiz,gradx,grady,gradz)
-  
-     return
-  end subroutine noise_and_diffuse_psi
-!! ------------------------------------------------------------------------------------------------ 
+!! ------------------------------------------------------------------------------------------------    
 end module turbulence

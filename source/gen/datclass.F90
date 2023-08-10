@@ -90,7 +90,7 @@ case(5) !! Inflow/outflow tube for simple flames
 
      yl=0.5d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/400.0       !15
+     dx0=xl/300.0       !15
      xbcond=0;ybcond=1
      
      nb_patches = 4
@@ -118,7 +118,7 @@ case(6) !! Hong Im flameholder setup
 
      xl=1.0d0 ! channel length
      h0=xl/40.0d0   !cylinder radius
-     yl=xl/10.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
+     yl=xl/5.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
      dx0=h0/25.0!25.0       !15
      xbcond=0;ybcond=3     
      

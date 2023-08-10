@@ -354,5 +354,45 @@ contains
      segment_time_local(2) = segment_time_local(2) + segment_tend - segment_tstart
      return
   end subroutine mirror_bcs_transport_only 
+!! ------------------------------------------------------------------------------------------------   
+  subroutine mirror_bcs_vel_only
+     use omp_lib
+     integer(ikind) :: i,j
+     
+     segment_tstart = omp_get_wtime()
+     
+     !! Update properties in the boundary particles
+     !$OMP PARALLEL DO PRIVATE(i)
+#ifdef mp
+     do j=npfb+1,np_nohalo
+#else
+     do j=npfb+1,np
+#endif
+        i = irelation(j)
+        if(vrelation(j).eq.1)then
+           rou(j) = rou(i)
+           rov(j) = rov(i) 
+        else if(vrelation(j).eq.2)then
+           rou(j) = -rou(i)
+           rov(j) = rov(i)        
+        else if(vrelation(j).eq.3)then
+           rou(j) = rou(i)
+           rov(j) = -rov(i) 
+        else if(vrelation(j).eq.4)then
+           rou(j) = -rou(i)
+           rov(j) = -rov(i) 
+        end if   
+#ifdef dim3
+        row(j) = row(i) !! Never reversed for periodic or symmetric BCs in X-Y plane
+#endif              
+
+     end do
+     !$OMP END PARALLEL DO     
+
+     !! Profiling
+     segment_tend = omp_get_wtime()
+     segment_time_local(2) = segment_time_local(2) + segment_tend - segment_tstart
+     return
+  end subroutine mirror_bcs_vel_only
 !! ------------------------------------------------------------------------------------------------ 
 end module mirror_boundaries
