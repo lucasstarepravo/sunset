@@ -270,6 +270,9 @@ contains
      
      !! Calculate node volumes - used for evaluating integral quantities in statistics routines
      call calc_node_volumes
+     
+     !! Calculate interpolants for boundary phantom nodes if this processor has boundaries
+     if(nb.ne.0) call calc_binterp
     
      write(6,*) "iproc",iproc,"LABFM weights calculated"
     
@@ -741,6 +744,197 @@ contains
      write(6,*) "finished boundary weights"
      return
   end subroutine calc_boundary_weights  
+!! ------------------------------------------------------------------------------------------------  
+  subroutine calc_binterp
+     integer(ikind) :: i,j,k,ii,iii
+     real(rkind) :: rad,qq,x,y,xx,yy,xs,ys
+     real(rkind),dimension(dims) :: rij
+
+     !! Linear system to find ABF coefficients
+     real(rkind),dimension(:,:),allocatable :: amatx,amaty
+     real(rkind),dimension(:),allocatable :: bvecx,gvec,xvec,bvecy
+     integer(ikind) :: i1,i2,nsize,nsizeG
+     real(rkind) :: ff1,hh
+
+
+     !! Set desired order::
+#if ORDER==2
+     k=2
+#elif ORDER==3
+     k=3
+#elif ORDER==4
+     k=4
+#elif ORDER==5
+     k=5
+#elif ORDER==6
+     k=6
+#elif ORDER==7
+     k=7
+#elif ORDER==8
+     k=8
+#elif ORDER==9
+     k=9
+#elif ORDER==10
+     k=10
+#elif ORDER==12
+     k=12     
+#endif
+     nsizeG=(k*k+3*k)/2   !!  5,9,14,20,27,35,44... for k=2,3,4,5,6,7,8...
+     nsize_large = nsizeG
+     
+     !! Left hand sides and arrays for interparticle weights 
+     allocate(ij_w_binterp(2,nplink,nb))
+     allocate(amatx(nsizeG,nsizeG),amaty(nsizeG,nsizeG))
+     amatx=zero;amaty=zero
+      
+     !! Right hand sides, vectors of monomials and ABFs
+     allocate(bvecx(nsizeG),bvecy(nsizeG))
+     allocate(gvec(nsizeG),xvec(nsizeG));gvec=zero;xvec=zero
+
+     !! No parallelism for individual linear system solving (have to set this on CSF/HPC-pool, but not on
+     !! local workstation.... ???
+     call openblas_set_num_threads(1)
+
+
+     !$OMP PARALLEL DO PRIVATE(i,iii,nsize,amatx,amaty,k,j,rij,rad,qq,x,y,xx,yy, &
+     !$OMP ff1,gvec,xvec,i1,i2,bvecx,bvecy,hh)
+     do ii=1,nb
+        iii=boundary_list(ii)  !! Index of boundary node
+        i=iii+2  !! Index of node in row 2
+        nsize = nsizeG
+        amatx=zero
+        amaty=zero
+        hh=h(i)
+        do k=1,ij_count(i)
+           j = ij_link(k,i) 
+           rij(:) = rp(i,:) - rp(j,:)
+           x = -rij(1);y = -rij(2)
+           
+           !! Different types of ABF need different arguments (xx,yy)
+           !! to account for domain of orthogonality
+           rad = sqrt(x*x + y*y)/hh;qq=rad
+#if ABF==1   
+           ff1 = fac(qq)/hh
+           xx=x;yy=y        !! "Original"
+#elif ABF==2     
+           ff1 = Wab(qq)
+           xx=x/hh;yy=y/hh    !! Hermite   
+#elif ABF==3
+           ff1 = Wab(qq)
+           xx=x/hh/ss;yy=y/hh/ss  !! Legendre
+#endif    
+
+           !! Populate the ABF array
+           gvec(1:nsizeG) = abfs(rad,xx,yy,ff1)
+           
+           !! Populate the monomials array
+           xvec(1:nsizeG) = monomials(x/hh,y/hh)
+
+           !! Build the LHS - it is the same for all three operators
+           do i1=1,nsize
+              amaty(i1,:) = xvec(i1)*gvec(:)   !! Contribution to LHS for this interaction
+           end do           
+           amatx(:,:) = amatx(:,:) + amaty(:,:)   
+        end do   
+                  
+        !! Drop to 4th order
+#if ORDER>=5              
+        do i1=1,nsizeG
+           amatx(i1,15:nsizeG)=zero        
+        end do
+        do i1=15,nsizeG
+           amatx(i1,1:nsizeG)=zero
+           amatx(i1,i1)=one
+        end do
+#endif        
+ 
+        !! Copy LHS 
+        amaty = amatx
+        
+        !! Set x and y based on normal
+        x = rnorm(i,1)*s(i);y=rnorm(i,2)*s(i)
+
+        !! Set RHS to monomials of x,y for i3 interpolation
+        xx = x/hh;yy=y/hh
+        bvecx = monomials(xx,yy)
+        !! Set RHS to monomials of 2x,2y for i4 interpolation
+#if ORDER>=5
+        bvecx(15:nsizeG)=zero
+#endif        
+        bvecy(1:2) = two*bvecx(1:2)
+        bvecy(3:5) = four*bvecx(3:5)
+        bvecy(6:9) = 8.0d0*bvecx(6:9)
+        bvecy(10:14) = 16.0d0*bvecx(10:14)        
+
+!if(iproc.eq.3) then
+!write(6,*) iproc,i
+!do i1=1,14
+!write(6,*) bvecx(i1),bvecy(i1),bvecy(i1)/bvecx(i1)
+!end do
+!endif
+    
+        !! Solve for i3 interpolants
+        i1=0;i2=0         
+        call dgesv(nsize,1,amatx,nsize,i1,bvecx,nsize,i2)   
+        
+
+        !! Set RHS to monomials of 2x,2y for i4 interpolation
+!        xx = two*x/hh;yy=two*y/hh
+!        bvecy = monomials(xx,yy)
+#if ORDER>=5
+        bvecy(15:nsizeG)=zero
+#endif  
+
+        !! Solve for i4 interpolants
+        i1=0;i2=0;nsize=nsizeG    
+        call dgesv(nsize,1,amaty,nsize,i1,bvecy,nsize,i2)    
+
+!if(iproc.eq.3) then
+!write(6,*) iproc,i
+!do i1=1,14
+!write(6,*) bvecx(i1),bvecy(i1),bvecy(i1)/bvecx(i1)
+!end do
+!endif
+
+ 
+        !! Another loop of neighbours to calculate interparticle weights
+        do k=1,ij_count(i)
+           j = ij_link(k,i) 
+           rij(:) = rp(i,:) - rp(j,:)
+           x=-rij(1);y=-rij(2)
+
+           !! Calculate arguments (diff ABFs need args over diff ranges)
+           !! N.B. args for ABFs are adjusted to be centred at stencil centre (not node i)
+           rad = sqrt(x*x + y*y)/hh;qq=rad
+#if ABF==1   
+           ff1 = fac(qq)/hh
+           xx=x;yy=y
+#elif ABF==2     
+           ff1 = Wab(qq)
+           xx=x/hh;yy=y/hh    !! Hermite   
+#elif ABF==3
+           ff1 = Wab(qq)
+           xx=x/hh/ss;yy=y/hh/ss  !! Legendre
+#endif           
+           !! Populate the ABF array        
+           gvec(1:nsizeG) = abfs(rad,xx,yy,ff1)
+
+           !! Weights for interpolation
+           ij_w_binterp(1,k,ii) = dot_product(bvecx,gvec)
+           ij_w_binterp(2,k,ii) = dot_product(bvecy,gvec)           
+!if(iproc.eq.3) write(6,*) ii,k,ij_w_binterp(1,k,ii),ij_w_binterp(2,k,ii)           
+        end do             
+        
+        write(2,*) "" !! Temporary fix for a weird openblas/lapack/openmp bug 
+        !! The bug may be due to a race condition or something, but not really sure
+        !! What's the best way to fix this??   
+     end do
+     !$OMP END PARALLEL DO
+     deallocate(amatx,amaty)
+     deallocate(bvecx,bvecy,gvec,xvec)   
+!stop             
+     return
+  end subroutine calc_binterp  
 !! ------------------------------------------------------------------------------------------------
   function monomials1D(z) result(cxvec)
      real(rkind),intent(in) :: z

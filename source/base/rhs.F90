@@ -151,7 +151,7 @@ contains
      integer(ikind) :: i,j
      real(rkind),dimension(dims) :: tmp_vec
      real(rkind) :: tmp_scal
-     
+      
      !! Build RHS for internal nodes
      !$omp parallel do private(i,tmp_vec,tmp_scal)
      do j=1,npfb-nb
@@ -183,6 +183,8 @@ contains
         end do
         !$omp end parallel do 
      end if       
+     
+     
 
      return
   end subroutine calc_rhs_ro

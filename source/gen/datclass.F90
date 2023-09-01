@@ -118,7 +118,7 @@ case(6) !! Hong Im flameholder setup
 
      xl=1.0d0 ! channel length
      h0=xl/40.0d0   !cylinder radius
-     yl=xl/5.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
+     yl=xl/10.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
      dx0=h0/25.0!25.0       !15
      xbcond=0;ybcond=3     
      
@@ -143,7 +143,7 @@ case(6) !! Hong Im flameholder setup
      blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi;blob_ellipse(1)=0
 
      dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.0d0*dx0  !! dx for solids and in/outs...!! 
+     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=4.0d0*dx0  !! dx for solids and in/outs...!! 
 !! ------------------------------------------------------------------------------------------------
 case(7) !! Something periodic
 

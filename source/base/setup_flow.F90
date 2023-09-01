@@ -74,13 +74,13 @@ contains
 !     call make_1d_flame(0.0d0,2.0d-4,2.366d3)
         
      !! Make a 2D gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
-!     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
+     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
 
      !! Load an existing 1D flame file
 !     call load_flame_file
 
      !! Make a no-flow domain
-     call make_noflow
+!     call make_noflow
 
      !! A messy routine to play with for other initial conditions
 !     call hardcode_initial_conditions     
@@ -98,7 +98,7 @@ contains
 !     call superimpose_2d_gaussian_hotspot(-0.22d0,zero,2.0d-4,2.5d3)
 
      !! Add some turbulence to the velocity field
-     call make_turbulent_velocity_field(6.9d-4,5.0d0*u_char)
+!     call make_turbulent_velocity_field(6.9d-4,5.0d0*u_char)
      !! =======================================================================
      
      !! Convert from velocity to momentum and Y to roY
@@ -366,7 +366,7 @@ contains
      !! Temperatures, pressures and velocity from reference
      T_reactants = T_ref     
      P_flame = p_ref
-     u_reactants = u_char*0.2d0
+     u_reactants = u_char
 
      !! Inflow mixture gas constant
      Rmix_local = zero
