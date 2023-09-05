@@ -45,7 +45,7 @@ contains
      open(unit=195,file='data_out/statistics/velcheck.out')
      
      !! Time, L2 error of velocity field relative to analytic solution for Taylor-Green flow  
-     open(unit=196,file='data_out/statistics/taylor_green_l2.out')
+     open(unit=196,file='data_out/statistics/l2.out')
      
      !! Time, total energy within domain.
      open(unit=197,file='data_out/statistics/energy_sum.out')  
@@ -92,6 +92,9 @@ contains
      
         !! Error evaluation for Taylor Green vortices?
 !        call error_TG
+     
+        !! Error evaluation for Poiseuille flow
+        call poiseuille_l2norm
 
         !! Calculate the lift and drag on all solid obstacles
 !        call liftdrag
@@ -481,7 +484,7 @@ contains
         y1 = y+half
 
 
-        jj = 30!floor(10.0d0/sqrt(time+0.1d0)); % vary the degree of expansion to avoid NaNs...
+        jj = 50!floor(10.0d0/sqrt(time+0.1d0)); % vary the degree of expansion to avoid NaNs...
         do j=1,jj
            N=(2*j-1)*pi
            X1 = sin(N*y1)/N**3.0d0
@@ -491,15 +494,26 @@ contains
         
         dVi = vol(i)
         local_error = u(i)-uexact
-        sum_e = sum_e + local_error**two
-        sum_exact = sum_exact + uexact**two
+        sum_e = sum_e + dVi*local_error**two
+        sum_exact = sum_exact + dVi*uexact**two
      end do
      !$omp end parallel do
-     sum_e = dsqrt(sum_e/sum_exact)
-
-     write(196,*) time/Time_char,sum_e
+     
+#ifdef mp
+     call global_reduce_sum(sum_e)
+     call global_reduce_sum(sum_exact)
+              
+     if(iproc.eq.0) then
+        write(196,*) time/Time_char,sqrt(sum_e/sum_exact)         
+        flush(196)
+     endif
+#else     
+     write(196,*) time/Time_char,sqrt(sum_e/sum_exact)
      flush(196)  
-     return
+#endif
+     return     
+  
+     
   end subroutine poiseuille_l2norm  
 !! ------------------------------------------------------------------------------------------------
   subroutine error_TG

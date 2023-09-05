@@ -288,7 +288,7 @@ contains
     
         !Lchar(1) is outgoing, so doesn't require modification
         Lchar(2) = zero
-        Lchar(3) = v(i)*nscbc_coeff*c/L_domain_x &      !! track v=zero
+        Lchar(3) = v(i)*nscbc_coeff*c/L_domain_x       !! track v=zero
         Lchar(4) = w(i)*nscbc_coeff*c/L_domain_x       !! track w=zero
         Lchar(5) = (u(i)-u_inflow_local(j))*nscbc_coeff*(one-u(i)/c)*c*c*one/L_domain_x     !! Track u_inflow
 #ifdef ms
@@ -299,7 +299,7 @@ contains
         Lchar(2) = zero   !! No entropy in isothermal flows
         !Lchar(3) is outgoing
         !Lchar(4) is outgoing
-        Lchar(5) (p(i)-p_inflow)*nscbc_coeff*c*(one-Ma*Ma)/two/L_domain_x     !! track p_outflow
+        Lchar(5) = (p(i)-p_inflow)*nscbc_coeff*c*(one-Ma*Ma)/two/L_domain_x     !! track p_outflow
         !Lchar(5+1:5+nspec) is outgoing     
      end if        
 #else

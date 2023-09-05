@@ -29,7 +29,7 @@ program datgen
   integer(ikind) :: iround,nround,nsearch,ipartrow,ipartrowm1,nnear,npdps,idown,iup,ibc
   logical :: keepgoing,keepgoing2,skip
   real(rkind),dimension(:,:),allocatable :: pdp
-  real(rkind) :: dist2bound,dxtmp,minpdp
+  real(rkind) :: dist2bound,dxtmp,minpdp,dist2io
   real(rkind),dimension(:),allocatable :: tmpX
   real(rkind),dimension(:),allocatable :: pdp_x,pdp_y,pdp_dist2
   logical,dimension(:),allocatable :: pdp_active
@@ -82,15 +82,32 @@ program datgen
 
 
 !! ------------------------------------------------------------------------------------------------
-case(4) !! blank
+case(4) !! Poiseuille flow setup
 
+     yl=1.0d0
+     xl=yl/1.0d0
+     dx0=yl/50.0d0
+     xbcond=1;ybcond=0
+     
+     nb_patches = 4
+     allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
+     allocate(b_type(nb_patches))
+     b_type(:) = (/ 0, 3, 0, 3/)  
+     b_node(1,:) = (/-0.5d0*xl, -0.5d0*yl /)
+     b_node(2,:) = (/0.5d0*xl, -0.5d0*yl /)
+     b_node(3,:) = (/0.5d0*xl, 0.5d0*yl /)
+     b_node(4,:) = (/-0.5d0*xl, 0.5d0*yl /)
+     nb_blobs = 0;n_blob_coefs=0
+
+     dxmin = dx0/1.0d0
+     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...
 
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.5d0!0.0125d0  ! channel width
+     yl=0.0125d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/300.0       !15
+     dx0=xl/1000.0       !15
      xbcond=0;ybcond=1
      
      nb_patches = 4
@@ -264,12 +281,14 @@ end select
         
         !! How far are we from the boundaries?
         dist2bound = xb_max-xb_min + 100.0d0
+        dist2io = xb_max-xb_min + 100.0d0
         i=1
         do while(i.le.nb)
            tmpN(1) = x - xp(i);tmpN(2) = y - yp(i);temp = sqrt(dot_product(tmpN,tmpN))
            if(i.gt.nbio.and.temp.le.dist2bound) dist2bound = temp
+           if(i.lt.nbio.and.temp.le.dist2io) dist2io = temp
            i=i+1
-           if(temp.le.4.25*dxp(i-1)) keepgoing = .false. !! Too close to bound, leave it.           
+           if(temp.le.2.25*dxp(i-1)) keepgoing = .false. !! Too close to bound, leave it.  !!NEWBC          
         end do     
      
         !! Calculate the resolution locally
@@ -315,7 +334,9 @@ end select
            ipart = ipart + 1
            call random_number(temp);temp = temp -0.5d0;xp(ipart) = pdp_x(j) + temp*dxmin*0.5d0
            call random_number(temp);temp = temp -0.5d0;yp(ipart) = pdp_y(j) + temp*dxmin*0.5d0
-           dxp(ipart) = dx     
+           dxp(ipart) = dx  
+           if(dist2bound.le.4.5d0*dx) node_type(ipart)=998
+           if(dist2io.le.4.5d0*dx) node_type(ipart) = 998
         end if           
         
         !! Deactive all pdps within dx of this pdp
@@ -433,7 +454,7 @@ end select
      if(node_type(i).ge.0.and.node_type(i).le.2) then
         write(13,*) xp(i), yp(i),node_type(i),xnorm(i),ynorm(i),dxp(i)
      else
-        write(13,*) xp(i), yp(i),999,0.0d0,0.0d0,dxp(i)
+        write(13,*) xp(i), yp(i),node_type(i),0.0d0,0.0d0,dxp(i)
      end if
   end do
   close(13)

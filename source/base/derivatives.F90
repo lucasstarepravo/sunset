@@ -27,9 +27,7 @@ contains
     real(rkind),dimension(:,:),intent(inout) :: gradphi
     integer :: i,j,k
     real(rkind),dimension(dims) :: gradtmp
-    real(rkind) :: gradztmp
-real(rkind),dimension(:),allocatable :: phii3,phii4    
-    
+    real(rkind) :: gradztmp   
     
     segment_tstart = omp_get_wtime()     
     
@@ -61,33 +59,6 @@ real(rkind),dimension(:),allocatable :: phii3,phii4
     !! Or set to zero if 2D simulations
     gradphi(:,3) = zero    
 #endif    
-
-
-!!!_-------------REBUILD BOUNDARY DERIVATIVE---------------------------
-if(nb.ne.0) then
-allocate(phii3(nb),phii4(nb))
-call calc_interpolated_nodes(phi,phii3,phii4)
-
-   do j=1,nb
-      i=boundary_list(j)
-      if(node_type(i).eq.0) then !! Walls only for now
-         gradztmp = gradphi(i,1)      
-         gradphi(i,1) = (-25.0d0*phi(i) + 48.0d0*phi(i+1) - 36.0d0*phi(i+2) &
-                         + 16.0d0*phii3(j) - 3.0d0*phii4(j))/(12.0d0*s(i))
-         gradphi(i,1) = gradphi(i,1)/L_char
-
-!         write(6,*) gradztmp,gradphi(i,1),abs((gradztmp-gradphi(i,1))/max(abs(gradztmp),1.0d-10))
-      end if
-
-   end do
-deallocate(phii3,phii4)
-endif
-
-
-
-
-!!! --------------------------------------
-
 
     !! Profiling
     segment_tend = omp_get_wtime()
@@ -301,40 +272,6 @@ endif
 
     return
   end subroutine calc_grad2crossbound 
-!! ------------------------------------------------------------------------------------------------   
-  subroutine calc_interpolated_nodes(phi,phii3,phii4)
-    !! Calculate the Laplacian of a scalar phi
-    real(rkind),dimension(:),intent(in) :: phi
-    real(rkind),dimension(:),intent(inout) :: phii3,phii4
-    integer i,j,k,ii,iii
-    real(rkind) :: tmpi3,tmpi4
-    
-    
-    segment_tstart = omp_get_wtime()         
-
-    !$OMP PARALLEL DO PRIVATE(i,iii,j,k,tmpi3,tmpi4)
-    do ii=1,nb
-       iii=boundary_list(ii)
-       i=iii+2
-       tmpi3 = phi(i)
-       tmpi4 = phi(i)
-       do k=1,ij_count(i)
-          j = ij_link(k,i) 
-          tmpi3 = tmpi3 + (phi(j)-phi(i))*ij_w_binterp(1,k,ii)
-          tmpi4 = tmpi4 + (phi(j)-phi(i))*ij_w_binterp(2,k,ii)          
-       end do
-       phii3(ii) = tmpi3
-       phii4(ii) = tmpi4                     
-
-    end do
-    !$OMP END PARALLEL DO
-  
-
-    !! Profiling
-    segment_tend = omp_get_wtime()
-    segment_time_local(5) = segment_time_local(5) + segment_tend - segment_tstart
-    return
-  end subroutine calc_interpolated_nodes
 !! ------------------------------------------------------------------------------------------------ 
   subroutine calc_filtered_var(phi)
     !! Calculate the hyperviscosity filtered phi

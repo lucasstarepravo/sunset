@@ -151,7 +151,7 @@ contains
      integer(ikind) :: i,j
      real(rkind),dimension(dims) :: tmp_vec
      real(rkind) :: tmp_scal
-      
+    
      !! Build RHS for internal nodes
      !$omp parallel do private(i,tmp_vec,tmp_scal)
      do j=1,npfb-nb
@@ -161,7 +161,6 @@ contains
 
         rhs_ro(i) = -ro(i)*divvel(i) - tmp_scal   
         
-  
      end do
      !$omp end parallel do
 
@@ -177,13 +176,13 @@ contains
               
 
               rhs_ro(i) = - ro(i)*dutdt - ro(i)*gradw(i,3)
+              
            else !! In x-y coords for inflow, outflow
               rhs_ro(i) = -v(i)*gradro(i,2) - ro(i)*gradv(i,2) - w(i)*gradro(i,3) - ro(i)*gradw(i,3)
-           end if         
+           end if  
         end do
         !$omp end parallel do 
      end if       
-     
      
 
      return
@@ -551,9 +550,15 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
         tmp_scal_w = ro(i)*dot_product(tmp_vec,gradw(i,:)) - w(i)*rhs_ro(i) !! Convective term for w    
                 
         !! Viscous term (Lap(U) + (1/3)grad(div.U) formulation - avoids explicit calculation of cross derivs)
+#ifndef isoT        
         f_visc_u = visc(i)*(lapu(i) + onethird*graddivvel(i,1))
         f_visc_v = visc(i)*(lapv(i) + onethird*graddivvel(i,2))
         f_visc_w = visc(i)*(lapw(i) + onethird*graddivvel(i,3))
+#else
+        f_visc_u = visc(i)*(lapu(i))  !! Isothermal flows assume small velocity divergence
+        f_visc_v = visc(i)*(lapv(i))
+        f_visc_w = visc(i)*(lapw(i))
+#endif        
         
         !! Viscous forces due to non-uniform viscosity
 #ifdef tdtp
@@ -654,9 +659,15 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
               L(j,5) = half*(u(i)+c)*(dpdn + tmpro*c*gradu(i,1))
 
               !! Build initial stress divergence 
+#ifndef isoT              
               f_visc_u = visc(i)*(lapu(i) + onethird*graddivvel(i,1)) 
               f_visc_v = visc(i)*(lapv(i) + onethird*graddivvel(i,2)) 
               f_visc_w = visc(i)*(lapw(i) + onethird*graddivvel(i,3))
+#else
+              f_visc_u = visc(i)*(lapu(i))  !! Isothermal flows assume small velocity divergence
+              f_visc_v = visc(i)*(lapv(i))
+              f_visc_w = visc(i)*(lapw(i))
+#endif              
 #ifdef tdtp
               !! non-uniform viscosity terms. 
 !              gradvisc(:) = r_temp_dependence*visc(i)*gradT(i,:)/T(i)

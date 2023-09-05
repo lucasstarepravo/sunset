@@ -71,10 +71,10 @@ contains
      !! e.g. uniform/non-uniform inflow etc.
         
      !! Make a 1D flame: pass X-position,flame_thickness and T_hot
-!     call make_1d_flame(0.0d0,2.0d-4,2.366d3)
+     call make_1d_flame(0.0d0,2.0d-4,2.366d3)
         
      !! Make a 2D gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
-     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
+!     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
 
      !! Load an existing 1D flame file
 !     call load_flame_file
@@ -676,25 +676,20 @@ contains
      !! Values within domain
      !$OMP PARALLEL DO PRIVATE(x,y,z,tmp,ispec,Rmix_local)
      do i=1,npfb
-!        x = rp(i,1);y=rp(i,2);z=rp(i,3)
-        x = rp(i,3)-pi;y=rp(i,2);z=-rp(i,1) !! swap coords, and shift so x=-pi is on the front face        
+        x = rp(i,1);y=rp(i,2);z=rp(i,3)
 
         !! TG 3D Re1600 as in Cant 2022, Sandam 2017 etc (ish)
-!        u(i) = -cos(x)*sin(y)*cos(z)!*oosqrt2
-!        v(i) = sin(x)*cos(y)*cos(z)    !!c c
-!        w(i) = zero!u(i);u(i)=zero
+        u(i) = zero!-cos(x)*sin(y)*cos(z)!*oosqrt2
+        v(i) = zero!sin(x)*cos(y)*cos(z)    !!c c
+        w(i) = zero!u(i);u(i)=zero
+                
         
-        w(i) = -cos(x)*sin(y)*cos(z)!*oosqrt2  !! Swap coords
-        v(i) = sin(x)*cos(y)*cos(z)    !!c c
-        u(i) = zero!u(i);u(i)=zero
-        
-        
-        tmp = Rgas_universal*one_over_molar_mass(1)*T_ref  !! RT0        
-        tmp = rho_char*U_char*U_char/tmp   !! roUU/RT0
-        tmp = -tmp*(one/16.0d0)*(cos(two*x)+cos(two*y))*(two+cos(two*z))        
-        T(i) = T_ref
+!        tmp = Rgas_universal*one_over_molar_mass(1)*T_ref  !! RT0        
+!        tmp = rho_char*U_char*U_char/tmp   !! roUU/RT0
+!        tmp = -tmp*(one/16.0d0)*(cos(two*x)+cos(two*y))*(two+cos(two*z))        
+!        T(i) = T_ref
 
-        ro(i) = rho_char + tmp
+        ro(i) = rho_char! + tmp
 
 #ifdef ms    
 !        tmp = one - half*(one + erf(5.0d0*x))
@@ -708,15 +703,19 @@ contains
  !       tmp = exp(-y*y/0.01d0)
  !       ro(i) = one + 0.1d0*tmp
         
+#ifndef isoT
         !! Local mixture gas constant
         Rmix_local = zero
         do ispec=1,nspec
            Rmix_local = Rmix_local + Yspec(i,ispec)*one_over_molar_mass(ispec)
         end do
-        Rmix_local = Rmix_local*Rgas_universal
+        Rmix_local = Rmix_local*Rgas_universal       
         
         !! Density
         p(i) = ro(i)*Rmix_local*T(i)
+#else
+        p(i) = ro(i)*csq
+#endif        
         
                    
      end do

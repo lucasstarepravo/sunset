@@ -123,7 +123,7 @@ contains
      
      !! set the sound speed squared
 #ifdef isoT
-     csq = (u_char/Ma)**two
+     csq = (u_char/Ma)**two     
 #endif      
 
      !! Read in T-exponent for TDTP if required
@@ -150,6 +150,9 @@ contains
      
      !! Set characteristic density to unity. It is only used for isothermal flows
      rho_char = one
+#ifdef isoT
+     p_ref = rho_char*csq
+#endif     
           
      return
   end subroutine load_control_data_all

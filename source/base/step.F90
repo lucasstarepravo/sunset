@@ -227,7 +227,7 @@ contains
      !! Register 3 is rhs_ro,rhs_rou,rhs_rov (only used for RHS)
      !! Register 4 is e_acc_ro,e_acc_rou,e_acc_rov - error accumulator
      integer(ikind) :: i,k,ispec
-     real(rkind) :: time0,emax_Y
+     real(rkind) :: time0,emax_Y,outflow_error_scaling
      real(rkind),dimension(:),allocatable :: rou_reg1,rov_reg1,row_reg1,ro_reg1,roE_reg1
      real(rkind),dimension(:),allocatable :: e_acc_ro,e_acc_rou,e_acc_rov,e_acc_E,e_acc_row
      real(rkind),dimension(:,:),allocatable :: Yspec_reg1,e_acc_Yspec
@@ -236,6 +236,9 @@ contains
      
      !! Push the max error storage back one
      emax_nm1 = emax_n;emax_n=emax_np1
+     
+     !! Scaling parameter for outflows
+     outflow_error_scaling=1.0d0
      
      !! Set RKa,RKb,RKbmbh with dt (avoids multiplying by dt on per-node basis)
      RKa(:) = dt*rk3_4s_2r_a(:)
@@ -389,19 +392,18 @@ contains
         !! "scale_outflow_errors", which is set in setup_domain.
         if(scale_outflow_errors.eq.1) then
            if(node_type(i).eq.2) then
-              e_acc_ro(i) = e_acc_ro(i)*1.0d2
-              e_acc_rou(i) = e_acc_rou(i)*1.0d2
-              e_acc_rov(i) = e_acc_rov(i)*1.0d2
-              e_acc_row(i) = e_acc_row(i)*1.0d2
+              e_acc_ro(i) = e_acc_ro(i)*outflow_error_scaling
+              e_acc_rou(i) = e_acc_rou(i)*outflow_error_scaling
+              e_acc_rov(i) = e_acc_rov(i)*outflow_error_scaling
+              e_acc_row(i) = e_acc_row(i)*outflow_error_scaling
 #ifndef isoT      
-              e_acc_E(i) = e_acc_E(i)*1.0d2
+              e_acc_E(i) = e_acc_E(i)*outflow_error_scaling
 #endif           
 #ifdef ms
-              e_acc_Yspec(i,:) = e_acc_Yspec(i,:)*1.0d2
+              e_acc_Yspec(i,:) = e_acc_Yspec(i,:)*outflow_error_scaling
 #endif           
            end if
         end if
-
         
         !! Calculating L_infinity norm of errors, normalised by eX_norm. 
         enrm_ro = max(enrm_ro,abs(e_acc_ro(i))*ero_norm)      

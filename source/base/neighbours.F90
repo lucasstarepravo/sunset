@@ -64,7 +64,7 @@ contains
     deallocate(nc)
     deallocate(ip)
     deallocate(cellpart)
-    
+        
     write(6,*) iproc,"neighbours found"
 
   end subroutine find_neighbours
@@ -326,5 +326,5 @@ contains
     if (j+1.lt.last)  call quicksort_neighbours(ii,a, j+1, last)
     
   end subroutine quicksort_neighbours
-!! ------------------------------------------------------------------------------------------------  
+!! ------------------------------------------------------------------------------------------------    
 end module neighbours

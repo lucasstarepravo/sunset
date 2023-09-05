@@ -61,7 +61,7 @@ contains
         if(jj.ge.0.and.jj.le.2) then !! If it is a boundary node
            k = ii !! k is the index of the parent node
            nb = nb + 1
-           do j=1,4  !! Make 4 additional nodes
+           do j=1,2  !! Make 4 additional nodes   !! NEWBC
               ii = ii + 1
               rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
               rnorm(ii,:)=rnorm(k,:)          !! Copy normals
@@ -82,8 +82,8 @@ contains
      smag = 0.5d0
      do i=1,npfb
         if(node_type(i).ge.3)then  !! only perturb interior nodes
-        dx = rand();dx = smag*(dx - 0.5d0)*2.0d0*s(i)
-        dy = rand();dy = smag*(dy - 0.5d0)*2.0d0*s(i)        
+        dx = rand();dx = smag*(dx - 0.5d0)*1.0d0*s(i)
+        dy = rand();dy = smag*(dy - 0.5d0)*1.0d0*s(i)        
         rp(i,:) = rp(i,:) + (/dx,dy/)
         end if
 !        write(32,*) rp(i,:)
@@ -100,7 +100,7 @@ contains
      
      !! Write new file to ../gen/IPART
      open(unit=13,file='../gen/IPART')
-     write(13,*) nb,npfb-4*nb,smax
+     write(13,*) nb,npfb-2*nb,smax  !! NEWBC
      write(13,*) xmin,xmax,ymin,ymax
      write(13,*) xbcond,ybcond         
      do i=1,npfb
@@ -147,7 +147,7 @@ contains
         !! Find shifting vector...
         !$OMP PARALLEL DO PRIVATE(k,j,rij,rad,qq,gradkernel,dr_tmp,qkd_mag)
         do i=1,npfb
-           if(node_type(i).eq.999) then
+           if(node_type(i).eq.999.or.node_type(i).eq.998) then !! Fluid nodes excluding first 2 rows
               qkd_mag = 1.0d-1*h(i)
               dr_tmp = zero
               do k=1,ij_count(i)
@@ -173,7 +173,7 @@ contains
         !! Move particles...
         !$OMP PARALLEL DO
         do i=1,npfb
-           if(node_type(i).eq.999) then
+           if(node_type(i).eq.999.or.node_type(i).eq.998) then !! Fluid nodes excluding first 2 rows
               rp(i,:) = rp(i,:) - dr(i,:)
            end if
         end do
@@ -246,7 +246,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
         if(jj.ge.0.and.jj.le.2) then !! If it is a boundary node
            k = ii !! k is the index of the parent node
            nb = nb + 1
-           do j=1,4  !! Make 4 additional nodes
+           do j=1,2  !! Make 4 additional nodes  !! NEWBC
               ii = ii + 1
               rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
               rnorm(ii,:)=rnorm(k,:)          !! Copy normals
@@ -270,7 +270,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      integer(ikind) :: i,n,j,k
      real(rkind) :: max_x,min_x,max_y,min_y,max_s,block_size_x,block_size_y
      
-     n= npfb - 4*nb
+     n= npfb - 2*nb !!NEWBC
      open(212,file='../../IPART')
      write(212,*) nb,n*nprocsZ,smax
      write(212,*) xmin,xmax,ymin,ymax
@@ -330,7 +330,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      integer(ikind) :: i,n,j
      
      !! Number of nodes without FD stencils
-     n = npfb - 4*nb
+     n = npfb - 2*nb   !! NEWBC
   
      allocate(x(n),y(n),xn(n),yn(n),ds(n),nt(n))
      
@@ -362,7 +362,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      logical :: keepgoing       
      
      !! How many particles (total) need sorting
-     nptmp = npfb-4*nb
+     nptmp = npfb-2*nb  !! NEWBC
      
      !! allocation of index limits
      allocate(nband(nprocsX),effective_nband(nprocsX))
@@ -385,7 +385,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
         effective_nband(kk) = 0
         do i=nl_ini,nl_end
            if(nt(i).ge.0.and.nt(i).le.2) then
-              effective_nband(kk) = effective_nband(kk) + 5
+              effective_nband(kk) = effective_nband(kk) + 3 !! NEWBC
            else
               effective_nband(kk) = effective_nband(kk) + 1              
            end if
@@ -416,7 +416,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
            effective_nband(kk) = 0
            do i=nl_ini,nl_end
               if(nt(i).ge.0.and.nt(i).le.2) then
-                 effective_nband(kk) = effective_nband(kk) + 5
+                 effective_nband(kk) = effective_nband(kk) + 3 !! NEWBC
               else
                  effective_nband(kk) = effective_nband(kk) + 1              
               end if
@@ -454,7 +454,9 @@ write(6,*) "Shifting iteration",ll,"of ",kk
         write(6,*) kk,nband(kk),effective_nband(kk)
         j=j+nband(kk)
      end do
-     write(6,*) "checking sums",j,npfb-4*nb
+     write(6,*) "checking sums",j,npfb-2*nb !!NEWBC
+     
+     write(6,*) "Number of bound nodes",nb
 
 !     stop            
       
@@ -491,7 +493,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
         effective_nblock(kk) = 0
         do i=nl_ini,nl_end
            if(nt(i).ge.0.and.nt(i).le.2) then
-              effective_nblock(kk) = effective_nblock(kk) + 5
+              effective_nblock(kk) = effective_nblock(kk) + 3 !! NEWBC
            else
               effective_nblock(kk) = effective_nblock(kk) + 1              
            end if
@@ -526,7 +528,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
            effective_nblock(kk) = 0
            do i=nl_ini,nl_end
               if(nt(i).ge.0.and.nt(i).le.2) then
-                 effective_nblock(kk) = effective_nblock(kk) + 5
+                 effective_nblock(kk) = effective_nblock(kk) + 3 !! NEWBC
               else
                  effective_nblock(kk) = effective_nblock(kk) + 1              
               end if
@@ -572,7 +574,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      
     
      !! How many particles (total) need sorting
-     nptmp = npfb-4*nb
+     nptmp = npfb-2*nb  !! NEWBC
     
      !! Find band sizes, and adjust by 1d diffusion
      call find_band_sizes

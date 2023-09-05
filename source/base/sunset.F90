@@ -68,8 +68,8 @@ program sunset
   !! Set initial fields
   call initial_solution
 #ifdef restart
-     call set_tstep
-     dt = half*half*min(dt_cfl,dt_parabolic)
+  call set_tstep
+  dt = half*half*min(dt_cfl,dt_parabolic)
 #endif   
 
   !! Initialise time profiling and output counter...

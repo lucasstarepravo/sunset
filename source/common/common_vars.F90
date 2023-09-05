@@ -120,6 +120,8 @@ module common_vars
   
   !! LABFM interpolation operators
   real(rkind),dimension(:,:,:),allocatable :: ij_w_binterp
+  real(rkind),dimension(:,:),allocatable :: ij_w_binterp_sum
+  real(rkind),dimension(:,:,:),allocatable :: ij_w_interp
   
   !! Finite Difference weightings 
   real(rkind),dimension(:),allocatable :: ij_fd_grad,ij_fd_grad2,ij_fd_hyp         
