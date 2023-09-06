@@ -238,7 +238,7 @@ contains
      emax_nm1 = emax_n;emax_n=emax_np1
      
      !! Scaling parameter for outflows
-     outflow_error_scaling=1.0d0
+     outflow_error_scaling=1.0d2
      
      !! Set RKa,RKb,RKbmbh with dt (avoids multiplying by dt on per-node basis)
      RKa(:) = dt*rk3_4s_2r_a(:)

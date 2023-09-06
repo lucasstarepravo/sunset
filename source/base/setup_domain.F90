@@ -163,11 +163,11 @@ contains
         h(ii) = dummy*hovs
         s(ii) = dummy
         node_type(ii) = jj
-        if(jj.ge.0.and.jj.le.2) then !! If it is a boundary node
+        if(jj.eq.0) then !! If it is a wall boundary node
            h(ii) = s(ii)*hovs_bound        
            k = ii !! k is the index of the parent node
-           nb = nb + 1
-           do j=1,2  !! Make 4 additional nodes  !!NEWBC
+           nb = nb + 1           
+           do j=1,2  !! Make 2 additional nodes  !!NEWBC
               ii = ii + 1
               rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
 if(j.eq.2) then !! Shake nodes for 2nd gen interpolation testing
@@ -181,7 +181,22 @@ end if
               fd_parent(ii) = k            !! and lineage
               npfb = npfb + 1           
            end do
+        else if(jj.eq.1.or.jj.eq.2) then !! If it is an io boundary node
+           h(ii) = s(ii)*hovs_bound        
+           k = ii !! k is the index of the parent node
+           nb = nb + 1           
+           do j=1,4  !! Make 4 additional nodes  !!NEWBC
+              ii = ii + 1
+              rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
+              rnorm(ii,:)=rnorm(k,:)          !! Copy normals
+              h(ii)=h(k);s(ii)=s(k)          !! length-scales
+              node_type(ii) = -j           !! and node type
+              fd_parent(ii) = k            !! and lineage
+              npfb = npfb + 1           
+           end do
         end if
+
+
      end do
 
 
@@ -248,7 +263,7 @@ end if
      allocate(internal_list(npfb-nb));internal_list=0    
      ii=0;jj=0
      do i=1,npfb
-        if(node_type(i).lt.0.or.node_type(i).eq.999.or.node_type(i).eq.998.or.node_type(i).eq.997) then
+        if(node_type(i).lt.0.or.node_type(i).eq.999.or.node_type(i).eq.998) then
            ii=ii+1
            internal_list(ii) = i
         else

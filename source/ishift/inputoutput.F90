@@ -22,6 +22,7 @@ module inputoutput
   
   real(rkind),parameter :: coef_diffusion=0.2d0 !0.4d0
   integer(ikind),parameter :: maxiters_diffusion = 200
+  integer(ikind) :: nbw,nbio
 
 contains
 !! ------------------------------------------------------------------------------------------------  
@@ -51,17 +52,21 @@ contains
      !! Load all nodes. Build FD stencils near boundaries on the fly.
      npfb_tmp = npfb
      nb = 0;ii = 0
+     nbio=0 !! Counter for io bound nodes
+     nbw=0 !! counter for wall bound nodes
     
+     write(6,*) "npfb,nb",npfb,nb 
      do i=1,npfb_tmp
         ii = ii + 1
         read(13,*) rp(ii,1:2),jj,rnorm(ii,1:2),dummy
         h(ii) = dummy*hovs_local
         s(ii) = dummy
         node_type(ii) = jj
-        if(jj.ge.0.and.jj.le.2) then !! If it is a boundary node
+        if(jj.eq.0) then !! If it is a solid boundary node
            k = ii !! k is the index of the parent node
            nb = nb + 1
-           do j=1,2  !! Make 4 additional nodes   !! NEWBC
+           nbw = nbw + 1
+           do j=1,2  !! Make 2 additional nodes   !! NEWBC
               ii = ii + 1
               rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
               rnorm(ii,:)=rnorm(k,:)          !! Copy normals
@@ -71,6 +76,21 @@ contains
               npfb = npfb + 1           
            end do
         end if
+        if(jj.eq.1.or.jj.eq.2) then !! If it is an io boundary node
+           k = ii !! k is the index of the parent node
+           nb = nb + 1
+           nbio = nbio + 1
+           do j=1,4  !! Make 4 additional nodes   !! NEWBC
+              ii = ii + 1
+              rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
+              rnorm(ii,:)=rnorm(k,:)          !! Copy normals
+              h(ii)=h(k);s(ii)=s(k)          !! length-scales
+              node_type(ii) = -j           !! and node type
+              fd_parent(ii) = k            !! and lineage
+              npfb = npfb + 1           
+           end do
+        end if
+        
      end do
 
      write(6,*) nb,npfb     
@@ -100,7 +120,7 @@ contains
      
      !! Write new file to ../gen/IPART
      open(unit=13,file='../gen/IPART')
-     write(13,*) nb,npfb-2*nb,smax  !! NEWBC
+     write(13,*) nb,npfb-2*nbw-4*nbio,smax  !! NEWBC
      write(13,*) xmin,xmax,ymin,ymax
      write(13,*) xbcond,ybcond         
      do i=1,npfb
@@ -236,6 +256,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      !! Load all nodes. Build FD stencils near boundaries on the fly.
      npfb_tmp = npfb
      nb = 0;ii = 0
+     nbw=0;nbio=0
     
      do i=1,npfb_tmp
         ii = ii + 1
@@ -243,9 +264,10 @@ write(6,*) "Shifting iteration",ll,"of ",kk
         h(ii) = dummy*hovs_local
         s(ii) = dummy
         node_type(ii) = jj
-        if(jj.ge.0.and.jj.le.2) then !! If it is a boundary node
+        if(jj.eq.0) then !! If it is a wall boundary node
            k = ii !! k is the index of the parent node
            nb = nb + 1
+           nbw = nbw+1
            do j=1,2  !! Make 4 additional nodes  !! NEWBC
               ii = ii + 1
               rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
@@ -256,6 +278,21 @@ write(6,*) "Shifting iteration",ll,"of ",kk
               npfb = npfb + 1           
            end do
         end if
+        if(jj.eq.1.or.jj.eq.2) then !! If it is an io boundary node
+           k = ii !! k is the index of the parent node
+           nb = nb + 1
+           nbio = nbio+1
+           do j=1,4  !! Make 4 additional nodes  !! NEWBC
+              ii = ii + 1
+              rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
+              rnorm(ii,:)=rnorm(k,:)          !! Copy normals
+              h(ii)=h(k);s(ii)=s(k)          !! length-scales
+              node_type(ii) = -j           !! and node type
+              fd_parent(ii) = k            !! and lineage
+              npfb = npfb + 1           
+           end do
+        end if
+        
      end do
 
      write(6,*) nb,npfb     
@@ -270,7 +307,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      integer(ikind) :: i,n,j,k
      real(rkind) :: max_x,min_x,max_y,min_y,max_s,block_size_x,block_size_y
      
-     n= npfb - 2*nb !!NEWBC
+     n= npfb - 2*nbw - 4*nbio !!NEWBC
      open(212,file='../../IPART')
      write(212,*) nb,n*nprocsZ,smax
      write(212,*) xmin,xmax,ymin,ymax
@@ -330,7 +367,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      integer(ikind) :: i,n,j
      
      !! Number of nodes without FD stencils
-     n = npfb - 2*nb   !! NEWBC
+     n = npfb - 2*nbw - 4*nbio  !! NEWBC
   
      allocate(x(n),y(n),xn(n),yn(n),ds(n),nt(n))
      
@@ -362,7 +399,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      logical :: keepgoing       
      
      !! How many particles (total) need sorting
-     nptmp = npfb-2*nb  !! NEWBC
+     nptmp = npfb-2*nbw - 4*nbio  !! NEWBC
      
      !! allocation of index limits
      allocate(nband(nprocsX),effective_nband(nprocsX))
@@ -384,8 +421,10 @@ write(6,*) "Shifting iteration",ll,"of ",kk
         
         effective_nband(kk) = 0
         do i=nl_ini,nl_end
-           if(nt(i).ge.0.and.nt(i).le.2) then
+           if(nt(i).eq.0) then
               effective_nband(kk) = effective_nband(kk) + 3 !! NEWBC
+           else if(nt(i).eq.1.or.nt(i).eq.2) then
+              effective_nband(kk) = effective_nband(kk) + 5 !! NEWBC           
            else
               effective_nband(kk) = effective_nband(kk) + 1              
            end if
@@ -415,8 +454,10 @@ write(6,*) "Shifting iteration",ll,"of ",kk
             
            effective_nband(kk) = 0
            do i=nl_ini,nl_end
-              if(nt(i).ge.0.and.nt(i).le.2) then
+              if(nt(i).eq.0) then
                  effective_nband(kk) = effective_nband(kk) + 3 !! NEWBC
+              else if(nt(i).eq.1.or.nt(i).eq.2) then                 
+                 effective_nband(kk) = effective_nband(kk) + 5 !! NEWBC
               else
                  effective_nband(kk) = effective_nband(kk) + 1              
               end if
@@ -454,7 +495,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
         write(6,*) kk,nband(kk),effective_nband(kk)
         j=j+nband(kk)
      end do
-     write(6,*) "checking sums",j,npfb-2*nb !!NEWBC
+     write(6,*) "checking sums",j,npfb-2*nbw - 4*nbio !!NEWBC
      
      write(6,*) "Number of bound nodes",nb
 
@@ -492,8 +533,10 @@ write(6,*) "Shifting iteration",ll,"of ",kk
         
         effective_nblock(kk) = 0
         do i=nl_ini,nl_end
-           if(nt(i).ge.0.and.nt(i).le.2) then
+           if(nt(i).eq.0) then
               effective_nblock(kk) = effective_nblock(kk) + 3 !! NEWBC
+           else if(nt(i).eq.1.or.nt(i).eq.2) then
+              effective_nblock(kk) = effective_nblock(kk) + 5 !! NEWBC           
            else
               effective_nblock(kk) = effective_nblock(kk) + 1              
            end if
@@ -527,11 +570,13 @@ write(6,*) "Shifting iteration",ll,"of ",kk
             
            effective_nblock(kk) = 0
            do i=nl_ini,nl_end
-              if(nt(i).ge.0.and.nt(i).le.2) then
+              if(nt(i).eq.0) then
                  effective_nblock(kk) = effective_nblock(kk) + 3 !! NEWBC
+              else if(nt(i).eq.1.or.nt(i).eq.2) then
+                 effective_nblock(kk) = effective_nblock(kk) + 5 !! NEWBC           
               else
                  effective_nblock(kk) = effective_nblock(kk) + 1              
-              end if
+              end if           
            end do
         
         end do     
@@ -568,13 +613,13 @@ write(6,*) "Shifting iteration",ll,"of ",kk
    
      !! First sort nodes in X
      write(6,*) "About to quicksort"
-     call quicksort(x,1,npfb-4*nb)
+     call quicksort(x,1,npfb-2*nbw - 4*nbio)  !! NEWBC
      write(6,*) "Quicksorted nodes ordered increasing x"
      
      
     
      !! How many particles (total) need sorting
-     nptmp = npfb-2*nb  !! NEWBC
+     nptmp = npfb-2*nbw - 4*nbio  !! NEWBC
     
      !! Find band sizes, and adjust by 1d diffusion
      call find_band_sizes

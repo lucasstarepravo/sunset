@@ -160,7 +160,7 @@ case(6) !! Hong Im flameholder setup
      blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi;blob_ellipse(1)=0
 
      dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=4.0d0*dx0  !! dx for solids and in/outs...!! 
+     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=2.0d0*dx0  !! dx for solids and in/outs...!! 
 !! ------------------------------------------------------------------------------------------------
 case(7) !! Something periodic
 
@@ -286,10 +286,12 @@ end select
         do while(i.le.nb)
            tmpN(1) = x - xp(i);tmpN(2) = y - yp(i);temp = sqrt(dot_product(tmpN,tmpN))
            if(i.gt.nbio.and.temp.le.dist2bound) dist2bound = temp
-           if(i.lt.nbio.and.temp.le.dist2io) dist2io = temp
+           if(i.le.nbio.and.temp/dxp(i).le.dist2io) dist2io = temp/dxp(i)
            i=i+1
-           if(temp.le.2.25*dxp(i-1)) keepgoing = .false. !! Too close to bound, leave it.  !!NEWBC          
+           if(dist2bound.le.2.25*dxp(i-1)) keepgoing = .false. !! Too close to solid bound, leave it.  !!NEWBC
         end do     
+
+        if(dist2io.le.4.25) keepgoing = .false. !! Too close to io bound, leave it.  !!NEWBC              
      
         !! Calculate the resolution locally
         call get_resolution(x,y,dist2bound,dx)
@@ -336,7 +338,6 @@ end select
            call random_number(temp);temp = temp -0.5d0;yp(ipart) = pdp_y(j) + temp*dxmin*0.5d0
            dxp(ipart) = dx  
            if(dist2bound.le.4.5d0*dx) node_type(ipart)=998
-           if(dist2io.le.4.5d0*dx) node_type(ipart) = 998
         end if           
         
         !! Deactive all pdps within dx of this pdp
@@ -424,7 +425,7 @@ end select
      npfb = ipart
      dx0 = maxval(dxp(1:npfb))
      
-     write(*,*) 'nb,npfb= ', nb,npfb,nbio
+     write(*,*) 'nb,npfb,nbio= ', nb,npfb,nbio
 
 !! ------------------------------------------------------------------------------------------------
 !! Re-order nodes (from left to right)

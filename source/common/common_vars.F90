@@ -119,8 +119,6 @@ module common_vars
   real(rkind),dimension(:),allocatable :: ij_w_hyp_sum,ij_w_lap_sum
   
   !! LABFM interpolation operators
-  real(rkind),dimension(:,:,:),allocatable :: ij_w_binterp
-  real(rkind),dimension(:,:),allocatable :: ij_w_binterp_sum
   real(rkind),dimension(:,:,:),allocatable :: ij_w_interp
   
   !! Finite Difference weightings 
