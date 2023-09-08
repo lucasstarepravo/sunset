@@ -609,7 +609,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
         call calc_grad2vecbound(u,v,w,grad2uvec)  
         call calc_grad2crossbound(gradu,grad2ucross)        
    
-     
+    
         !$omp parallel do private(i,tmpro,c,xn,yn,un,ut,f_visc_u,f_visc_v,body_force_u,body_force_v &
         !$omp ,dpdn,dundn,dutdn,f_visc_w,tmp_vec,tmp_scal_u,tmp_scal_v,tmp_scal_w)
         do j=1,nb
@@ -712,9 +712,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
               rhs_rou(i) = -v(i)*gradu(i,2) - w(i)*gradu(i,3) + f_visc_u + body_force_u  
               rhs_rov(i) = -v(i)*gradv(i,2) - w(i)*gradv(i,3) - gradp(i,2) + f_visc_v + body_force_v
               rhs_row(i) = -v(i)*gradw(i,2) - w(i)*gradw(i,3) - gradp(i,3) + f_visc_w + body_force_w 
-              
-                     
-              
+                            
            end if
         end do
         !$omp end parallel do 
@@ -816,6 +814,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
            rhs_roE(i) = - v(i)*gradroE(i,2) - roE(i)*gradv(i,2) - w(i)*gradroE(i,3) - roE(i)*gradw(i,3) &
                       - p(i)*gradv(i,2) - v(i)*gradp(i,2) - p(i)*gradw(i,3) - w(i)*gradp(i,3) &
                       + store_diff_E(i) 
+                                            
         end do
         !$omp end parallel do
         deallocate(grad2T)
@@ -922,7 +921,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
     !$omp end parallel do
     !! De-allocate L
     deallocate(L)
-    
+        
     !! Profiling
     segment_tend = omp_get_wtime()
     segment_time_local(2) = segment_time_local(2) + segment_tend - segment_tstart    

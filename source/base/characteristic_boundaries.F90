@@ -405,18 +405,16 @@ contains
      if(u(i).le.c) then !! Subsonic. If supersonic, just use L1 from definition...
      
         gammagas = cp(i)/(cp(i)-Rgas_mix(i))     
-        Lchar(1) = (p(i)-p_outflow)*nscbc_coeff*c*(one-Ma*Ma)/two/L_domain_x &                               !! track p_outflow
+        Lchar(1) = (p(i)-p_outflow)*nscbc_coeff*c*(one-Ma*Ma)*half/L_domain_x &   !! track p_outflow
 #ifdef react
                  - half*(gammagas-one)*sumoverspecies_homega(j) &
 #endif
                  !! N.B. It's more stable to just follow Sutherland 2003 and neglect transverse terms
-                 +zero!- (one-Ma)*half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2) - &
-!                                      tmpro*c*v(i)*gradb_u(2)) !& !! trans1 conv.
+                 +zero!- (one-Ma)*half*( &
+!                  v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2)-tmpro*c*v(i)*gradb_u(2)) !& !! trans1 conv.
 !                 - (one-Ma)*half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3) - &
 !                                      tmpro*c*w(i)*gradb_u(3))   !! trans2 conv.
     
-      
-
      !Lchar(2) is outgoing
      !Lchar(3) is outgoing
      !Lchar(4) is outgoing

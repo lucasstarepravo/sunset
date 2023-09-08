@@ -485,11 +485,11 @@ contains
               
               !! Filter in boundary normal direction, but only for outflows.
               if(node_type(i).eq.2) then  
-                 if(j.eq.i)              ij_w_hyp(k,i) = -zero   !! 4th DERIV
-                 if(node_type(j).eq.-1)  ij_w_hyp(k,i) =  4.0d0/dx4
-                 if(node_type(j).eq.-2)  ij_w_hyp(k,i) = -6.0d0/dx4
-                 if(node_type(j).eq.-3)  ij_w_hyp(k,i) =  4.0d0/dx4
-                 if(node_type(j).eq.-4)  ij_w_hyp(k,i) = -one/dx4     !! made negative (need coeff -1)...   
+!                 if(j.eq.i)              ij_w_hyp(k,i) = -zero   !! 4th DERIV
+!                 if(node_type(j).eq.-1)  ij_w_hyp(k,i) =  4.0d0/dx4
+!                 if(node_type(j).eq.-2)  ij_w_hyp(k,i) = -6.0d0/dx4
+!                 if(node_type(j).eq.-3)  ij_w_hyp(k,i) =  4.0d0/dx4
+!                 if(node_type(j).eq.-4)  ij_w_hyp(k,i) = -one/dx4     !! made negative (need coeff -1)...   
               end if
               end if
            end do
@@ -824,7 +824,7 @@ contains
      !! Add neighbours of i2 to neighbour list of i0 and i1 for walls only
      do ii=1,nb
         i=boundary_list(ii)
-        if(node_type(i).eq.0) then !! Only for walls
+        if(node_type(i).eq.10) then !! Only for walls
         
         i2=i+2
         i1=i+1
@@ -920,12 +920,11 @@ contains
      call openblas_set_num_threads(1)
 
 
-     !$OMP PARALLEL DO PRIVATE(i,iii,nsize,k,j,rij,rad,qq,x,y,xx,yy, &
+     !$OMP PARALLEL DO PRIVATE(iii,nsize,k,j,rij,rad,qq,x,y,xx,yy, &
      !$OMP ff1,gvec,xvec,i1,i2,hh,amati2,amati3,amati4 &
      !$OMP ,bveci2,bveci3,bveci4,xveci,gveci)
      do ii=1,nb
         iii=boundary_list(ii)  !! Index of boundary node
-        i=iii+2  !! Index of node in row 2
         nsize = nsizeG
         amati2=zero;amati3=zero;amati4=zero
         hh=h(i)
@@ -1484,10 +1483,9 @@ write(6,*) i,i1,"stopping because of NaN",ii
 
         !! Reduce the filter coefficient near boundaries
         if(node_type(i).eq.-1) filter_coeff(i) = filter_coeff(i)*half*oosqrt2!*half*half
-        if(node_type(i).eq.-2) filter_coeff(i) = filter_coeff(i)*half!*half*oosqrt2
+        if(node_type(i).eq.-2) filter_coeff(i) = filter_coeff(i)*half
         if(node_type(i).eq.-3) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half
-        if(node_type(i).eq.-4) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half                        
-        if(node_type(i).eq.998) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half
+        if(node_type(i).eq.-4.or.node_type(i).eq.998) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half                        
 
      end do
      !$omp end parallel do
@@ -1515,7 +1513,7 @@ write(6,*) i,i1,"stopping because of NaN",ii
         end do
         filter_coeff(i) = (one/3.0d0)/lsum  !(two/3.0d0)
         
-        filter_coeff(i) = filter_coeff(i)*half
+        filter_coeff(i) = filter_coeff(i)*half*half
         
      end do
      !$omp end parallel do

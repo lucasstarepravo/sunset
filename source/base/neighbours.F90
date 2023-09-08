@@ -234,6 +234,32 @@ contains
           call neighbour_node_cell(i,rpi,jc)
    
        end do
+       
+       !! Augment neighbours for walls and next2walls
+       if(node_type(i).eq.0) then
+          rpi(:) = rp(i,:) + two*s(i)*rnorm(i,:)
+          do kc=1,ic_count(ic)
+             jc = ic_link(ic,kc)
+#ifdef dim3
+             jc = jc + ncx*ncy*(zlayer_index_global(i)-1)
+#endif                   
+             call neighbour_node_cell(i,rpi,jc)
+          end do
+       end if
+       if(node_type(i).eq.-1)then
+          if(node_type(fd_parent(i)).eq.0) then
+             rpi(:) = rp(i,:) + s(i)*rnorm(i,:)
+             do kc=1,ic_count(ic)
+                jc = ic_link(ic,kc)
+#ifdef dim3
+                jc = jc + ncx*ncy*(zlayer_index_global(i)-1)
+#endif                   
+                call neighbour_node_cell(i,rpi,jc)
+             end do 
+          end if                         
+       end if
+       
+       
     end do
     !$omp end parallel do
   end subroutine neighboring_list_parallel

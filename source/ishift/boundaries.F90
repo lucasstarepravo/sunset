@@ -191,7 +191,20 @@ contains
              end if
           end if
        end if       
-    end do       
+    end do  
+    
+    !! Loop through all boundary nodes and make one back from the boundary
+!    do i=1,npfb
+!       if(node_type(i).eq.0) then
+!          imp = imp + 1
+!          k = npfb + imp
+!          irelation(k)=i
+!          rp(k,1) = rp(i,1) - s(i)*rnorm(i,1)
+!          rp(k,2) = rp(i,2) - s(i)*rnorm(i,2)
+!          vrelation(k) = 0       
+!       end if
+!    end do
+         
               
     nmirror = imp
     np = npfb + nmirror   

@@ -170,10 +170,10 @@ contains
            do j=1,2  !! Make 2 additional nodes  !!NEWBC
               ii = ii + 1
               rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
-if(j.eq.2) then !! Shake nodes for 2nd gen interpolation testing
-     dummy = rand()-half;rp(ii,1) = rp(ii,1) + quarter*dummy*s(k)
-     dummy = rand()-half;rp(ii,2) = rp(ii,2) + quarter*dummy*s(k)     
-end if
+!if(j.eq.2) then !! Shake nodes for 2nd gen interpolation testing
+!     dummy = rand()-half;rp(ii,1) = rp(ii,1) + quarter*dummy*s(k)
+!     dummy = rand()-half;rp(ii,2) = rp(ii,2) + quarter*dummy*s(k)     
+!end if
 
               rnorm(ii,:)=rnorm(k,:)          !! Copy normals
               h(ii)=h(k);s(ii)=s(k)          !! length-scales
@@ -284,15 +284,17 @@ end if
               else              
                  znf_tdiff(j) = .true.      !! no heat flux through adiabatic wall
               end if  
-              znf_vdiff(j) = .false.
-              znf_vtdiff(j) = .false.              
+              znf_vdiff(j) = .false.        
+              znf_vtdiff(j) = .false.      
+                      
            else if(node_type(i).eq.1) then !! Inflow
               znf_mdiff(j) = .false.        
               znf_tdiff(j) = .false.
               znf_vdiff(j) = .true.     !! No normal viscous diffusion through inflows                
-              znf_vtdiff(j) = .false.              
+              znf_vtdiff(j) = .false.      
+                      
            else if(node_type(i).eq.2) then !! Outflow
-              znf_mdiff(j) = .true.      !! No mass diffusion through outflow (N.B. not imposed...)
+              znf_mdiff(j) = .true.      !! No mass diffusion through outflow 
               znf_tdiff(j) = .true.      !! No thermal diffusion through outflow
               znf_vdiff(j) = .false.      
               znf_vtdiff(j) = .true.      !! No tangential viscous diffusion through outflow                            

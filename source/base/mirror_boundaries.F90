@@ -20,7 +20,7 @@ module mirror_boundaries
   !! 0 = wall
   !! 1 = inflow
   !! 2 = outflow
-  !! -1,-2 are fluid rows near boundary
+  !! -1,-2,-3,-4 are fluid rows near boundary
   !! 998 = disordered fluid nodes (the old rows 3 & 4)
   !! 999 = regular fluid
   

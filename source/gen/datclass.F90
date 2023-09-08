@@ -119,10 +119,10 @@ case(5) !! Inflow/outflow tube for simple flames
      b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
      b_node(4,:) = (/ -0.5d0*xl, 0.5d0*yl /)
      nb_blobs = 0;n_blob_coefs=6
-!     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
+!     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs))
 !     blob_centre(1,:)=(/0.d0,0.d0/); !! Central
 !     do i=1,nb_blobs
-!        blob_coeffs(i,:)=h0*(/1.0d0,0.4d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0;blob_ellipse(i)=1
+!        blob_coeffs(i,:)=h0*(/1.0d0,0.4d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0
 !     end do
 
 
@@ -150,14 +150,14 @@ case(6) !! Hong Im flameholder setup
      nb_blobs=1
      open(unit=191,file="blob_fcoefs.in")
      read(191,*) n_blob_coefs
-     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
+     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs))
      blob_centre(1,:)=(/ -0.275d0*xl,-0.0d0*yl/);
      do i=1,n_blob_coefs
         read(191,*) blob_coeffs(1,i)
      end do
      close(191)
      blob_coeffs(1,:) = 0.0d0;blob_coeffs(1,1) = 1.0d0
-     blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi;blob_ellipse(1)=0
+     blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi
 
      dxmin = dx0/1.0d0
      dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=2.0d0*dx0  !! dx for solids and in/outs...!! 
@@ -181,7 +181,7 @@ case(7) !! Something periodic
      b_node(3,:) = (/0.5d0*xl, 0.5d0*yl /)
      b_node(4,:) = (/-0.5d0*xl, 0.5d0*yl /)
      nb_blobs = 7;n_blob_coefs=6
-     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
+     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs))
      blob_centre(1,:) = (/0.0d0,0.0d0/)   !! Row 0
      blob_centre(2,:) = (/0.0d0,-S_cyl/)
      blob_centre(3,:) = (/0.0d0,S_cyl/)
@@ -192,7 +192,7 @@ case(7) !! Something periodic
                           
      
      do i=1,nb_blobs
-        blob_coeffs(i,:)=h0*(/1.0d0,1.0d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0;blob_ellipse(i)=1
+        blob_coeffs(i,:)=h0*(/1.0d0,1.0d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0
      end do
 
      dxmin = dx0/3.0d0
@@ -202,8 +202,8 @@ case(7) !! Something periodic
 case(8) !! Array of circles
 
      xl=1.0d0 ! channel length
-     h0=xl/20.0d0   !cylinder radius
-     yl=xl/10.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
+     h0=xl/40.0d0   !cylinder radius
+     yl=xl/5.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
      dx0=h0/50.0       !15
      xbcond=0;ybcond=1     
      
@@ -218,7 +218,7 @@ case(8) !! Array of circles
      nb_blobs=1
      open(unit=191,file="blob_fcoefs.in")
      read(191,*) n_blob_coefs
-     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs),blob_ellipse(nb_blobs))
+     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs))
      do i=1,n_blob_coefs
         read(191,*) blob_coeffs(1,i)       
      end do
@@ -230,16 +230,16 @@ case(8) !! Array of circles
 !     blob_coeffs(3,:) = blob_coeffs(1,:)        
 
 
-     blob_centre(1,:)=(/ -0.275d0*xl,-0.0d0*yl/);
-     blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi;blob_ellipse(1)=0
+     blob_centre(1,:)=(/ -0.2d0*xl,-0.0d0*yl/);
+     blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.1d0*pi
 !     blob_centre(2,:)=(/ -0.275d0*xl,-0.5d0*yl/); 
-!     blob_coeffs(2,:) = blob_coeffs(2,:)*h0;blob_rotation(2)=-0.0d0*pi;blob_ellipse(2)=0
+!     blob_coeffs(2,:) = blob_coeffs(2,:)*h0;blob_rotation(2)=-0.0d0*pi
 !     blob_centre(3,:)=(/ -0.275d0*xl, 0.5d0*yl/);
-!     blob_coeffs(3,:) = blob_coeffs(3,:)*h0;blob_rotation(3)=-0.0d0*pi;blob_ellipse(3)=0
+!     blob_coeffs(3,:) = blob_coeffs(3,:)*h0;blob_rotation(3)=-0.0d0*pi
 
          
-     dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=3.0d0*dx0  !! dx for solids and in/outs...!!     
+     dxmin = dx0/3.0d0
+     dx_wall=dxmin;dx_in=8.0d0*dx0;dx_out=4.0d0*dx0  !! dx for solids and in/outs...!!     
      
 !! ------------------------------------------------------------------------------------------------     
 end select
@@ -307,16 +307,12 @@ end select
                  tmp2 = pi-asin((y-blob_centre(i,2))/temp)
               endif              
               tmp2 = tmp2 - blob_rotation(i)
-              if(blob_ellipse(i).eq.0)then !! blob is blob
-                 r_mag = blob_coeffs(i,1)
-                 do ibc = 2,n_blob_coefs
-                    r_mag = r_mag + blob_coeffs(i,ibc)*cos(dble(ibc-1)*tmp2) 
-                 end do
-              else              !! blob is ellipse
-                 r_mag = blob_coeffs(i,1)*blob_coeffs(i,2) &
-                 /sqrt(blob_coeffs(i,2)*blob_coeffs(i,2)*cos(tmp2)**2. + &
-                   blob_coeffs(i,1)*blob_coeffs(i,1)*sin(tmp2)**2.)                       
-              end if                      
+
+              r_mag = blob_coeffs(i,1)
+              do ibc = 2,n_blob_coefs
+                 r_mag = r_mag + blob_coeffs(i,ibc)*cos(dble(ibc-1)*tmp2) 
+              end do
+                    
               if(temp.le.r_mag)then
                  keepgoing = .false.
               end if
@@ -338,6 +334,7 @@ end select
            call random_number(temp);temp = temp -0.5d0;yp(ipart) = pdp_y(j) + temp*dxmin*0.5d0
            dxp(ipart) = dx  
            if(dist2bound.le.4.5d0*dx) node_type(ipart)=998
+!           if(dist2bound.le.3.0d0*dx) node_type(ipart)=997
         end if           
         
         !! Deactive all pdps within dx of this pdp
@@ -708,88 +705,50 @@ end subroutine quicksort
 
      if(nb_blobs.ne.0)then
         do ib=1,nb_blobs
-          
-           !! Blobby blobs
-           if(blob_ellipse(ib).eq.0)then
-           
-              !! Estimate approx number of nodes round the blob              
-              nb = floor(Sblob(ib)/dx_wall)
+                  
+           !! Estimate approx number of nodes round the blob              
+           nb = floor(Sblob(ib)/dx_wall)
 
-              !! Revise node spacing to get integer number round blob
-              dxlocal = Sblob(ib)/dble(nb)                      
+           !! Revise node spacing to get integer number round blob
+           dxlocal = Sblob(ib)/dble(nb)                      
                       
-              a0 = blob_coeffs(ib,1)     
-              x0 = blob_centre(ib,1);y0=blob_centre(ib,2)
-              th = 0.0d0 !! theta
-              do while(th.le.2.0d0*pi-0.25*dxlocal/a0)
-                 !! Position node
-                 th_sh = th - blob_rotation(ib)
+           a0 = blob_coeffs(ib,1)     
+           x0 = blob_centre(ib,1);y0=blob_centre(ib,2)
+           th = 0.0d0 !! theta
+           do while(th.le.2.0d0*pi-0.25*dxlocal/a0)
+              !! Position node
+              th_sh = th - blob_rotation(ib)
                 
-                 !! Evaluate radius
-                 r_mag = blob_coeffs(ib,1)
+              !! Evaluate radius
+              r_mag = blob_coeffs(ib,1)
+              do ibc=2,n_blob_coefs
+                 r_mag = r_mag + blob_coeffs(ib,ibc)*cos(dble(ibc-1)*th_sh)
+              end do
+                 
+              !! Relative position
+              x = r_mag*cos(th);y = r_mag*sin(th)
+
+              !! If the position is within the domain, create a particle
+              if(x+x0.ge.xb_min.and.x+x0.lt.xb_max.and.y+y0.ge.yb_min.and.y+y0.lt.yb_max)then              
+                 ipart = ipart + 1 
+                 xp(ipart)=x0 + x;yp(ipart)=y0 + y;dxp(ipart)=dx_wall
+         
+                 !! Calculate normals
+                 tmp2 = 0.0
                  do ibc=2,n_blob_coefs
-                    r_mag = r_mag + blob_coeffs(ib,ibc)*cos(dble(ibc-1)*th_sh)
-                 end do
-                 
-                 !! Relative position
-                 x = r_mag*cos(th);y = r_mag*sin(th)
-
-                 !! If the position is within the domain, create a particle
-                 if(x+x0.ge.xb_min.and.x+x0.lt.xb_max.and.y+y0.ge.yb_min.and.y+y0.lt.yb_max)then              
-                    ipart = ipart + 1 
-                    xp(ipart)=x0 + x;yp(ipart)=y0 + y;dxp(ipart)=dx_wall
-         
-                    !! Calculate normals
-                    tmp2 = 0.0
-                    do ibc=2,n_blob_coefs
-                       tmp2 = tmp2 - dble(ibc-1)*blob_coeffs(ib,ibc)*sin(dble(ibc-1)*th_sh)
-                    end do     
+                    tmp2 = tmp2 - dble(ibc-1)*blob_coeffs(ib,ibc)*sin(dble(ibc-1)*th_sh)
+                 end do     
                          
-                    tmp2 = -atan(tmp2/r_mag)
-                    xnorm(ipart) = (x*cos(tmp2) - y*sin(tmp2))/r_mag
-                    ynorm(ipart) = (x*sin(tmp2) + y*cos(tmp2))/r_mag
-                    node_type(ipart) = 0 !! Identify it as a wall                    
-                 end if                 
+                 tmp2 = -atan(tmp2/r_mag)
+                 xnorm(ipart) = (x*cos(tmp2) - y*sin(tmp2))/r_mag
+                 ynorm(ipart) = (x*sin(tmp2) + y*cos(tmp2))/r_mag
+                 node_type(ipart) = 0 !! Identify it as a wall                    
+              end if                 
       
-                 !! Increment angle...
-                 th  = th + cos(tmp2)*dxlocal/r_mag     
-              end do   
-                                         
-                                                      
-           !! Elliptical blobs
-           else
-              a0 = blob_coeffs(ib,1);a1 = blob_coeffs(ib,2)        
-              x0 = blob_centre(ib,1);y0=blob_centre(ib,2)
-           
-           
-              th = 0.0d0 !! theta
-              do while(th.le.2.0d0*pi-0.25*dx_wall/a0)
-
-                 !! Position node
-                 th_sh = th - blob_rotation(ib)
-                 r_mag = a0*a1/sqrt(a1*a1*cos(th_sh)**2. + a0*a0*sin(th_sh)**2.)      
-                 
-                 x = r_mag*cos(th);y = r_mag*sin(th)
-
-                 if(x+x0.ge.xb_min.and.x+x0.lt.xb_max.and.y+y0.ge.yb_min.and.y+y0.lt.yb_max)then              
-                    ipart = ipart + 1 
-                    xp(ipart)=x0 + x;yp(ipart)=y0 + y
-                    dxp(ipart)=dx_wall
-         
-                    !! Normals
-                    tmp2 = (a0*a1**3. -a1*a0**3.)*cos(th_sh)*sin(th_sh) &
-                       /(a1*a1*cos(th_sh)**2. + a0*a0*sin(th_sh)**2.)**(3./2.)
-                    tmp2 = -atan(tmp2/r_mag)
-                    xnorm(ipart) = (x*cos(tmp2) - y*sin(tmp2))/r_mag
-                    ynorm(ipart) = (x*sin(tmp2) + y*cos(tmp2))/r_mag
-                    node_type(ipart) = 0  !! Identify it as a wall
-                 end if                 
-      
-                 !! Increment angle...
-                 
-                 th  = th + cos(tmp2)*dx_wall/r_mag     
-              end do                                            
-           end if                                                  
+              !! Increment angle...
+              th  = th + cos(tmp2)*dxlocal/r_mag     
+           end do   
+                                                                                      
         end do              
      end if
 
@@ -815,46 +774,38 @@ end subroutine quicksort
      if(nb_blobs.ne.0)then
         do ib=1,nb_blobs
           
-           !! Blobby blobs
-           if(blob_ellipse(ib).eq.0)then
-           
-              !! Initialise counters etc
-              Sblob(ib) = 0.0d0
-              a0 = blob_coeffs(ib,1)     
-              !! Coordinates of start point
-              y0 = 0.0d0
-              x0 = a0
-              do ibc = 2,n_blob_coefs
-                 x0 = x0 + blob_coeffs(ib,ibc)
-              end do
+           !! Initialise counters etc
+           Sblob(ib) = 0.0d0
+           a0 = blob_coeffs(ib,1)     
+           !! Coordinates of start point
+           y0 = 0.0d0
+           x0 = a0
+           do ibc = 2,n_blob_coefs
+              x0 = x0 + blob_coeffs(ib,ibc)
+           end do
                            
-              th = 0.0d0 !! theta       
-              dstiny = 0.005d0*dx_wall       
-              do while(th.le.2.0d0*pi-0.01*dstiny/x0)
+           th = 0.0d0 !! theta       
+           dstiny = 0.005d0*dx_wall       
+           do while(th.le.2.0d0*pi-0.01*dstiny/x0)
                 
-                 !! Evaluate radius
-                 r_mag = blob_coeffs(ib,1)
-                 do ibc=2,n_blob_coefs
-                    r_mag = r_mag + blob_coeffs(ib,ibc)*cos(dble(ibc-1)*th)
-                 end do
+              !! Evaluate radius
+              r_mag = blob_coeffs(ib,1)
+              do ibc=2,n_blob_coefs
+                 r_mag = r_mag + blob_coeffs(ib,ibc)*cos(dble(ibc-1)*th)
+              end do
                  
-                 !! Calculate normals
-                 tmp2 = 0.0
-                 do ibc=2,n_blob_coefs
-                    tmp2 = tmp2 - dble(ibc-1)*blob_coeffs(ib,ibc)*sin(dble(ibc-1)*th)
-                 end do                             
-                 tmp2 = -atan(tmp2/r_mag)
+              !! Calculate normals
+              tmp2 = 0.0
+              do ibc=2,n_blob_coefs
+                 tmp2 = tmp2 - dble(ibc-1)*blob_coeffs(ib,ibc)*sin(dble(ibc-1)*th)
+              end do                             
+              tmp2 = -atan(tmp2/r_mag)
       
-                 !! Increment angle...
-                 th  = th + cos(tmp2)*dstiny/r_mag                      
-                 !! Increment Sblob
-                 Sblob(ib) = Sblob(ib) + dstiny
-              end do                                                                     
-                                                      
-           !! Elliptical blobs
-           else
-             !! Do nothing for now
-           end if                                                  
+              !! Increment angle...
+              th  = th + cos(tmp2)*dstiny/r_mag                      
+              !! Increment Sblob
+              Sblob(ib) = Sblob(ib) + dstiny
+           end do                                                                     
         end do              
      end if
 

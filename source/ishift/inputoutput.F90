@@ -268,7 +268,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
            k = ii !! k is the index of the parent node
            nb = nb + 1
            nbw = nbw+1
-           do j=1,2  !! Make 4 additional nodes  !! NEWBC
+           do j=1,2  !! Make X additional nodes  !! NEWBC
               ii = ii + 1
               rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
               rnorm(ii,:)=rnorm(k,:)          !! Copy normals
@@ -399,7 +399,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      logical :: keepgoing       
      
      !! How many particles (total) need sorting
-     nptmp = npfb-2*nbw - 4*nbio  !! NEWBC
+     nptmp = npfb- 2*nbw - 4*nbio  !! NEWBC
      
      !! allocation of index limits
      allocate(nband(nprocsX),effective_nband(nprocsX))
@@ -495,7 +495,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
         write(6,*) kk,nband(kk),effective_nband(kk)
         j=j+nband(kk)
      end do
-     write(6,*) "checking sums",j,npfb-2*nbw - 4*nbio !!NEWBC
+     write(6,*) "checking sums",j,npfb- 2*nbw - 4*nbio !!NEWBC
      
      write(6,*) "Number of bound nodes",nb
 
@@ -613,13 +613,13 @@ write(6,*) "Shifting iteration",ll,"of ",kk
    
      !! First sort nodes in X
      write(6,*) "About to quicksort"
-     call quicksort(x,1,npfb-2*nbw - 4*nbio)  !! NEWBC
+     call quicksort(x,1,npfb- 2*nbw - 4*nbio)  !! NEWBC
      write(6,*) "Quicksorted nodes ordered increasing x"
      
      
     
      !! How many particles (total) need sorting
-     nptmp = npfb-2*nbw - 4*nbio  !! NEWBC
+     nptmp = npfb- 2*nbw - 4*nbio  !! NEWBC
     
      !! Find band sizes, and adjust by 1d diffusion
      call find_band_sizes

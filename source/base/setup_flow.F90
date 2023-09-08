@@ -71,10 +71,10 @@ contains
      !! e.g. uniform/non-uniform inflow etc.
         
      !! Make a 1D flame: pass X-position,flame_thickness and T_hot
-     call make_1d_flame(0.0d0,2.0d-4,2.366d3)
+!     call make_1d_flame(0.0d0,2.0d-4,2.366d3)
         
      !! Make a 2D gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
-!     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
+     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
 
      !! Load an existing 1D flame file
 !     call load_flame_file
@@ -385,6 +385,7 @@ contains
         
         !! Gaussian progress variable
         c = exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y)/fl_thck)**two)! &
+!        c = exp(-((x-f_loc_x)/fl_thck)**two) !! One-dimensional hotspot
 !          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y + 0.075d0)/fl_thck)**two) &
 !          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y - 0.075d0)/fl_thck)**two)
         

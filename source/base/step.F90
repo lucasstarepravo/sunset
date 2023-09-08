@@ -238,7 +238,7 @@ contains
      emax_nm1 = emax_n;emax_n=emax_np1
      
      !! Scaling parameter for outflows
-     outflow_error_scaling=1.0d2
+     outflow_error_scaling=1.0d1
      
      !! Set RKa,RKb,RKbmbh with dt (avoids multiplying by dt on per-node basis)
      RKa(:) = dt*rk3_4s_2r_a(:)
@@ -418,6 +418,11 @@ contains
            enrm_Yspec(ispec) = max(enrm_Yspec(ispec),abs(e_acc_Yspec(i,ispec))*eroY_norm)
         end do
 #endif                                      
+
+!        alpha_out(i) = max(abs(e_acc_ro(i))*ero_norm,max(abs(e_acc_rou(i))*erou_norm, &
+!                       max(abs(e_acc_rov(i))*erou_norm,max(abs(e_acc_E(i))*eroE_norm,max(&
+!                       abs(e_acc_Yspec(i,1))*eroY_norm,abs(e_acc_Yspec(i,2))*eroY_norm)))))
+
 
      end do
      !$omp end parallel do  
