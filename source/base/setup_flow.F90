@@ -366,7 +366,7 @@ contains
      !! Temperatures, pressures and velocity from reference
      T_reactants = T_ref     
      P_flame = p_ref
-     u_reactants = u_char
+     u_reactants = 0.2d0*u_char
 
      !! Inflow mixture gas constant
      Rmix_local = zero

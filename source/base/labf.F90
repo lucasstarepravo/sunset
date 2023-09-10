@@ -225,13 +225,20 @@ contains
            i1=0;i2=0;nsize=nsizeG 
         end if 
 #endif    
-!#if ORDER>=5
-!        if(node_type(i).lt.0)then !! for rows 1 & 2, drop to 4th order
-!           bvechyp(:)=zero;bvechyp(10)=-one;bvechyp(12)=-two;bvechyp(14)=-one
-!           bvechyp(:)=bvechyp(:)/hh/hh/hh/hh        
-!           i1=0;i2=0;nsize=nsizeG 
-!        end if 
-!#endif    
+#if ORDER>=5
+        if(node_type(i).eq.-1.or.node_type(i).eq.-2)then !! for rows 1 & 2, drop to 4th order
+           do i1=1,nsizeG
+              amathyp(i1,15:nsizeG)=zero        
+           end do
+           do i1=15,nsizeG
+              amathyp(i1,1:nsizeG)=zero
+              amathyp(i1,i1)=one
+           end do
+           bvechyp(:)=zero;bvechyp(10)=-one;bvechyp(12)=-two;bvechyp(14)=-one
+           bvechyp(:)=bvechyp(:)/hh/hh/hh/hh        
+           i1=0;i2=0;nsize=nsizeG 
+        end if 
+#endif    
 
         call dgesv(nsize,1,amathyp,nsize,i1,bvechyp,nsize,i2)
 
@@ -501,21 +508,21 @@ contains
               !! Normal derivatives
               if(j.eq.i)              ij_w_grad(1,k,i) =  zero         !! FIRST DERIV
               if(node_type(j).eq.-1)  ij_w_grad(1,k,i) =  4.0d0/dx
+              if(node_type(j).eq.-2)  ij_w_grad(1,k,i) = -3.0d0/dx              
 
               if(j.eq.i)              ij_wb_grad2(1,k,jj) =  zero                  !! SECOND DERIV
               if(node_type(j).eq.-1)  ij_wb_grad2(1,k,jj) = -104.0d0/12.0d0/dx2
+              if(node_type(j).eq.-2)  ij_wb_grad2(1,k,jj) =  114.0d0/12.0d0/dx2
               end if
            end do        
            do k=1,ij_count(i)  !! Another loop to add interpolated bits
               j=ij_link(k,i)
               
               !! Modify first derivatives          
-              ij_w_grad(1,k,i) = ij_w_grad(1,k,i) - three*ij_w_interp(1,k,jj)/dx &
-                                                  + fourthirds*ij_w_interp(2,k,jj)/dx &
+              ij_w_grad(1,k,i) = ij_w_grad(1,k,i) + fourthirds*ij_w_interp(2,k,jj)/dx &
                                                   - quarter*ij_w_interp(3,k,jj)/dx                  
               !! Modify second derivative
-              ij_wb_grad2(1,k,jj) = ij_wb_grad2(1,k,jj) + (114.0d0/12.0d0)*ij_w_interp(1,k,jj)/dx2 &
-                                                        - (56.0d0/12.0d0)*ij_w_interp(2,k,jj)/dx2 &
+              ij_wb_grad2(1,k,jj) = ij_wb_grad2(1,k,jj) - (56.0d0/12.0d0)*ij_w_interp(2,k,jj)/dx2 &
                                                         + (11.0d0/12.0d0)*ij_w_interp(3,k,jj)/dx2                       
            end do        
         
@@ -548,12 +555,12 @@ contains
               !! Normal derivatives
               if(j.eq.fd_parent(i))                                   ij_w_grad(1,k,i) = -0.25d0/dx     !! FIRST DERIV
               if(j.eq.i)                                              ij_w_grad(1,k,i) =  zero
+              if(node_type(j).eq.-2.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) =  1.5d0/dx              
            end do
            do k=1,ij_count(i)  !! Another loop to add interpolated bits
               j=ij_link(k,i)           
               !! Modify first derivatives          
-              ij_w_grad(1,k,i) = ij_w_grad(1,k,i) + 1.5d0*ij_w_interp(4,k,jj)/dx &
-                                                  - half*ij_w_interp(5,k,jj)/dx &
+              ij_w_grad(1,k,i) = ij_w_grad(1,k,i) - half*ij_w_interp(5,k,jj)/dx &
                                                   + (one/12.0d0)*ij_w_interp(6,k,jj)/dx
            end do
         endif     
@@ -824,7 +831,7 @@ contains
      !! Add neighbours of i2 to neighbour list of i0 and i1 for walls only
      do ii=1,nb
         i=boundary_list(ii)
-        if(node_type(i).eq.10) then !! Only for walls
+        if(node_type(i).eq.0) then !! Only for walls
         
         i2=i+2
         i1=i+1

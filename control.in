@@ -4,19 +4,19 @@
 0.01d0
 
 !! Characteristic velocity scale (U_char)
-0.39
+10.0d0
 
 !! Start and end time (in multiples of L_char/Uchar)
-0.0d0 1.0d0
+0.0d0 10.0d0
 
 !! Output period (in multiples of L_char/U_char), stats output period
-1.0d-5 1.0d-4
+1.0d-4 1.0d-4
 
 !! Gravity vector (grav)
 0.0d0 0.0d0 0.0d0
 
 !! Inflow equivalence ratio
-1.0d0
+0.5d0
 
 !! Reference temp (for TDTP)
 2.98d2
@@ -31,7 +31,7 @@
 0.7d0
 
 !! Mixture average flag
-0
+1
 
 !! Mach number (only used if isoT)
 0.02d0
@@ -44,7 +44,6 @@
 
 !! WALLS: adiabatic(0) or isothermal (1)
 0
-
 
 
 

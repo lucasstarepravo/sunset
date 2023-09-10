@@ -159,7 +159,7 @@ case(6) !! Hong Im flameholder setup
      blob_coeffs(1,:) = 0.0d0;blob_coeffs(1,1) = 1.0d0
      blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi
 
-     dxmin = dx0/1.0d0
+     dxmin = dx0/2.0d0
      dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=2.0d0*dx0  !! dx for solids and in/outs...!! 
 !! ------------------------------------------------------------------------------------------------
 case(7) !! Something periodic

@@ -419,9 +419,9 @@ contains
         end do
 #endif                                      
 
-!        alpha_out(i) = max(abs(e_acc_ro(i))*ero_norm,max(abs(e_acc_rou(i))*erou_norm, &
-!                       max(abs(e_acc_rov(i))*erou_norm,max(abs(e_acc_E(i))*eroE_norm,max(&
-!                       abs(e_acc_Yspec(i,1))*eroY_norm,abs(e_acc_Yspec(i,2))*eroY_norm)))))
+        alpha_out(i) = max(abs(e_acc_ro(i))*ero_norm,max(abs(e_acc_rou(i))*erou_norm, &
+                       max(abs(e_acc_rov(i))*erou_norm,max(abs(e_acc_E(i))*eroE_norm,max(&
+                       abs(e_acc_Yspec(i,1))*eroY_norm,abs(e_acc_Yspec(i,2))*eroY_norm)))))
 
 
      end do

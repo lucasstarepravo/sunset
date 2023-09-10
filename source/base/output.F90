@@ -256,19 +256,20 @@ contains
 #endif           
  
            !! Pass something to tmpVort (we use vorticity to output other things sometimes during debugging...)
-           tmpVort = vort(i)
+!           tmpVort = vort(i)
+if(i.le.npfb) then
+   tmpvort=dble(ij_count(i))
+else
+   tmpvort = zero
+end if
                 
            !! Pass heat release rate to alpha_out?
-           alpha_out(i) = hrr(i)
+!           alpha_out(i) = hrr(i)
 
 #ifdef dim3
            write(20,*) ro(i),u(i),v(i),w(i),tmpVort,tmpT,p(i),alpha_out(i),Yspec(i,1:nspec_out)*tmpro       
-!           write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),h(i),node_type(i),ro(i), &
-!                       u(i),v(i),w(i),tmpVort,tmpT,alpha_out(i),Yspec(i,1:nspec_out)*tmpro       
 #else
            write(20,*) ro(i),u(i),v(i),tmpVort,tmpT,p(i),alpha_out(i),Yspec(i,1:nspec_out)*tmpro
-!           write(20,*) rp(i,1),rp(i,2),s(i),h(i),node_type(i),ro(i),u(i),v(i),tmpVort, &
-!                       tmpT,alpha_out(i),Yspec(i,1:nspec_out)*tmpro
 #endif
         end do
 
@@ -330,6 +331,7 @@ contains
         write(20,*) rp(i,1),rp(i,2),rp(i,3),s(i),h(i),node_type(i)    
 #else
         write(20,*) rp(i,1),rp(i,2),s(i),h(i),node_type(i)
+!        write(20,*) rp(i,1)+0.2*dble(iprocX),rp(i,2)+0.1*dble(iprocY),s(i),h(i),node_type(i)
 #endif
      end do
 
