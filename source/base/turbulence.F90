@@ -57,9 +57,8 @@ contains
 
   
      !! Apply some diffusion until we get to the required lengthscales
-!     call noise_and_diffuse_velocity_field
      call noise_and_diffuse_psi
-     call noise_and_diffuse_velocity_field     
+     call noise_and_diffuse_velocity_field  !! This does just a tiny amount 
      
      !! Scale the turbulent velocity field to give the desired turbulence statistics
      call scale_velocity_field

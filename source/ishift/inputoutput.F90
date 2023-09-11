@@ -23,6 +23,8 @@ module inputoutput
   real(rkind),parameter :: coef_diffusion=0.2d0 !0.4d0
   integer(ikind),parameter :: maxiters_diffusion = 200
   integer(ikind) :: nbw,nbio
+  integer(ikind),parameter :: nrio=4
+  integer(ikind),parameter :: nrw=3  !! Number of rows
 
 contains
 !! ------------------------------------------------------------------------------------------------  
@@ -66,7 +68,7 @@ contains
            k = ii !! k is the index of the parent node
            nb = nb + 1
            nbw = nbw + 1
-           do j=1,2  !! Make 2 additional nodes   !! NEWBC
+           do j=1,nrw  !! Make 2 additional nodes   !! NEWBC
               ii = ii + 1
               rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
               rnorm(ii,:)=rnorm(k,:)          !! Copy normals
@@ -80,7 +82,7 @@ contains
            k = ii !! k is the index of the parent node
            nb = nb + 1
            nbio = nbio + 1
-           do j=1,4  !! Make 4 additional nodes   !! NEWBC
+           do j=1,nrio  !! Make 4 additional nodes   !! NEWBC
               ii = ii + 1
               rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
               rnorm(ii,:)=rnorm(k,:)          !! Copy normals
@@ -120,7 +122,7 @@ contains
      
      !! Write new file to ../gen/IPART
      open(unit=13,file='../gen/IPART')
-     write(13,*) nb,npfb-2*nbw-4*nbio,smax  !! NEWBC
+     write(13,*) nb,npfb-nrw*nbw-nrio*nbio,smax  !! NEWBC
      write(13,*) xmin,xmax,ymin,ymax
      write(13,*) xbcond,ybcond         
      do i=1,npfb
@@ -268,7 +270,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
            k = ii !! k is the index of the parent node
            nb = nb + 1
            nbw = nbw+1
-           do j=1,2  !! Make X additional nodes  !! NEWBC
+           do j=1,nrw  !! Make X additional nodes  !! NEWBC
               ii = ii + 1
               rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
               rnorm(ii,:)=rnorm(k,:)          !! Copy normals
@@ -282,7 +284,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
            k = ii !! k is the index of the parent node
            nb = nb + 1
            nbio = nbio+1
-           do j=1,4  !! Make 4 additional nodes  !! NEWBC
+           do j=1,nrio  !! Make 4 additional nodes  !! NEWBC
               ii = ii + 1
               rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
               rnorm(ii,:)=rnorm(k,:)          !! Copy normals
@@ -307,7 +309,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      integer(ikind) :: i,n,j,k
      real(rkind) :: max_x,min_x,max_y,min_y,max_s,block_size_x,block_size_y
      
-     n= npfb - 2*nbw - 4*nbio !!NEWBC
+     n= npfb - nrw*nbw - nrio*nbio !!NEWBC
      open(212,file='../../IPART')
      write(212,*) nb,n*nprocsZ,smax
      write(212,*) xmin,xmax,ymin,ymax
@@ -367,7 +369,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      integer(ikind) :: i,n,j
      
      !! Number of nodes without FD stencils
-     n = npfb - 2*nbw - 4*nbio  !! NEWBC
+     n = npfb - nrw*nbw - nrio*nbio  !! NEWBC
   
      allocate(x(n),y(n),xn(n),yn(n),ds(n),nt(n))
      
@@ -399,7 +401,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      logical :: keepgoing       
      
      !! How many particles (total) need sorting
-     nptmp = npfb- 2*nbw - 4*nbio  !! NEWBC
+     nptmp = npfb- nrw*nbw - nrio*nbio  !! NEWBC
      
      !! allocation of index limits
      allocate(nband(nprocsX),effective_nband(nprocsX))
@@ -422,9 +424,9 @@ write(6,*) "Shifting iteration",ll,"of ",kk
         effective_nband(kk) = 0
         do i=nl_ini,nl_end
            if(nt(i).eq.0) then
-              effective_nband(kk) = effective_nband(kk) + 3 !! NEWBC
+              effective_nband(kk) = effective_nband(kk) + nrw+1 !! NEWBC
            else if(nt(i).eq.1.or.nt(i).eq.2) then
-              effective_nband(kk) = effective_nband(kk) + 5 !! NEWBC           
+              effective_nband(kk) = effective_nband(kk) + nrio+1 !! NEWBC           
            else
               effective_nband(kk) = effective_nband(kk) + 1              
            end if
@@ -455,9 +457,9 @@ write(6,*) "Shifting iteration",ll,"of ",kk
            effective_nband(kk) = 0
            do i=nl_ini,nl_end
               if(nt(i).eq.0) then
-                 effective_nband(kk) = effective_nband(kk) + 3 !! NEWBC
+                 effective_nband(kk) = effective_nband(kk) + nrw+1 !! NEWBC
               else if(nt(i).eq.1.or.nt(i).eq.2) then                 
-                 effective_nband(kk) = effective_nband(kk) + 5 !! NEWBC
+                 effective_nband(kk) = effective_nband(kk) + nrio+1 !! NEWBC
               else
                  effective_nband(kk) = effective_nband(kk) + 1              
               end if
@@ -495,7 +497,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
         write(6,*) kk,nband(kk),effective_nband(kk)
         j=j+nband(kk)
      end do
-     write(6,*) "checking sums",j,npfb- 2*nbw - 4*nbio !!NEWBC
+     write(6,*) "checking sums",j,npfb- nrw*nbw - nrio*nbio !!NEWBC
      
      write(6,*) "Number of bound nodes",nb
 
@@ -534,9 +536,9 @@ write(6,*) "Shifting iteration",ll,"of ",kk
         effective_nblock(kk) = 0
         do i=nl_ini,nl_end
            if(nt(i).eq.0) then
-              effective_nblock(kk) = effective_nblock(kk) + 3 !! NEWBC
+              effective_nblock(kk) = effective_nblock(kk) + nrw+1 !! NEWBC
            else if(nt(i).eq.1.or.nt(i).eq.2) then
-              effective_nblock(kk) = effective_nblock(kk) + 5 !! NEWBC           
+              effective_nblock(kk) = effective_nblock(kk) + nrio+1 !! NEWBC           
            else
               effective_nblock(kk) = effective_nblock(kk) + 1              
            end if
@@ -571,9 +573,9 @@ write(6,*) "Shifting iteration",ll,"of ",kk
            effective_nblock(kk) = 0
            do i=nl_ini,nl_end
               if(nt(i).eq.0) then
-                 effective_nblock(kk) = effective_nblock(kk) + 3 !! NEWBC
+                 effective_nblock(kk) = effective_nblock(kk) + nrw+1 !! NEWBC
               else if(nt(i).eq.1.or.nt(i).eq.2) then
-                 effective_nblock(kk) = effective_nblock(kk) + 5 !! NEWBC           
+                 effective_nblock(kk) = effective_nblock(kk) + nrio+1 !! NEWBC           
               else
                  effective_nblock(kk) = effective_nblock(kk) + 1              
               end if           
@@ -613,13 +615,13 @@ write(6,*) "Shifting iteration",ll,"of ",kk
    
      !! First sort nodes in X
      write(6,*) "About to quicksort"
-     call quicksort(x,1,npfb- 2*nbw - 4*nbio)  !! NEWBC
+     call quicksort(x,1,npfb- nrw*nbw - nrio*nbio)  !! NEWBC
      write(6,*) "Quicksorted nodes ordered increasing x"
      
      
     
      !! How many particles (total) need sorting
-     nptmp = npfb- 2*nbw - 4*nbio  !! NEWBC
+     nptmp = npfb- nrw*nbw - nrio*nbio  !! NEWBC
     
      !! Find band sizes, and adjust by 1d diffusion
      call find_band_sizes

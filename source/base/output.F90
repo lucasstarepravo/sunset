@@ -256,12 +256,7 @@ contains
 #endif           
  
            !! Pass something to tmpVort (we use vorticity to output other things sometimes during debugging...)
-!           tmpVort = vort(i)
-if(i.le.npfb) then
-   tmpvort=dble(ij_count(i))
-else
-   tmpvort = zero
-end if
+           tmpVort = vort(i)
                 
            !! Pass heat release rate to alpha_out?
 !           alpha_out(i) = hrr(i)

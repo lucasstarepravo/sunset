@@ -105,9 +105,9 @@ case(4) !! Poiseuille flow setup
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.0125d0!0.0125d0  ! channel width
+     yl=0.4d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/1000.0       !15
+     dx0=xl/300.0       !15
      xbcond=0;ybcond=1
      
      nb_patches = 4
@@ -127,7 +127,7 @@ case(5) !! Inflow/outflow tube for simple flames
 
 
      dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx0*1.0d0  !! dx for solids and in/outs..
+     dx_wall=dxmin;dx_in=2.0d0*dx0;dx_out=dx0*2.0d0  !! dx for solids and in/outs..
 
      
 !! ------------------------------------------------------------------------------------------------
@@ -288,7 +288,7 @@ end select
            if(i.gt.nbio.and.temp.le.dist2bound) dist2bound = temp
            if(i.le.nbio.and.temp/dxp(i).le.dist2io) dist2io = temp/dxp(i)
            i=i+1
-           if(dist2bound.le.2.25*dxp(i-1)) keepgoing = .false. !! Too close to solid bound, leave it.  !!NEWBC
+           if(dist2bound.le.3.25*dxp(i-1)) keepgoing = .false. !! Too close to solid bound, leave it.  !!NEWBC
         end do     
 
         if(dist2io.le.4.25) keepgoing = .false. !! Too close to io bound, leave it.  !!NEWBC              

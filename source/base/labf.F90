@@ -226,18 +226,18 @@ contains
         end if 
 #endif    
 #if ORDER>=5
-        if(node_type(i).eq.-1.or.node_type(i).eq.-2)then !! for rows 1 & 2, drop to 4th order
-           do i1=1,nsizeG
-              amathyp(i1,15:nsizeG)=zero        
-           end do
-           do i1=15,nsizeG
-              amathyp(i1,1:nsizeG)=zero
-              amathyp(i1,i1)=one
-           end do
-           bvechyp(:)=zero;bvechyp(10)=-one;bvechyp(12)=-two;bvechyp(14)=-one
-           bvechyp(:)=bvechyp(:)/hh/hh/hh/hh        
-           i1=0;i2=0;nsize=nsizeG 
-        end if 
+!        if(node_type(i).eq.-1.or.node_type(i).eq.-2)then !! for rows 1 & 2, drop to 4th order
+!           do i1=1,nsizeG
+!              amathyp(i1,15:nsizeG)=zero        
+!           end do
+!           do i1=15,nsizeG
+!              amathyp(i1,1:nsizeG)=zero
+!              amathyp(i1,i1)=one
+!           end do
+!           bvechyp(:)=zero;bvechyp(10)=-one;bvechyp(12)=-two;bvechyp(14)=-one
+!           bvechyp(:)=bvechyp(:)/hh/hh/hh/hh        
+!           i1=0;i2=0;nsize=nsizeG 
+!        end if 
 #endif    
 
         call dgesv(nsize,1,amathyp,nsize,i1,bvechyp,nsize,i2)
