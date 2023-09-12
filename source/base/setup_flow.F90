@@ -56,7 +56,8 @@ contains
      !! Allocate the boundary temperatures
      if(nb.ne.0) then
         allocate(T_bound(nb));T_bound = T_ref  
-        allocate(u_inflow_local(nb));u_inflow_local = u_char               
+        allocate(u_inflow_local(nb));u_inflow_local = u_char   
+        allocate(dudt_inflow_local(nb));dudt_inflow_local=zero            
      end if
      
      !! =======================================================================
@@ -74,7 +75,7 @@ contains
 !     call make_1d_flame(0.0d0,2.0d-4,2.366d3)
         
      !! Make a 2D gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
-     call make_2d_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
+     call make_2d_gaussian_hotspot(0.1d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
 
      !! Load an existing 1D flame file
 !     call load_flame_file
@@ -98,7 +99,7 @@ contains
 !     call superimpose_2d_gaussian_hotspot(-0.22d0,zero,2.0d-4,2.5d3)
 
      !! Add some turbulence to the velocity field
-!     call make_turbulent_velocity_field(3.0d-4,5.0d0*u_char)
+!     call make_turbulent_velocity_field(1.0d-3,5.0d0*u_char)
      !! =======================================================================
      
      !! Convert from velocity to momentum and Y to roY
@@ -284,7 +285,7 @@ contains
      !! Temperatures, pressures and velocity from reference
      T_reactants = T_ref     
      P_flame = p_ref
-     u_reactants = u_char
+     u_reactants = u_inflow_start
 
      !! Inflow mixture gas constant
      Rmix_local = zero
@@ -366,7 +367,7 @@ contains
      !! Temperatures, pressures and velocity from reference
      T_reactants = T_ref     
      P_flame = p_ref
-     u_reactants = u_char
+     u_reactants = zero!u_inflow_start
 
      !! Inflow mixture gas constant
      Rmix_local = zero
@@ -384,8 +385,8 @@ contains
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
         
         !! Gaussian progress variable
-        c = exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y)/fl_thck)**two)! &
-!        c = exp(-((x-f_loc_x)/fl_thck)**two) !! One-dimensional hotspot
+!        c = exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y)/fl_thck)**two)! &
+        c = exp(-((x-f_loc_x)/fl_thck)**two) !! One-dimensional hotspot
 !          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y + 0.075d0)/fl_thck)**two) &
 !          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y - 0.075d0)/fl_thck)**two)
         

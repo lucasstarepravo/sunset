@@ -508,22 +508,22 @@ contains
               !! Normal derivatives
               if(j.eq.i)              ij_w_grad(1,k,i) =  zero         !! FIRST DERIV
               if(node_type(j).eq.-1)  ij_w_grad(1,k,i) =  4.0d0/dx
-              if(node_type(j).eq.-2)  ij_w_grad(1,k,i) = -3.0d0/dx              
+              if(node_type(j).eq.-2)  ij_w_grad(1,k,i) = -3.0d0/dx   
+              if(node_type(j).eq.-3)  ij_w_grad(1,k,i) =  fourthirds/dx                                       
 
               if(j.eq.i)              ij_wb_grad2(1,k,jj) =  zero                  !! SECOND DERIV
               if(node_type(j).eq.-1)  ij_wb_grad2(1,k,jj) = -104.0d0/12.0d0/dx2
               if(node_type(j).eq.-2)  ij_wb_grad2(1,k,jj) =  114.0d0/12.0d0/dx2
+              if(node_type(j).eq.-3)  ij_wb_grad2(1,k,jj) = -56.0d0/12.0d0/dx2              
               end if
            end do        
            do k=1,ij_count(i)  !! Another loop to add interpolated bits
               j=ij_link(k,i)
               
               !! Modify first derivatives          
-              ij_w_grad(1,k,i) = ij_w_grad(1,k,i) + fourthirds*ij_w_interp(2,k,jj)/dx &
-                                                  - quarter*ij_w_interp(3,k,jj)/dx                  
+              ij_w_grad(1,k,i) = ij_w_grad(1,k,i) - quarter*ij_w_interp(3,k,jj)/dx                  
               !! Modify second derivative
-              ij_wb_grad2(1,k,jj) = ij_wb_grad2(1,k,jj) - (56.0d0/12.0d0)*ij_w_interp(2,k,jj)/dx2 &
-                                                        + (11.0d0/12.0d0)*ij_w_interp(3,k,jj)/dx2                       
+              ij_wb_grad2(1,k,jj) = ij_wb_grad2(1,k,jj) + (11.0d0/12.0d0)*ij_w_interp(3,k,jj)/dx2                       
            end do        
         
         
@@ -555,13 +555,13 @@ contains
               !! Normal derivatives
               if(j.eq.fd_parent(i))                                   ij_w_grad(1,k,i) = -0.25d0/dx     !! FIRST DERIV
               if(j.eq.i)                                              ij_w_grad(1,k,i) =  zero
-              if(node_type(j).eq.-2.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) =  1.5d0/dx              
+              if(node_type(j).eq.-2.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) =  1.5d0/dx   
+              if(node_type(j).eq.-3.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) = -half/dx                                       
            end do
            do k=1,ij_count(i)  !! Another loop to add interpolated bits
               j=ij_link(k,i)           
               !! Modify first derivatives          
-              ij_w_grad(1,k,i) = ij_w_grad(1,k,i) - half*ij_w_interp(5,k,jj)/dx &
-                                                  + (one/12.0d0)*ij_w_interp(6,k,jj)/dx
+              ij_w_grad(1,k,i) = ij_w_grad(1,k,i) + (one/12.0d0)*ij_w_interp(6,k,jj)/dx
            end do
         endif     
      end do       

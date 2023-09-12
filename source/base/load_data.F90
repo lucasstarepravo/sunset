@@ -136,8 +136,16 @@ contains
      
      !! Read in inflow boundary type
      read(12,*)
-     read(12,*) inflow_type,inflow_velocity_control
+     read(12,*) inflow_type
      read(12,*)
+
+     !! Read inflow velocity control parameters
+     read(12,*)
+     read(12,*) inflow_velocity_control,u_inflow_start,u_inflow_end,u_inflow_ramptime
+     read(12,*)     
+     u_inflow_start=u_inflow_start*u_char
+     u_inflow_end = u_inflow_end*u_char
+     u_inflow_ramptime = u_inflow_ramptime*Time_char    
      
      !! Read in wall boundary type
      read(12,*)

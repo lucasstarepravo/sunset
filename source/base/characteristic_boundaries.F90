@@ -215,7 +215,7 @@ contains
      Lchar(2) = zero  !! No entropy for isothermal flows
      Lchar(3) = zero  !! v,w are prescribed
      Lchar(4) = zero
-     Lchar(5) = Lchar(1)  !-tmpro*c*du_inflowdt !! Acoustically reflecting
+     Lchar(5) = Lchar(1) - tmpro*c*dudt_inflow_local(j) !! Acoustically reflecting
 #ifdef ms
      Lchar(5+1:5+nspec) = zero ! presume no inflow composition variation         
 #endif     
@@ -228,7 +228,7 @@ contains
      !Lchar(1) is outgoing, so doesn't require modification
 
      !! Acoustically reflecting
-     Lchar(5) = Lchar(1)  !- tmpro*c*du_inflowdt
+     Lchar(5) = Lchar(1) - tmpro*c*dudt_inflow_local(j)
 
      !! v and w are prescribed
      Lchar(3) = zero
@@ -526,24 +526,20 @@ contains
      !! Hard-coded routine to apply time-dependent inflow velocity. Currently hard-coded to ramp 
      !! the inflow over a prescribed time
      integer(ikind) :: i,j
-     real(rkind) :: y,u_inflow_start,u_inflow_end
-     real(rkind) :: ramp_time,u_inflow_mean
+     real(rkind) :: y
+     real(rkind) :: u_inflow_mean
      
      if(inflow_velocity_control.eq.1) then
-        !! Start and end inflow speeds, and ramp time
-        u_inflow_start = u_char
-        u_inflow_end = u_char
-        ramp_time = half*Time_char   
      
         !! Set the desired mean inflow velocity
-        if(time.le.ramp_time) then
-           u_inflow_mean = u_inflow_start + (u_inflow_end-u_inflow_start)*time/ramp_time
+        if(time.le.u_inflow_ramptime) then
+           u_inflow_mean = u_inflow_start + (u_inflow_end-u_inflow_start)*time/u_inflow_ramptime
         else
            u_inflow_mean = u_inflow_end
         end if
      
         !! Only update u_inflow_local if it has changed (i.e. time<ramp_time)
-        if(time.le.ramp_time) then
+        if(time.le.u_inflow_ramptime) then
            !! Loop over all boundary nodes
            !$omp parallel do private(i,y)
            do j=1,nb
@@ -551,12 +547,17 @@ contains
               if(node_type(i).eq.1) then !! Inflows only
                  y = rp(i,2)/(ymax-ymin)
                  u_inflow_local(j) = u_inflow_mean*six*(half-y)*(half+y)
+                 dudt_inflow_local(j) = ((u_inflow_end-u_inflow_start)/u_inflow_ramptime)*six*(half-y)*(half+y)
               end if
            end do
            !$omp end parallel do
+        else
+           !! Set dudt to zero at inflow
+           dudt_inflow_local = zero
         end if             
      else
-        !! DO NOTHING. u_inflow_local(:) = u_char
+        !! Do nothing
+        dudt_inflow_local = zero
      endif
   
      return
