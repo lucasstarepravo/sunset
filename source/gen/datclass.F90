@@ -105,9 +105,9 @@ case(4) !! Poiseuille flow setup
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.025d0!0.0125d0  ! channel width
+     yl=0.25d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/300.0       !15
+     dx0=xl/200.0       !15
      xbcond=0;ybcond=1
      
      nb_patches = 4
@@ -144,8 +144,8 @@ case(6) !! Hong Im flameholder setup
      allocate(b_type(nb_patches))
      b_type(:) = (/ 3, 2, 3, 1/)  
      b_node(1,:) = (/ -0.5d0*xl, -0.5d0*yl /)
-     b_node(2,:) = (/ 0.5d0*xl, -0.5d0*yl /)
-     b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
+     b_node(2,:) = (/ 1.5d0*xl, -0.5d0*yl /)
+     b_node(3,:) = (/ 1.5d0*xl, 0.5d0*yl /)
      b_node(4,:) = (/ -0.5d0*xl, 0.5d0*yl /)
      nb_blobs=1
      open(unit=191,file="blob_fcoefs.in")
@@ -156,32 +156,38 @@ case(6) !! Hong Im flameholder setup
         read(191,*) blob_coeffs(1,i)
      end do
      close(191)
-     blob_coeffs(1,:) = 0.0d0;blob_coeffs(1,1) = 1.0d0
+!     blob_coeffs(1,:) = 0.0d0;blob_coeffs(1,1) = 1.0d0
      blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi
 
-     dxmin = dx0/2.0d0
+     dxmin = dx0/1.5d0
      dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=2.0d0*dx0  !! dx for solids and in/outs...!! 
 !! ------------------------------------------------------------------------------------------------
-case(7) !! Something periodic
+case(7) !! Porous with in-out
 
      D_cyl = 1.0d0
-     S_cyl = D_cyl*1.2d0
-     h0=D_cyl/2.0d0      !cylinder radius
-     yl=2.0d0*S_cyl ! box height
-     xl=sqrt(3.0d0)*S_cyl ! channel length
-     dx0=D_cyl/50.0       !75
-     xbcond=1;ybcond=1     
+     S_cyl = D_cyl*1.25d0
+     yl = 2.0d0*S_cyl
+     xl = sqrt(3.0d0)*S_cyl
+     h0=D_cyl/2.0d0      !cylinder radius    
+     dx0=D_cyl/60.0       !75
+     xbcond=0;ybcond=1     
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
      allocate(b_type(nb_patches))
-     b_type(:) = (/ 3, 3, 3, 3/)  
-     b_node(1,:) = (/-0.5d0*xl, -0.5d0*yl /)
-     b_node(2,:) = (/0.5d0*xl, -0.5d0*yl /)
-     b_node(3,:) = (/0.5d0*xl, 0.5d0*yl /)
-     b_node(4,:) = (/-0.5d0*xl, 0.5d0*yl /)
-     nb_blobs = 7;n_blob_coefs=6
+     b_type(:) = (/ 3, 2, 3, 1/)  
+     b_node(1,:) = (/-2.250d0*xl, -0.5d0*yl /)
+     b_node(2,:) = (/3.0d0*xl, -0.5d0*yl /)
+     b_node(3,:) = (/3.0d0*xl, 0.5d0*yl /)
+     b_node(4,:) = (/-2.25d0*xl, 0.5d0*yl /)
+     open(unit=191,file="blob_fcoefs.in")
+     read(191,*) n_blob_coefs    
+     nb_blobs = 7
      allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs))
+     do i=1,n_blob_coefs
+        read(191,*) blob_coeffs(1,i)      
+        blob_coeffs(:,i) = blob_coeffs(1,i)
+     end do
      blob_centre(1,:) = (/0.0d0,0.0d0/)   !! Row 0
      blob_centre(2,:) = (/0.0d0,-S_cyl/)
      blob_centre(3,:) = (/0.0d0,S_cyl/)
@@ -189,14 +195,15 @@ case(7) !! Something periodic
      blob_centre(5,:) = (/S_cyl*sqrt(3.0d0)/2.0d0,0.5d0*S_cyl/)
      blob_centre(6,:) = (/-S_cyl*sqrt(3.0d0)/2.0d0,-0.5d0*S_cyl/) !! Row -1/2
      blob_centre(7,:) = (/-S_cyl*sqrt(3.0d0)/2.0d0,0.5d0*S_cyl/)
-                          
-     
+                               
      do i=1,nb_blobs
-        blob_coeffs(i,:)=h0*(/1.0d0,1.0d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0
+        blob_coeffs(i,:) = 0.0d0;blob_coeffs(i,1) = 1.0d0
+        blob_coeffs(i,:) = blob_coeffs(i,:)*h0
+        blob_rotation(i)=-0.0d0/9.0d0
      end do
 
-     dxmin = dx0/3.0d0
-     dx_wall=dxmin;dx_in=2.0d0*dx0;dx_out=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...
+     dxmin = dx0/2.0d0
+     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=4.0d0*dx0  !! dx for solids and in/outs...!! Ratio for scaling far field...
 
 !! ------------------------------------------------------------------------------------------------
 case(8) !! Array of circles
@@ -437,9 +444,9 @@ end select
   
   !! Write to fort file for quick visualisation
 !  write(31,*) npfb
-!  do i=1,npfb
-!     write(31,*) xp(i),yp(i),dxp(i)
-!  end do
+  do i=1,npfb
+     write(31,*) xp(i),yp(i),dxp(i)
+  end do
   !! Use Octave/Matlab and run  "A=load('fort.31');scatter(A(:,1),A(:,2),1,A(:,3),'filled');colorbar" 
   !! from this directory for instant visualisation.
   

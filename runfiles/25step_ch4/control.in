@@ -42,8 +42,8 @@
 !! INFLOWS type (non-reflecting (0), hard (1), inout (2))
 0
 
-!! Inflow velocity control parameters (control?, Ustart,Uend,ramp-time <- all dimensionless)
-1 1.0d0 1.0d0 0.5d0
+!! Inflow velocity control parameters (profile, temporal control?, Ustart,Uend,ramp-time <- all dimensionless)
+0 0 1.0d0 1.0d0 0.5d0
 
 !! WALLS: adiabatic(0) or isothermal (1)
 0

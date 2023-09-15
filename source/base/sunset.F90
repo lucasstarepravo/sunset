@@ -81,7 +81,7 @@ program sunset
 
      !! Output, conditionally: at start, subsequently every dt_out
      if(itime.eq.0.or.time.gt.n_out*dt_out) then 
-!     if(itime.eq.0.or.mod(itime,100).eq.0)then
+!     if(itime.eq.0.or.mod(itime,1).eq.0)then
         n_out = n_out + 1
         call output_layer(n_out)        
         call output_laminar_flame_structure(n_out)

@@ -226,18 +226,18 @@ contains
         end if 
 #endif    
 #if ORDER>=5
-!        if(node_type(i).eq.-1.or.node_type(i).eq.-2)then !! for rows 1 & 2, drop to 4th order
-!           do i1=1,nsizeG
-!              amathyp(i1,15:nsizeG)=zero        
-!           end do
-!           do i1=15,nsizeG
-!              amathyp(i1,1:nsizeG)=zero
-!              amathyp(i1,i1)=one
-!           end do
-!           bvechyp(:)=zero;bvechyp(10)=-one;bvechyp(12)=-two;bvechyp(14)=-one
-!           bvechyp(:)=bvechyp(:)/hh/hh/hh/hh        
-!           i1=0;i2=0;nsize=nsizeG 
-!        end if 
+        if(node_type(i).eq.-1)then !! for rows 1, drop to 4th order
+           do i1=1,nsizeG
+              amathyp(i1,15:nsizeG)=zero        
+           end do
+           do i1=15,nsizeG
+              amathyp(i1,1:nsizeG)=zero
+              amathyp(i1,i1)=one
+           end do
+           bvechyp(:)=zero;bvechyp(10)=-one;bvechyp(12)=-two;bvechyp(14)=-one
+           bvechyp(:)=bvechyp(:)/hh/hh/hh/hh        
+           i1=0;i2=0;nsize=nsizeG 
+        end if 
 #endif    
 
         call dgesv(nsize,1,amathyp,nsize,i1,bvechyp,nsize,i2)
@@ -622,7 +622,7 @@ contains
         call dgesv(nsize,1,amattt,nsize,i1,bvectt,nsize,i2)      
 
         !! Solve system for transverse hyperviscous filter   
-        bvecthyp(:)=zero;bvecthyp(4)=-one;i1=0;i2=0;nsize=nsizeG
+        bvecthyp(:)=zero;bvecthyp(6)=-one;i1=0;i2=0;nsize=nsizeG
         call dgesv(nsize,1,amatthyp,nsize,i1,bvecthyp,nsize,i2)                  
 
 
@@ -763,7 +763,7 @@ contains
                  tmp_t = tmp_t + ij_wb_grad2(2,k,jj)*tmp_n
               end if
            end do
-           ooRcurve(jj) = sqrt(-tmp_t)  !! 1/radius of curvature...         
+           ooRcurve(jj) = sqrt(-tmp_t)  !! 1/radius of curvature...   
         end if     
      end do
      
@@ -1489,10 +1489,10 @@ write(6,*) i,i1,"stopping because of NaN",ii
         filter_coeff(i) = (two/3.0d0)/lsum   !2/3
 
         !! Reduce the filter coefficient near boundaries
-        if(node_type(i).eq.-1) filter_coeff(i) = filter_coeff(i)*half*oosqrt2!*half*half
-        if(node_type(i).eq.-2) filter_coeff(i) = filter_coeff(i)*half
-        if(node_type(i).eq.-3) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half
-        if(node_type(i).eq.-4.or.node_type(i).eq.998) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half                        
+!        if(node_type(i).eq.-1) filter_coeff(i) = filter_coeff(i)*half*oosqrt2!*half*half
+!        if(node_type(i).eq.-2) filter_coeff(i) = filter_coeff(i)*half
+!        if(node_type(i).eq.-3) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half
+!        if(node_type(i).eq.-4.or.node_type(i).eq.998) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half                        
 
      end do
      !$omp end parallel do
@@ -1520,8 +1520,8 @@ write(6,*) i,i1,"stopping because of NaN",ii
         end do
         filter_coeff(i) = (one/3.0d0)/lsum  !(two/3.0d0)
         
-        filter_coeff(i) = filter_coeff(i)*half*half
-        
+        filter_coeff(i) = filter_coeff(i)!*half*half
+                
      end do
      !$omp end parallel do
      

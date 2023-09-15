@@ -238,7 +238,7 @@ contains
      emax_nm1 = emax_n;emax_n=emax_np1
      
      !! Scaling parameter for outflows
-     outflow_error_scaling=1.0d1
+     outflow_error_scaling=1.0d2
      
      !! Set RKa,RKb,RKbmbh with dt (avoids multiplying by dt on per-node basis)
      RKa(:) = dt*rk3_4s_2r_a(:)
@@ -391,7 +391,7 @@ contains
         !! circumstances this isn't necessary (outflow boundary isn't most restrictive). This is controlled by 
         !! "scale_outflow_errors", which is set in setup_domain.
         if(scale_outflow_errors.eq.1) then
-           if(node_type(i).eq.2) then
+           if(node_type(i).eq.2.or.node_type(i).eq.1) then
               e_acc_ro(i) = e_acc_ro(i)*outflow_error_scaling
               e_acc_rou(i) = e_acc_rou(i)*outflow_error_scaling
               e_acc_rov(i) = e_acc_rov(i)*outflow_error_scaling
@@ -534,7 +534,11 @@ contains
 !     !$omp end parallel do
 
      !! Scale by characteristic lengths and coefficients
+#ifdef isoT     
+     dt_cfl = 0.4d0*dt_cfl*L_char  !! Isothermal seems to need more restrictive cfl at BCs. needs investigating.
+#else
      dt_cfl = one*dt_cfl*L_char
+#endif     
      dt_visc = 0.3d0*dt_visc*L_char*L_char
      dt_therm = 0.3d0*dt_therm*L_char*L_char
      dt_spec = two*dt_spec*L_char*L_char
@@ -564,7 +568,7 @@ contains
 #else
 #ifndef react
      write(192,*) time,dt,one
-     flush(192)         
+     flush(192)    
 #endif     
 #endif     
 

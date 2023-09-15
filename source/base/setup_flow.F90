@@ -40,7 +40,6 @@ contains
      allocate(T(np));T=T_ref
      allocate(p(np));p=zero
      allocate(u(np),v(np),w(np));u=zero;v=zero;w=zero
-     allocate(alpha_out(np));alpha_out = zero   
      allocate(hrr(npfb));hrr = zero !! Array for heat release rate  
      
      !! Transport properties
@@ -75,7 +74,7 @@ contains
 !     call make_1d_flame(0.0d0,2.0d-4,2.366d3)
         
      !! Make a 2D gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
-     call make_2d_gaussian_hotspot(0.1d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
+     call make_2d_gaussian_hotspot(-2.0d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
 
      !! Load an existing 1D flame file
 !     call load_flame_file
@@ -324,7 +323,12 @@ contains
         ro(i) = P_flame/(Rmix_local*T(i))
         
         !! Velocity
-        u(i) = u_reactants*ro_inflow/ro(i)
+        if(inflow_velocity_profile.eq.1) then !! Parabolic
+           y=y/(ymax-ymin)
+           u(i) = u_reactants*(ro_inflow/ro(i))*six*(half-y)*(half+y)  
+        else if(inflow_velocity_profile.eq.0) then !! Uniform
+           u(i) = u_reactants*ro_inflow/ro(i)
+        end if        
         v(i) = zero
         w(i) = zero
                         
@@ -367,7 +371,7 @@ contains
      !! Temperatures, pressures and velocity from reference
      T_reactants = T_ref     
      P_flame = p_ref
-     u_reactants = zero!u_inflow_start
+     u_reactants = u_inflow_start
 
      !! Inflow mixture gas constant
      Rmix_local = zero
@@ -385,8 +389,8 @@ contains
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
         
         !! Gaussian progress variable
-!        c = exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y)/fl_thck)**two)! &
-        c = exp(-((x-f_loc_x)/fl_thck)**two) !! One-dimensional hotspot
+        c = exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y)/fl_thck)**two)! &
+!        c = exp(-((x-f_loc_x)/fl_thck)**two) !! One-dimensional hotspot
 !          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y + 0.075d0)/fl_thck)**two) &
 !          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y - 0.075d0)/fl_thck)**two)
         
@@ -410,8 +414,12 @@ contains
         ro(i) = P_flame/(Rmix_local*T(i))
         
         !! Velocity
-        y=y/(ymax-ymin)
-        u(i) = u_reactants*six*(half-y)*(half+y)  !! comment/uncomment for parabolic profile
+        if(inflow_velocity_profile.eq.1) then !! Parabolic
+           y=y/(ymax-ymin)
+           u(i) = u_reactants*six*(half-y)*(half+y)  
+        else if(inflow_velocity_profile.eq.0) then !! Uniform
+           u(i) = u_reactants        
+        end if        
         v(i) = zero
         w(i) = zero
                         
@@ -681,7 +689,7 @@ contains
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
 
         !! TG 3D Re1600 as in Cant 2022, Sandam 2017 etc (ish)
-        u(i) = zero!-cos(x)*sin(y)*cos(z)!*oosqrt2
+        u(i) = u_char!-cos(x)*sin(y)*cos(z)!*oosqrt2
         v(i) = zero!sin(x)*cos(y)*cos(z)    !!c c
         w(i) = zero!u(i);u(i)=zero
                 

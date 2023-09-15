@@ -262,9 +262,9 @@ contains
            alpha_out(i) = hrr(i)
 
 #ifdef dim3
-           write(20,*) ro(i),u(i),v(i),w(i),tmpVort,tmpT,p(i),alpha_out(i),Yspec(i,1:nspec_out)*tmpro       
+           write(20,*) ro(i),u(i),v(i),w(i),tmpVort,tmpT,p(i)-p_ref,alpha_out(i),Yspec(i,1:nspec_out)*tmpro       
 #else
-           write(20,*) ro(i),u(i),v(i),tmpVort,tmpT,p(i),alpha_out(i),Yspec(i,1:nspec_out)*tmpro
+           write(20,*) ro(i),u(i),v(i),tmpVort,tmpT,p(i)-p_ref,alpha_out(i),Yspec(i,1:nspec_out)*tmpro
 #endif
         end do
 

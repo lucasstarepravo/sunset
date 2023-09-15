@@ -545,9 +545,14 @@ contains
            do j=1,nb
               i=boundary_list(j)
               if(node_type(i).eq.1) then !! Inflows only
-                 y = rp(i,2)/(ymax-ymin)
-                 u_inflow_local(j) = u_inflow_mean*six*(half-y)*(half+y)
-                 dudt_inflow_local(j) = ((u_inflow_end-u_inflow_start)/u_inflow_ramptime)*six*(half-y)*(half+y)
+                 if(inflow_velocity_profile.eq.1) then !! Parabolic profile
+                    y = rp(i,2)/(ymax-ymin)                 
+                    u_inflow_local(j) = u_inflow_mean*six*(half-y)*(half+y)
+                    dudt_inflow_local(j) = ((u_inflow_end-u_inflow_start)/u_inflow_ramptime)*six*(half-y)*(half+y)
+                 else if(inflow_velocity_profile.eq.0) then !! uniform profile
+                    u_inflow_local(j) = u_inflow_mean
+                    dudt_inflow_local(j) = ((u_inflow_end-u_inflow_start)/u_inflow_ramptime)
+                 end if
               end if
            end do
            !$omp end parallel do

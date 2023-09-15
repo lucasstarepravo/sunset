@@ -141,7 +141,7 @@ contains
 
      !! Read inflow velocity control parameters
      read(12,*)
-     read(12,*) inflow_velocity_control,u_inflow_start,u_inflow_end,u_inflow_ramptime
+     read(12,*) inflow_velocity_profile,inflow_velocity_control,u_inflow_start,u_inflow_end,u_inflow_ramptime
      read(12,*)     
      u_inflow_start=u_inflow_start*u_char
      u_inflow_end = u_inflow_end*u_char

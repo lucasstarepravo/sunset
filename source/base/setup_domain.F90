@@ -321,8 +321,8 @@ contains
         end do
      end if         
                
-              
-              
+     !! Allocate alpha_out early, in case want to output aspects of the initialisation         
+     allocate(alpha_out(np));alpha_out = zero                 
      
      return
   end subroutine build_domain

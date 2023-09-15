@@ -132,7 +132,7 @@ contains
       
           
      !! If we want to calculate total dissipation rate
-     if(.true..and.iRKstep.eq.1) then
+     if(.false..and.iRKstep.eq.1) then
         call check_enstrophy
      end if    
      
@@ -644,7 +644,6 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
 !              store_diff_E(i) = store_diff_E(i) + zero 
               
            else    !! In/out is in x-y coord system
-
               !! Convective terms
               tmp_vec(1) = zero;tmp_vec(2) = v(i);tmp_vec(3) = w(i) !! tmp_vec holds (0,v,w) for node i
               tmp_scal_u = ro(i)*dot_product(tmp_vec,gradu(i,:)) - u(i)*rhs_ro(i) !! convective term for u
@@ -905,7 +904,6 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
 #ifdef ms
        do ispec=1,nspec
           rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) - (Yspec(i,ispec)/tmpro)*tmp_scal - ro(i)*L(j,5+ispec) 
-          
 #ifndef isoT
           !! Evaluate enthalpy
           call evaluate_enthalpy_only_at_node(T(i),ispec,enthalpy)            
