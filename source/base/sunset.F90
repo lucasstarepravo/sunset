@@ -63,7 +63,7 @@ program sunset
 #ifndef isoT
   call load_chemistry_data
 #endif  
-  if(mix_av_flag.eq.1) call load_transport_file
+  if(flag_mix_av.eq.1) call load_transport_file
 
   !! Set initial fields
   call initial_solution
@@ -175,7 +175,7 @@ subroutine deallocate_everything
   if(allocated(molar_mass)) deallocate(molar_mass,one_over_molar_mass)
   if(allocated(one_over_Lewis_number)) deallocate(one_over_Lewis_number)
   
-  if(mix_av_flag.eq.1) deallocate(mxav_coef_visc,mxav_coef_lambda,mxav_coef_diff)
+  if(flag_mix_av.eq.1) deallocate(mxav_coef_visc,mxav_coef_lambda,mxav_coef_diff)
   
   
   return

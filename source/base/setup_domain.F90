@@ -274,7 +274,7 @@ contains
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! Walls
               znf_mdiff(j) = .true.      !! No mass diffusion through walls
-              if(wall_type.eq.1) then
+              if(flag_wall_type.eq.1) then
                  znf_tdiff(j) = .false.     !! isothermal wall can have heat flux
               else              
                  znf_tdiff(j) = .true.      !! no heat flux through adiabatic wall
@@ -402,6 +402,7 @@ write(6,*) "sizes",iproc,npfb,np_nohalo,np
 #else
      dz = dz_local/dble(npfb)
 #endif     
+
 
      !! Set the dimensionless extent of the z-domain
      L_domain_z_dimensionless = L_domain_z/L_char

@@ -10,7 +10,7 @@
 0.0d0 10.0d0
 
 !! Output period (in multiples of L_char/U_char), stats output period
-1.0d-2 1.0d-4
+1.0d-1 1.0d-4
 
 !! Gravity vector (grav)
 0.0d0 0.0d0 0.0d0
@@ -40,7 +40,7 @@
 7.0d-1
 
 !! INFLOWS type (non-reflecting (0), hard (1), inout (2))
-0
+1
 
 !! Inflow velocity control parameters (profile, temporal control?, Ustart,Uend,ramp-time <- all dimensionless)
 0 0 1.0d0 1.0d0 0.5d0
@@ -48,5 +48,7 @@
 !! WALLS: adiabatic(0) or isothermal (1)
 0
 
+!! Initial base flow (0=zero, 1=uniform, 2=parabolic)
+1
 
 

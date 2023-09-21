@@ -22,11 +22,17 @@ module common_vars
   real(rkind) :: rho_char,T_ref,visc_ref,p_ref,phi_in
   real(rkind) :: dt_out,dt_out_stats !! Time interval between outputs  
   real(rkind) :: Pr,Ma
-  integer(ikind) :: mix_av_flag
+  
 #ifdef isoT
   real(rkind) :: csq
 #endif  
   real(rkind) :: r_temp_dependence
+
+  !! Control flags
+  integer(ikind) :: flag_mix_av,flag_inflow_type,flag_wall_type 
+  integer(ikind) :: flag_uinflow_control,flag_inflow_profile
+  integer(ikind) :: flag_base_flow  
+
   
   !! Evolved fluid quantities
   real(rkind), dimension(:), allocatable, target :: rou,rov,row,ro,roE
@@ -133,7 +139,6 @@ module common_vars
   integer(ikind),dimension(:),allocatable :: fd_parent !! pointer to the boundary node which is parent 
   
   !! Characteristic BC bits
-  integer(ikind) :: inflow_type,wall_type,inflow_velocity_control,inflow_velocity_profile
   real(rkind),dimension(:),allocatable :: T_bound
   real(rkind) :: p_outflow,p_inflow   !! Desired pressure on outflow boundary (and inflow if required...)
   real(rkind),dimension(:),allocatable :: sumoverspecies_homega

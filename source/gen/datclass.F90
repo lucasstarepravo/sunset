@@ -105,9 +105,9 @@ case(4) !! Poiseuille flow setup
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.25d0!0.0125d0  ! channel width
+     yl=0.05d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/200.0       !15
+     dx0=xl/250.0       !15
      xbcond=0;ybcond=1
      
      nb_patches = 4
@@ -177,8 +177,8 @@ case(7) !! Porous with in-out
      allocate(b_type(nb_patches))
      b_type(:) = (/ 3, 2, 3, 1/)  
      b_node(1,:) = (/-2.250d0*xl, -0.5d0*yl /)
-     b_node(2,:) = (/3.0d0*xl, -0.5d0*yl /)
-     b_node(3,:) = (/3.0d0*xl, 0.5d0*yl /)
+     b_node(2,:) = (/4.0d0*xl, -0.5d0*yl /)
+     b_node(3,:) = (/4.0d0*xl, 0.5d0*yl /)
      b_node(4,:) = (/-2.25d0*xl, 0.5d0*yl /)
      open(unit=191,file="blob_fcoefs.in")
      read(191,*) n_blob_coefs    
@@ -203,7 +203,7 @@ case(7) !! Porous with in-out
      end do
 
      dxmin = dx0/2.0d0
-     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=4.0d0*dx0  !! dx for solids and in/outs...!! Ratio for scaling far field...
+     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=1.0d0*dx0  !! dx for solids and in/outs...!! Ratio for scaling far field...
 
 !! ------------------------------------------------------------------------------------------------
 case(8) !! Array of circles

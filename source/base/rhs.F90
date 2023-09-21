@@ -211,6 +211,8 @@ contains
 #ifndef isoT     
      allocate(gradcp(npfb,dims));gradcp = zero
 #endif     
+
+
 #ifdef ms     
      allocate(gradYspec(npfb,dims,nspec));gradYspec=zero
      allocate(lapYspec(npfb));lapYspec=zero
@@ -223,7 +225,7 @@ contains
      !! For mixture averaged transport, pre-calculate additional diffusion driving forces
      allocate(mxav_store1(npfb,dims),mxav_store2(npfb,dims))
      allocate(mxav_store3(npfb),mxav_store4(npfb))
-     if(mix_av_flag.eq.1) then
+     if(flag_mix_av.eq.1) then
      
         !! Pre-populate stores 3 and 4 with density and pressure laplacians
         call calc_laplacian(ro,mxav_store3)
@@ -258,7 +260,6 @@ contains
         mxav_store3=zero;mxav_store4=zero        
      end if
      
-     
      !! Loop over all species
      do ispec=1,nspec
     
@@ -273,8 +274,9 @@ contains
         call calc_gradient(Y_thisspec,gradYspec(:,:,ispec))
         call calc_laplacian(Y_thisspec,lapYspec)
 
+
         !! Diffusivity gradients
-        if(mix_av_flag.eq.1) then
+        if(flag_mix_av.eq.1) then
            call calc_gradient(roMdiff(:,ispec),gradroMdiff)           
         else
 #ifndef isoT
@@ -469,7 +471,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
         !$omp end parallel do
      end do
      
-     !! Run over all nodes on final time to add terms to energy equation
+     !! Run over all nodes one final time to add terms to energy equation
      !$omp parallel do private(body_force)
      do i=1,npfb
         !! Additional terms for energy equation
@@ -529,7 +531,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
      !! Evaluate the viscosity gradient (different methods depending on whether mixture averaged)
 #ifdef tdtp     
      allocate(gradvisc(npfb,dims))
-     if(mix_av_flag.eq.1) then
+     if(flag_mix_av.eq.1) then
         call calc_gradient(visc,gradvisc)         
      else
         !$omp parallel do
@@ -740,7 +742,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
     
      !! Thermal conductivity gradient
      allocate(gradlambda(npfb,dims))
-     if(mix_av_flag.eq.1)then
+     if(flag_mix_av.eq.1)then
         call calc_gradient(lambda_th,gradlambda)
      else
         !$omp parallel do
@@ -846,7 +848,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
        
        !! WALL BOUNDARY 
        if(node_type(i).eq.0) then  
-          if(wall_type.eq.1) then    
+          if(flag_wall_type.eq.1) then    
              call specify_characteristics_isothermal_wall(j,L(j,:))
           else
              call specify_characteristics_adiabatic_wall(j,L(j,:))
@@ -854,9 +856,9 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
           
        !! INFLOW BOUNDARY
        else if(node_type(i).eq.1) then 
-          if(inflow_type.eq.1) then  !! Hard inflow
+          if(flag_inflow_type.eq.1) then  !! Hard inflow
              call specify_characteristics_hard_inflow(j,L(j,:))       
-          else if(inflow_type.eq.2) then !! Pressure-tracking Inflow-outflow
+          else if(flag_inflow_type.eq.2) then !! Pressure-tracking Inflow-outflow
              call specify_characteristics_inflow_outflow(j,L(j,:),gradro(i,:),gradp(i,:),gradu(i,:),gradv(i,:),gradw(i,:))
           else           
              call specify_characteristics_soft_inflow(j,L(j,:),gradro(i,:),gradp(i,:),gradu(i,:),gradv(i,:),gradw(i,:))       

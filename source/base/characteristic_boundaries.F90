@@ -457,7 +457,7 @@ contains
            row(i) = zero
 
            !! For isothermal walls, evaluate the energy given the prescribed temperature
-           if(wall_type.eq.1) then
+           if(flag_wall_type.eq.1) then
               call set_energy_on_bound(i,T_bound(j))        
            end if
         
@@ -465,14 +465,14 @@ contains
         else if(node_type(i).eq.1) then 
 
            !! Hard or non-reflecting
-           if(inflow_type.eq.1.or.inflow_type.eq.0)then
+           if(flag_inflow_type.eq.1.or.flag_inflow_type.eq.0)then
               do ispec = 1,nspec
                  Yspec(i,ispec) = Yspec_inflow(ispec)*ro(i)
               end do
            end if
         
         
-           if(inflow_type.eq.1) then !! Hard inflow
+           if(flag_inflow_type.eq.1) then !! Hard inflow
               !! Prescribed velocity               
               rou(i)=u_inflow_local(j)*ro(i)
               rov(i)=zero
@@ -494,7 +494,7 @@ contains
      
      
      !! For inflow-outflow types, adjust the zero-normal-flux flags dynamically depending on velocity sign
-     if(inflow_type.eq.2) then
+     if(flag_inflow_type.eq.2) then
         !$omp parallel do private(i)
         do j=1,nb
            i=boundary_list(j)
@@ -529,7 +529,7 @@ contains
      real(rkind) :: y
      real(rkind) :: u_inflow_mean
      
-     if(inflow_velocity_control.eq.1) then
+     if(flag_inflow_profile.eq.1) then
      
         !! Set the desired mean inflow velocity
         if(time.le.u_inflow_ramptime) then
@@ -545,11 +545,11 @@ contains
            do j=1,nb
               i=boundary_list(j)
               if(node_type(i).eq.1) then !! Inflows only
-                 if(inflow_velocity_profile.eq.1) then !! Parabolic profile
+                 if(flag_inflow_profile.eq.1) then !! Parabolic profile
                     y = rp(i,2)/(ymax-ymin)                 
                     u_inflow_local(j) = u_inflow_mean*six*(half-y)*(half+y)
                     dudt_inflow_local(j) = ((u_inflow_end-u_inflow_start)/u_inflow_ramptime)*six*(half-y)*(half+y)
-                 else if(inflow_velocity_profile.eq.0) then !! uniform profile
+                 else if(flag_inflow_profile.eq.0) then !! uniform profile
                     u_inflow_local(j) = u_inflow_mean
                     dudt_inflow_local(j) = ((u_inflow_end-u_inflow_start)/u_inflow_ramptime)
                  end if

@@ -38,7 +38,7 @@ contains
      segment_tstart=omp_get_wtime()             
        
 #ifndef isoT     
-     if(mix_av_flag.eq.0) then
+     if(flag_mix_av.eq.0) then
         !! Constant Lewis numbers, with option for temp dependence
         !$omp parallel do private(ispec,tmp)        
         do i=1,npfb
