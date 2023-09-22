@@ -387,7 +387,7 @@ contains
   end subroutine mass_and_energy_check 
 !! ------------------------------------------------------------------------------------------------   
   subroutine species_check
-     !! This subroutine calculates total quantity of each species in the domain
+     !! This subroutine calculates total mass of each species in the domain
      integer(ikind) :: i,ispec
      real(rkind) :: dVi,tmpY,sumY,tot_error,tmpro,tot_vol
      real(rkind),dimension(:),allocatable :: tot_Yspec
@@ -454,7 +454,7 @@ contains
         flush(199)
      end if
 #else
-     !! Normalise mass of species by volume
+     !! Normalise error by volume. Species masses are not normalised
      write(199,*) time/Time_char,sqrt(tot_error/tot_vol),tot_Yspec(:)
      flush(199)
 #endif

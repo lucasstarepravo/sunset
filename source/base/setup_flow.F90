@@ -75,10 +75,10 @@ contains
         
         
      !! Make a 1D flame: pass X-position,flame_thickness and T_hot
-     call make_1d_flame(0.0d0,2.0d-4,2.366d3)
+!     call make_1d_flame(0.0d0,2.0d-4,2.366d3)
         
      !! Make a gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
-!     call make_gaussian_hotspot(-2.0d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
+     call make_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
 
      !! Load an existing 1D flame file
 !     call load_flame_file
@@ -94,7 +94,7 @@ contains
      call load_restart_file
 
      !! Un-comment this to (re-)ignite a restarting simulation
-     call make_gaussian_hotspot(-2.0d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
+!     call make_gaussian_hotspot(-2.0d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
 
 #endif
 
@@ -531,7 +531,6 @@ contains
         !! Temporary assign p and T
         T(i) = T_ref
         p(i) = P_flame
-        
      end do
      !$omp end parallel do
      
