@@ -269,12 +269,13 @@ contains
            psiz(j) = psiz(i)
         end do        
         !$omp end parallel do
+#ifdef mp
 #ifdef dim3
         call halo_exchange(psix)
         call halo_exchange(psiy)        
 #endif
         call halo_exchange(psiz)
-                
+#endif                
         
         if(iproc.eq.0) write(6,*) "Diffusion progress:",100.0d0*dble(it_diff)/dble(nt_diff),"%."
         
@@ -349,9 +350,11 @@ contains
     
         !! Update mirrors and halos
         call mirror_bcs_vel_only
+#ifdef mp        
         call halo_exchange(u)
         call halo_exchange(v)        
         call halo_exchange(w)
+#endif        
                           
         !! Evaluate RHS
         call calc_laplacian(u,lapu)

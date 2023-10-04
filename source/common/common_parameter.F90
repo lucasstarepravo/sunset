@@ -11,7 +11,7 @@ module common_parameter
   use kind_parameters
   implicit none 
 
-  !! Numbers --------------------------------------------------------------------------------------
+  !! Commonly used numbers ------------------------------------------------------------------------
   real(rkind), parameter :: pi=3.141592653589793238462643383279502884197d0
   real(rkind), parameter :: pi4 = pi**4.0
   real(rkind), parameter :: zero = 0.0d0
