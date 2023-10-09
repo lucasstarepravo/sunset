@@ -125,7 +125,6 @@ case(5) !! Inflow/outflow tube for simple flames
 !        blob_coeffs(i,:)=h0*(/1.0d0,0.4d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0
 !     end do
 
-
      dxmin = dx0/1.0d0
      dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx0*1.0d0  !! dx for solids and in/outs..
 
@@ -135,9 +134,9 @@ case(6) !! Hong Im flameholder setup
 
      xl=1.0d0 ! channel length
      h0=xl/40.0d0   !cylinder radius
-     yl=xl/1.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
+     yl=xl/5.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
      dx0=h0/25.0!25.0       !15
-     xbcond=0;ybcond=3     
+     xbcond=0;ybcond=1     
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -147,17 +146,22 @@ case(6) !! Hong Im flameholder setup
      b_node(2,:) = (/ 0.5d0*xl, -0.5d0*yl /)
      b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
      b_node(4,:) = (/ -0.5d0*xl, 0.5d0*yl /)
-     nb_blobs=1
+     nb_blobs=3
      open(unit=191,file="blob_fcoefs.in")
      read(191,*) n_blob_coefs
      allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs))
-     blob_centre(1,:)=(/ -0.275d0*xl,-0.0d0*yl/);
      do i=1,n_blob_coefs
         read(191,*) blob_coeffs(1,i)
      end do
      close(191)
-     blob_coeffs(1,:) = 0.0d0;blob_coeffs(1,1) = 1.0d0
-     blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi
+     blob_coeffs(1,:) = 0.0d0;blob_coeffs(1,1) = 1.0d0;blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi
+     blob_coeffs(2,:) = blob_coeffs(1,:);blob_rotation(2)=-0.0d0*pi
+     blob_coeffs(3,:) = blob_coeffs(1,:);blob_rotation(3)=-0.0d0*pi    
+
+     blob_centre(1,:)=(/ -0.275d0*xl, 0.0d0*yl/);
+     blob_centre(2,:)=(/ -0.275d0*xl,-0.5d0*yl/);
+     blob_centre(3,:)=(/ -0.275d0*xl, 0.5d0*yl/);     
+
 
      dxmin = dx0/1.0d0
      dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.0d0*dx0  !! dx for solids and in/outs...!! 
@@ -447,7 +451,7 @@ end select
   do i=1,npfb
      write(31,*) xp(i),yp(i),dxp(i)
   end do
-  !! Use Octave/Matlab and run  "A=load('fort.31');scatter(A(:,1),A(:,2),1,A(:,3),'filled');colorbar" 
+  !! Use Octave/Matlab and run  "A=load('fort.31');scatter(A(:,1),A(:,2),10,A(:,3),'filled');colorbar" 
   !! from this directory for instant visualisation.
   
   !!

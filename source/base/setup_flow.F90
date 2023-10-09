@@ -75,10 +75,10 @@ contains
         
         
      !! Make a 1D flame: pass X-position,flame_thickness and T_hot
-     call make_1d_flame(0.0d0,2.0d-4,2.366d3)
+!     call make_1d_flame(0.0d0,2.0d-4,2.366d3)
         
      !! Make a gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
-!     call make_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
+     call make_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
 
      !! Load an existing 1D flame file
 !     call load_flame_file
@@ -177,11 +177,12 @@ contains
      segment_time_local = zero
      cputimecheck = zero         
      
+#ifndef restart
      !! Pre-set the time-stepping (necessary for PID controlled stepping)
-     dt = 1.0d-10   
-           
+     dt = 1.0d-10            
      !! Initialise PID controller variables
      emax_np1=pid_tol;emax_n=pid_tol;emax_nm1=pid_tol
+#endif     
      
      !! Initialise time-stepping error normalisation based on expected magnitudes
      ero_norm = one/one !! Unity density
@@ -191,9 +192,11 @@ contains
      
 
      !! Initialise PID controller variables for <|u|>
+#ifndef restart
      eflow_nm1 = one
      sum_eflow = zero   
      driving_force(:) = zero !! Will only be changed if using PID controller
+#endif     
                    
      return
   end subroutine initial_solution   
@@ -364,10 +367,8 @@ contains
         pR_local = ro(i)*T(i) 
                
         !! Gaussian progress variable
-        c = exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y)/fl_thck)**two)! &
-!        c = exp(-((x-f_loc_x)/fl_thck)**two) !! One-dimensional hotspot
-!          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y + 0.075d0)/fl_thck)**two) &
-!          + exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y - 0.075d0)/fl_thck)**two)
+!        c = exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y)/fl_thck)**two) !! 2D
+        c = exp(-((x-f_loc_x)/fl_thck)**two)                               !! 1D 
                 
         !! Adjust temperature profile
         T(i) = T(i)*(one-c) + T_hot*c
@@ -699,10 +700,13 @@ contains
      end do
      close(15)
 
-
      !! Open the field files
      open(14,file=fname)
+     read(14,*) !! Skip line
      read(14,*) k
+     read(14,*) emax_np1,emax_n,emax_nm1,dt
+     read(14,*) eflow_nm1,sum_eflow,driving_force
+     read(14,*) !! Skip line
      if(k.ne.npfb) write(6,*) "WARNING, expecting problem in restart. FIELDS FILE."
 
      !! Load the initial conditions

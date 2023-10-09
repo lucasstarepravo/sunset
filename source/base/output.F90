@@ -244,9 +244,14 @@ contains
 !        nspec_out = 1
         nspec_out = nspec          
         
-        !! Write the main dump files
+        !! Write the main dump files and write a header
         open(unit = 20,file=fname)  
+        write(20,*) "!! FIELDS FILE HEADER !!"
         write(20,*) np_out_local
+        write(20,*) emax_np1,emax_n,emax_nm1,dt
+        write(20,*) eflow_nm1,sum_eflow,driving_force
+        write(20,*) "!! END HEADER !!"
+               
         do i=1,np_out_local
            tmpro = one/ro(i) !! Store inverse of density
 #ifndef isoT

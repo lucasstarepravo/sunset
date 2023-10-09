@@ -161,8 +161,12 @@ program main
         end if
         
         open(ifi,file=name_orig,status='old')
-!       % READ POSITION, VELOCITY, DENSITY, PRESSURE, MASS AND VORTICITY DATA FOR ALL PARTICLES                      
+!       % READ VELOCITY, DENSITY, PRESSURE, MASS AND VORTICITY DATA FOR ALL PARTICLES                      
+        read(ifi,*) !! Skip line        
         read(ifi,*) np
+        read(ifi,*) !! Skip line
+        read(ifi,*) !! Skip line
+        read(ifi,*) !! Skip line                        
         np_ini = npp + 1
         np_end = np_ini + np 
         if(dim_flag.eq.1) then 
