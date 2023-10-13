@@ -409,8 +409,10 @@ contains
 #ifdef react
                  - half*(gammagas-one)*sumoverspecies_homega(j) &
 #endif
-                 !! N.B. It's more stable to just follow Sutherland 2003 and neglect transverse terms
-                 +zero!- (one-Ma)*half*( &
+
+                 - half*tmpro*c*(grav(1)+driving_force(1)/tmpro)
+                 !! N.B. It's more stable to just follow Sutherland 2003 and neglect transverse terms 
+                 !- (one-Ma)*half*( &
 !                  v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2)-tmpro*c*v(i)*gradb_u(2)) !& !! trans1 conv.
 !                 - (one-Ma)*half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3) - &
 !                                      tmpro*c*w(i)*gradb_u(3))   !! trans2 conv.
@@ -529,7 +531,8 @@ contains
      real(rkind) :: y
      real(rkind) :: u_inflow_mean
      
-     if(flag_inflow_profile.eq.1) then
+     !! If controlling the inflow
+     if(flag_uinflow_control.eq.1) then
      
         !! Set the desired mean inflow velocity
         if(time.le.u_inflow_ramptime) then
@@ -545,13 +548,17 @@ contains
            do j=1,nb
               i=boundary_list(j)
               if(node_type(i).eq.1) then !! Inflows only
-                 if(flag_inflow_profile.eq.1) then !! Parabolic profile
+                 if(flag_inflow_profile.eq.2) then !! Parabolic profile
                     y = rp(i,2)/(ymax-ymin)                 
                     u_inflow_local(j) = u_inflow_mean*six*(half-y)*(half+y)
                     dudt_inflow_local(j) = ((u_inflow_end-u_inflow_start)/u_inflow_ramptime)*six*(half-y)*(half+y)
-                 else if(flag_inflow_profile.eq.0) then !! uniform profile
+                 else if(flag_inflow_profile.eq.1) then !! uniform profile
                     u_inflow_local(j) = u_inflow_mean
                     dudt_inflow_local(j) = ((u_inflow_end-u_inflow_start)/u_inflow_ramptime)
+                 else
+                    write(6,*) "Requested inflow profile not an option. Please change control.in"
+                    write(6,*) "Stopping"
+                    stop
                  end if
               end if
            end do

@@ -105,9 +105,9 @@ case(4) !! Poiseuille flow setup
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.025d0!0.0125d0  ! channel width
+     yl=0.25d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/500.0       !15
+     dx0=xl/250.0       !15
      xbcond=0;ybcond=1
      
      nb_patches = 4
@@ -133,19 +133,19 @@ case(5) !! Inflow/outflow tube for simple flames
 case(6) !! Hong Im flameholder setup
 
      xl=1.0d0 ! channel length
-     h0=xl/40.0d0   !cylinder radius
+     h0=xl/50.0d0   !cylinder radius
      yl=xl/5.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
-     dx0=h0/25.0!25.0       !15
+     dx0=xl/(40.0d0*25.0d0)!25.0       !15
      xbcond=0;ybcond=1     
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
      allocate(b_type(nb_patches))
      b_type(:) = (/ 3, 2, 3, 1/)  
-     b_node(1,:) = (/ -0.5d0*xl, -0.5d0*yl /)
+     b_node(1,:) = (/ -0.50d0*xl, -0.5d0*yl /)
      b_node(2,:) = (/ 0.5d0*xl, -0.5d0*yl /)
      b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
-     b_node(4,:) = (/ -0.5d0*xl, 0.5d0*yl /)
+     b_node(4,:) = (/ -0.50d0*xl, 0.5d0*yl /)
      nb_blobs=3
      open(unit=191,file="blob_fcoefs.in")
      read(191,*) n_blob_coefs
@@ -164,7 +164,7 @@ case(6) !! Hong Im flameholder setup
 
 
      dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.0d0*dx0  !! dx for solids and in/outs...!! 
+     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=2.0d0*dx0  !! dx for solids and in/outs...!! 
 !! ------------------------------------------------------------------------------------------------
 case(7) !! Porous with in-out
 
