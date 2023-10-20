@@ -53,13 +53,11 @@ contains
            !! Thermal conductivity
            lambda_th(i) = cp(i)*visc(i)/Pr
 
-#ifdef ms       
            !! Molecular diffusivity - actually returning ro*Mdiff
            tmp = visc(i)/Pr
            do ispec=1,nspec
               roMdiff(i,ispec) = tmp*one_over_Lewis_number(ispec)
            end do        
-#endif        
    
         end do
         !$omp end parallel do
@@ -88,9 +86,7 @@ contains
      end if
 #else
      visc(:) = visc_ref
-#ifdef ms
      roMdiff(:,:) = visc_ref/Pr/one !! reference diffusivity with Le=one
-#endif     
 #endif     
 
      !! Profiling

@@ -391,7 +391,6 @@ contains
      integer(ikind) :: i,ispec
      real(rkind) :: dVi,tmpY,sumY,tot_error,tmpro,tot_vol
      real(rkind),dimension(:),allocatable :: tot_Yspec
-#ifdef ms     
      
      !! Allocate and zero accumulators
      allocate(tot_Yspec(nspec))   
@@ -460,8 +459,6 @@ contains
 #endif
      
      deallocate(tot_Yspec)
-
-#endif
 
      return
   end subroutine species_check    

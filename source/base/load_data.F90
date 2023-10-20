@@ -182,9 +182,6 @@ contains
      read(12,*)
      read(12,*) nspec
      read(12,*)
-#ifndef ms
-     nspec = 1  !! If not multispecies, nspec must be 1
-#endif          
 
      !! This section reads in transport data for all species.
      

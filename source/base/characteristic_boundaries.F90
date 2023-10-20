@@ -44,12 +44,8 @@ contains
      !Lchar(2) = zero !! as there is no entropy wave
      !Lchar(3) = zero and unchanged
      !Lchar(4) = zero and unchanged
-     
-     !! Acoustic reflection
-     Lchar(5)= Lchar(1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro) 
-#ifdef ms     
+     Lchar(5)= Lchar(1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro)       !! Acoustic reflection
      !Lchar(5+1:5+nspec) = zero and unchanged
-#endif     
 
 #else            
      !! THERMAL FLOWS
@@ -109,13 +105,9 @@ contains
      !Lchar(1) is outgoing, and so is unchanged    
      !Lchar(2) is zero, and unchanged - no entropy input
      !Lchar(3) is zero, and unchanged 
-     !Lchar(4) is zero, and unchanged
-    
-     !! Acoustic reflections    
-     Lchar(5)= Lchar(1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro)
-#ifdef ms     
+     !Lchar(4) is zero, and unchanged   
+     Lchar(5)= Lchar(1) + tmpro*c*dot_product(rnorm(i,:),grav+driving_force/tmpro)    !! Acoustic reflections    
      !Lchar(5+1:5+nspec) is zero, and unchanged (no surface reactions)
-#endif     
 
   end subroutine specify_characteristics_adiabatic_wall  
 !! ------------------------------------------------------------------------------------------------
@@ -148,11 +140,8 @@ contains
      Lchar(5) = (u(i)-u_inflow_local(j))*nscbc_coeff*(one-Ma)*c*c*one/L_domain_x &     !! Track u_inflow
               - half*(v(i)*gradb_p(2)+p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2)) &    !! transverse 1 conv. terms
               - half*(w(i)*gradb_p(3)+p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))      !! transverse 2 conv. terms 
-#ifdef ms
      Lchar(5+1:5+nspec) = zero
-#endif     
-
-         
+        
 #else
      !! THERMAL FLOWS    
      c=evaluate_sound_speed_at_node(cp(i),Rgas_mix(i),T(i)) 
@@ -180,10 +169,8 @@ contains
               - half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2))  & !! transverse 1 conv. terms
               - half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))    !! transverse 2 conv. terms  
              
-#ifdef ms
      !! TBC, include tracking, transverse and source terms for flame-inflow interactions
      Lchar(5+1:5+nspec) = zero !! At present just assume inflow is far enough from flame...
-#endif    
 
 
 #endif                   
@@ -212,9 +199,7 @@ contains
      Lchar(3) = zero  !! v,w are prescribed
      Lchar(4) = zero
      Lchar(5) = Lchar(1) - tmpro*c*dudt_inflow_local(j) !! Acoustically reflecting
-#ifdef ms
      Lchar(5+1:5+nspec) = zero ! presume no inflow composition variation         
-#endif     
          
 #else
      !! THERMAL FLOWS, prescribed inflow temperature
@@ -245,13 +230,10 @@ contains
 !                - w(i)*gradb_ro(3) - tmpro*gradb_w(3) &   !! trans 2 term
 !                + (gammagas-one)*sumoverspecies_homega(j)/c/c
                 !-dro/dt
-#ifdef ms
      do ispec=1,nspec
         Lchar(5+1:5+nspec) = zero! reaction_rate_bound(j,ispec)
                            ! - dY(ispec)/dt
      end do
-#endif    
-
 
 #endif                   
          
@@ -285,9 +267,8 @@ contains
         Lchar(3) = v(i)*nscbc_coeff*c/L_domain_x       !! track v=zero
         Lchar(4) = w(i)*nscbc_coeff*c/L_domain_x       !! track w=zero
         Lchar(5) = (u(i)-u_inflow_local(j))*nscbc_coeff*(one-u(i)/c)*c*c*one/L_domain_x     !! Track u_inflow
-#ifdef ms
         Lchar(5+1:5+nspec) = zero
-#endif     
+
      else               !! Outflow options
         !Lchar(1) is outgoing, unchanged
         Lchar(2) = zero   !! No entropy in isothermal flows
@@ -336,10 +317,8 @@ contains
 !!!                 - (one-Ma)*half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3)+ &
 !!!                   tmpro*c*w(i)*gradb_u(3))    !! transverse 2 conv. terms  
              
-#ifdef ms
         !! TBC, include tracking, transverse and source terms for flame-inflow interactions
         Lchar(5+1:5+nspec) = zero !! At present just assume inflow is far enough from flame...
-#endif    
 
      else        !! Outflow options
         !Lchar(1) is outgoing
@@ -420,9 +399,7 @@ contains
         Lchar(2)=zero !! no incoming entropy
         Lchar(3)=zero !! no incoming shear if outflow velocity is zero...
         Lchar(4)=zero
-#ifdef ms
         Lchar(5+1:5+nspec)=zero !! No incoming composition waves??
-#endif        
      end if        
 
   end subroutine specify_characteristics_outflow

@@ -47,9 +47,7 @@ contains
 #ifndef isoT
      allocate(lambda_th(np))
 #endif
-#ifdef ms     
      allocate(roMdiff(np,nspec))
-#endif     
      allocate(cp(np),Rgas_mix(np))
      
      !! Allocate the boundary temperatures
@@ -160,7 +158,6 @@ contains
         !$omp end parallel do        
      end if
      
-!#ifdef ms     
      !! Initialise the variable holding the inflow species     
      if(nb.ne.0) then
         allocate(Yspec_inflow(nspec))
@@ -173,7 +170,6 @@ contains
            end if
         end do
      endif
-!#endif     
            
      !! SOME ADDITIONAL INITIALISATION STUFF ------------------------------------------------------
      !! Profiling - re-zero time accumulators
@@ -219,6 +215,12 @@ contains
   
      !! Allocate two arrays
      allocate(Yspec_reactants(nspec),Yspec_products(nspec))
+  
+     !! Single-phase
+     if(nspec.eq.1) then
+        Yspec_reactants(1)=one
+        Yspec_products(1)=one
+     end if
   
      !! Single-step chemistry
      if(nspec.eq.2) then 
@@ -690,12 +692,9 @@ contains
 
         ro(i) = rho_char! + tmp
 
-#ifdef ms    
 !        tmp = one - half*(one + erf(5.0d0*x))
         Yspec(i,:) = one
-#else
-        Yspec(i,1) = one
-#endif         
+
 !        u(i) = zero
 !        v(i) = zero
  !       T(i) = T_ref

@@ -94,11 +94,9 @@ contains
 #ifndef isoT           
            roE(i) = roE_reg1(i) + RKa(k)*rhs_roE(i)
 #endif
-#ifdef ms           
            do ispec=1,nspec
               Yspec(i,ispec) = Yspec_reg1(i,ispec) + RKa(k)*rhs_Yspec(i,ispec)
            end do
-#endif
 
            !! Store next S in register 1
            ro_reg1(i) = ro_reg1(i) + RKb(k)*rhs_ro(i)
@@ -108,11 +106,9 @@ contains
 #ifndef isoT
            roE_reg1(i) = roE_reg1(i) + RKb(k)*rhs_roE(i)
 #endif
-#ifdef ms           
            do ispec=1,nspec
               Yspec_reg1(i,ispec) = Yspec_reg1(i,ispec) + RKb(k)*rhs_Yspec(i,ispec)
            end do
-#endif
         end do
         !$omp end parallel do
               
@@ -155,11 +151,9 @@ contains
 #ifndef isoT
         roE(i) = roE_reg1(i) + RKb(4)*rhs_roE(i)
 #endif
-#ifdef ms 
         do ispec=1,nspec
            Yspec(i,ispec) = Yspec_reg1(i,ispec) + RKb(4)*rhs_Yspec(i,ispec)
         end do
-#endif        
      end do
      !$omp end parallel do  
 
@@ -287,11 +281,9 @@ contains
 #ifndef isoT           
            roE(i) = roE_reg1(i) + RKa(k)*rhs_roE(i)
 #endif
-#ifdef ms           
            do ispec=1,nspec
               Yspec(i,ispec) = Yspec_reg1(i,ispec) + RKa(k)*rhs_Yspec(i,ispec)
            end do
-#endif
 
            !! Store next S in register 1
            ro_reg1(i) = ro_reg1(i) + RKb(k)*rhs_ro(i)
@@ -301,11 +293,9 @@ contains
 #ifndef isoT
            roE_reg1(i) = roE_reg1(i) + RKb(k)*rhs_roE(i)
 #endif
-#ifdef ms           
            do ispec=1,nspec
               Yspec_reg1(i,ispec) = Yspec_reg1(i,ispec) + RKb(k)*rhs_Yspec(i,ispec)
            end do
-#endif
            
            !! Error accumulation
            e_acc_ro(i) = e_acc_ro(i) + RKbmbh(k)*rhs_ro(i)       
@@ -315,11 +305,9 @@ contains
 #ifndef isoT
            e_acc_E(i) = e_acc_E(i) + RKbmbh(k)*rhs_roE(i)                    
 #endif
-#ifdef ms           
            do ispec=1,nspec         
               e_acc_Yspec(i,ispec) = e_acc_Yspec(i,ispec) + RKbmbh(k)*rhs_Yspec(i,ispec)
            end do
-#endif
         end do
         !$omp end parallel do
        
@@ -364,11 +352,9 @@ contains
 #ifndef isoT
         roE(i) = roE_reg1(i) + RKb(iRKstep)*rhs_roE(i)
 #endif
-#ifdef ms 
         do ispec=1,nspec
            Yspec(i,ispec) = Yspec_reg1(i,ispec) + RKb(iRKstep)*rhs_Yspec(i,ispec)
         end do
-#endif        
         
         !! Final error accumulators
         e_acc_ro(i) = e_acc_ro(i) + RKbmbh(iRKstep)*rhs_ro(i)       
@@ -378,11 +364,9 @@ contains
 #ifndef isoT
         e_acc_E(i) = e_acc_E(i) + RKbmbh(iRKstep)*rhs_roE(i)   
 #endif
-#ifdef ms 
         do ispec=1,nspec
            e_acc_Yspec(i,ispec) = e_acc_Yspec(i,ispec) + RKbmbh(iRKstep)*rhs_Yspec(i,ispec)
         end do
-#endif
         
         !! Trick for outflow stability - upscale the errors at the outflow. This is because the 
         !! low-order mixed discretisation at the boundary is less accurate than internally, and
@@ -399,9 +383,7 @@ contains
 #ifndef isoT      
               e_acc_E(i) = e_acc_E(i)*outflow_error_scaling
 #endif           
-#ifdef ms
               e_acc_Yspec(i,:) = e_acc_Yspec(i,:)*outflow_error_scaling
-#endif           
            end if
         end if
         
@@ -413,11 +395,9 @@ contains
 #ifndef isoT
         enrm_E = max(enrm_E,abs(e_acc_E(i))*eroE_norm)
 #endif
-#ifdef ms 
         do ispec=1,nspec
            enrm_Yspec(ispec) = max(enrm_Yspec(ispec),abs(e_acc_Yspec(i,ispec))*eroY_norm)
         end do
-#endif                                      
 
         !! Uncomment this if we want to see the distribution of time-stepping errors (useful for finding
         !! the least-stable nodes)
@@ -435,11 +415,8 @@ contains
      deallocate(e_acc_ro,e_acc_rou,e_acc_rov,e_acc_E,e_acc_Yspec,e_acc_row)
      
      !! Finalise L_infinity error norms: find max and ensure it's >0     
-#ifdef ms
      emax_Y = maxval(enrm_Yspec(1:nspec))     
-#else
-     emax_Y = zero
-#endif         
+       
      emax_np1 = max( &
                     max( &
                         max(enrm_ro,enrm_E), & 
@@ -525,10 +502,8 @@ contains
         dt_therm = min(dt_therm,s(i)*s(i)*ro(i)*cp(i)/lambda_th(i))
 #endif      
 
-#ifdef ms        
         !! Molecular diffusivity::  s*s*ro/roMdiff
         dt_spec = min(dt_spec,s(i)*s(i)*ro(i)/maxval(roMdiff(i,1:nspec)))
-#endif   
          
      end do
 !     !$omp end parallel do

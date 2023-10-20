@@ -56,11 +56,7 @@ contains
      !! gradients, and then calls property-specific RHS routines
           
      !! Some initial allocation of space for boundaries
-#ifndef ms
-     if(nb.ne.0) allocate(L(nb,5)) 
-#else
      if(nb.ne.0) allocate(L(nb,5+nspec)) 
-#endif  
 
      !! Determine secondary thermodynamic quantities and transport properties
      !! N.B. These are also calculated when setting time step, so not necessary for the first call
@@ -208,7 +204,6 @@ contains
 #endif     
 
 
-#ifdef ms     
      allocate(gradYspec(npfb,dims,nspec));gradYspec=zero
      allocate(lapYspec(npfb));lapYspec=zero
      allocate(speciessum_divroVY(npfb));speciessum_divroVY = zero
@@ -492,7 +487,6 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
      deallocate(speciessum_divroVY,speciessum_roVY,gradYspec)
      deallocate(speciessum_hY,speciessum_hgradY)
           
-#endif          
 
      return
   end subroutine calc_rhs_Yspec    
@@ -533,6 +527,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
         do i=1,npfb
            gradvisc(i,:) = r_temp_dependence*visc(i)*gradT(i,:)/T(i)
         end do
+        !$omp end parallel do
      end if
 #endif     
          
@@ -594,7 +589,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
         rhs_row(i) = zero
 #endif      
 
-    end do
+     end do
      !$omp end parallel do
          
      !! Make L1,L2,L3,L4,L5 and populate viscous + body force part of rhs' and save transverse
@@ -898,7 +893,6 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
 #endif           
        
        !! Species mass fractions
-#ifdef ms
        do ispec=1,nspec
           rhs_Yspec(i,ispec) = rhs_Yspec(i,ispec) - (Yspec(i,ispec)/tmpro)*tmp_scal - ro(i)*L(j,5+ispec) 
 #ifndef isoT
@@ -911,7 +905,6 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
           rhs_roE(i) = rhs_roE(i) - tmpro*enthalpy*L(j,5+ispec)
 #endif          
        end do
-#endif          
     end do
     !$omp end parallel do
     !! De-allocate L
@@ -951,33 +944,6 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
 #endif     
 
      !! Filter mass fractions
-#ifdef ms
-if(.false.)then !! Original filter correction method
-     !! Initialise filter correction term
-     allocate(filter_correction(np))
-     filter_correction(1:npfb) = ro(1:npfb)
-
-     !! Loop over species
-     do ispec=1,nspec
-     
-        !! Filter this species roY
-        call calc_filtered_var(Yspec(:,ispec))
- 
-        !! Add this species contribution to filter correction term
-        filter_correction(1:npfb) = filter_correction(1:npfb) - Yspec(1:npfb,ispec)
-     end do
-    
-     !! Scale filter correction term by the number of species
-     filter_correction = filter_correction/dble(nspec)    
-     
-     !! Apply filter correction term to each species
-     do ispec=1,nspec
-        Yspec(1:npfb,ispec) = Yspec(1:npfb,ispec) + filter_correction(1:npfb)
-     end do
-     
-     !! Deallocate space
-     deallocate(filter_correction)     
-else  !! Modified (weighted) filter correction method
      !! Initialise filter correction term
      allocate(filter_correction(np))
      filter_correction(1:npfb) = zero
@@ -1004,8 +970,6 @@ else  !! Modified (weighted) filter correction method
      
      !! Deallocate space
      deallocate(filter_correction)     
-endif     
-#endif   
    
      
      !! Profiling

@@ -149,9 +149,7 @@ subroutine deallocate_everything
 #ifndef isoT
   deallocate(lambda_th)
 #endif
-#ifdef ms
   deallocate(roMdiff)
-#endif    
 
   !! Neighbours lists and link lists
   deallocate(ij_count,ij_link)

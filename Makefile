@@ -6,7 +6,6 @@
 # thermo     Isothermal (0) or thermal (1) flow                                        (default: 1)
 # react      Reacting (1) or inert (0) flow                                            (default: 0)
 # restart    Start from initial conditions (0) or restart file (1)                     (default: 0)
-# multispec  Single (0) or multispecies (1) flow                                       (default: 0)
 # mpi        Shared only (0) or distributed-shared (1) acceleration                    (default: 0)          
 # dim3       Two (0) or three (1) dimensional simulation                               (default: 0)
 # pgrad      Drive the flow with a pressure gradient and P.I.D control                 (default: 0)
@@ -19,14 +18,12 @@
 # For isothermal flows:
 # make thermo=0 dim3=X mpi=X pgrad=X
 #
-# For standard combustion problems, react=1 will overwrite any thermo, tdtp and multispec flags:
+# For standard combustion problems, react=1 will overwrite any thermo and tdtp flags:
 # make react=1 dim3=X mpi=X flout=X      <---------- standard combustion make
 #
 # For thermal flows with real gas properties:
 # make thermo=1 dim3=X mpi=X pgrad=X tdtp=1
 #
-# For thermal flows with fixed cp, visc, lambda, use a runfile w/ zero temp dependence, and
-# make thermo=1 react=0 multispec=0 dim3=X mpi=X pgrad=X flout=0
 
 #
 # Choose compiler depending on whether mpi
@@ -53,17 +50,9 @@ FFLAGS += -Dtdtp
 endif
 endif
 
-# Multi-species?
-ifeq ($(multispec), 1)
-FFLAGS += -Dms
-endif
-
-# Reacting? set react if so, also force multispecies and tdtp
+# Reacting? set react if so, also force tdtp
 ifeq ($(react), 1)
 FFLAGS += -Dreact
-ifneq ($(multispec),1)
-FFLAGS += -Dms
-endif
 ifneq ($(tdtp),1)
 FFLAGS += -Dtdtp
 endif
