@@ -85,8 +85,8 @@ program datgen
 case(4) !! Poiseuille flow setup
 
      yl=1.0d0
-     xl=yl/1.0d0
-     dx0=yl/50.0d0
+     xl=yl/4.0d0
+     dx0=yl/400.0d0
      xbcond=1;ybcond=0
      
      nb_patches = 4
@@ -105,9 +105,9 @@ case(4) !! Poiseuille flow setup
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.25d0!0.0125d0  ! channel width
+     yl=0.0125d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/250.0       !15
+     dx0=xl/1000.0       !15
      xbcond=0;ybcond=1
      
      nb_patches = 4

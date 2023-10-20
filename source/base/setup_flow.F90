@@ -75,14 +75,17 @@ contains
         
         
      !! Make a 1D flame: pass X-position,flame_thickness and T_hot
-     call make_1d_flame(-0.275d0,2.0d-4,2.366d3)
-        
+     call make_1d_flame(-0.0d0,2.0d-4,2.366d3)  !-0.275d0
+     
      !! Make a gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
 !     call make_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
 
      !! Load an existing 1D flame file
 !     call load_flame_file
 
+     !! Make the initial conditions for a Rayleigh-Taylor instability
+!     call make_RT_initial_conditions(-0.0d0,2.0d-4,2.366d3)
+     
      !! A messy routine to play with for other initial conditions
 !     call hardcode_initial_conditions     
 
@@ -344,6 +347,86 @@ contains
   
      return
   end subroutine make_1d_flame
+!! ------------------------------------------------------------------------------------------------  
+  subroutine make_RT_initial_conditions(flame_location,flame_thickness,T_products)
+     integer(ikind) :: i,ispec,j
+     real(rkind),intent(in) :: flame_location,flame_thickness,T_products
+     real(rkind) :: fl_thck
+     real(rkind) :: c,Rmix_local,x,y,z,ro_inflow
+     real(rkind) :: T_y0,dcdy,p_local
+
+     !! Scale thickness because position vectors are scaled...
+     fl_thck = flame_thickness/L_char 
+
+     !! Inflow mixture gas constant
+     Rmix_local = zero
+     do ispec=1,nspec
+        Rmix_local = Rmix_local + Yspec_reactants(ispec)*one_over_molar_mass(ispec)
+     end do
+     Rmix_local = Rmix_local*Rgas_universal     
+
+     !! Inflow density
+     ro_inflow = p_ref/(Rmix_local*T_ref)
+     
+     !! Temperature at y0
+     T_y0 = T_ref + half*(T_products - T_ref)
+    
+     !! Loop over all nodes and impose values
+     !$omp parallel do private(x,y,z,c,Rmix_local,ispec,dcdy,p_local)
+     do i=1,npfb
+        x = rp(i,1);y=rp(i,2);z=rp(i,3)
+                
+        !! Error function based progress variable
+        z = 0.00d0*sin(two*pi*x/(xmax-xmin))
+        c = half*(one + erf((flame_location-y+z)/fl_thck))        
+        dcdy = zero*(one/one)*half*(two/(fl_thck*sqrt(pi)))*exp(-((flame_location-y+z)/fl_thck)**two)
+        
+        !! Temperature profile
+        T(i) = T(i) + (T_products - T(i))*c
+        
+        !! Composition
+        do ispec = 1,nspec
+           Yspec(i,ispec) = (one-c)*Yspec_reactants(ispec) + c*Yspec_products(ispec)
+        end do
+        
+        !! Local mixture gas constant
+        Rmix_local = zero
+        do ispec=1,nspec
+           Rmix_local = Rmix_local + Yspec(i,ispec)*one_over_molar_mass(ispec)
+        end do
+        Rmix_local = Rmix_local*Rgas_universal
+        
+        !! Local pressure:
+        p_local = (p_ref/(Rmix_local*T_y0))*Rmix_local*T(i)*exp( &
+                  -(-grav(2)/(Rmix_local*T(i)) + (T_products-T_ref)*dcdy/T(i))*y)
+!write(934,*) y,dcdy,c
+
+        !! Density
+        ro(i) = p_local/(Rmix_local*T(i))
+        
+        !! Adjust the velocity
+        u(i) = u(i)*ro_inflow/ro(i)
+        v(i) = zero
+        w(i) = zero
+                        
+     end do
+     !$omp end parallel do
+     
+     !! Special apply values on boundaries
+     if(nb.ne.0)then
+        do j=1,nb
+           i=boundary_list(j)
+           if(node_type(i).eq.0) then !! wall initial conditions
+              u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
+           end if                 
+           T_bound(j) = T(i)
+        end do
+     end if
+ 
+  
+  
+     return
+  end subroutine make_RT_initial_conditions   
 !! ------------------------------------------------------------------------------------------------ 
   subroutine make_gaussian_hotspot(f_loc_x,f_loc_y,flame_thickness,T_hot)
      !! Add a Gaussian hotspot to the flow. The composition and velocity are unchanged.

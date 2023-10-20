@@ -4,7 +4,7 @@
 0.01d0
 
 !! Characteristic velocity scale (U_char)
-1.0d0
+2.05d0
 
 !! Start and end time (in multiples of L_char/Uchar)
 0.0d0 1.0d0
@@ -31,7 +31,7 @@
 0.7d0
 
 !! Mixture average flag
-0
+1
 
 !! Mach number (only used if isoT)
 0.02d0
@@ -50,6 +50,5 @@
 
 !! Initial base flow (0=zero, 1=uniform, 2=parabolic)
 1
-
 
 

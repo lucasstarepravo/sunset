@@ -98,10 +98,10 @@ program sunset
  
     
      !! Perform one time step (with Error estimation if reacting flows)
-#ifndef react
-     call step_rk3_4S_2R
-#else     
+#ifdef react
      call step_rk3_4S_2R_EE     
+#else     
+     call step_rk3_4S_2R
 #endif     
 
      !! Profiling and write some things to screen

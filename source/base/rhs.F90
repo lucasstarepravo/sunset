@@ -117,17 +117,12 @@ contains
      call calc_rhs_roE
 
      !! Calculate chemical production rates and add these to rhs of species equation
-#ifdef react     
      call calculate_chemical_production_rate
-!     call calculate_chemical_production_rate_dummy      
-#endif     
 
      !! Evaluate RHS for boundaries
      if(nb.ne.0) then 
         call calc_rhs_nscbc   
-#ifdef react
         deallocate(sumoverspecies_homega,reaction_rate_bound)
-#endif                
      end if
       
           

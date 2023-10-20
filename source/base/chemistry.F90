@@ -25,9 +25,9 @@ module chemistry
 
 
 contains
-#ifdef react
 !! ------------------------------------------------------------------------------------------------  
   subroutine calculate_chemical_production_rate
+#ifdef react
      integer(ikind) :: j,i,ispec,istep,jspec,jstep,ithirdbody,kspec
      real(rkind) :: arrhenius_rate_back,gibbs_tmp,tmpro,nu_dash_local
      real(rkind) :: mass_production_rate,arrhenius_rate0,arrhenius_rate
@@ -278,11 +278,7 @@ contains
      segment_tend = omp_get_wtime()
      segment_time_local(6) = segment_time_local(6) + segment_tend - segment_tstart  
 
-  
-     return
-  end subroutine calculate_chemical_production_rate  
-!! ------------------------------------------------------------------------------------------------ 
-  subroutine calculate_chemical_production_rate_dummy
+#else
      !! Dummy routine if we want to compile with react, but suppress chemical reactions (i.e. for
      !! pre-ignition inert simulations.       
      segment_tstart = omp_get_wtime()                  
@@ -295,11 +291,10 @@ contains
        
      !! Profiling
      segment_tend = omp_get_wtime()
-     segment_time_local(6) = segment_time_local(6) + segment_tend - segment_tstart  
-  
+     segment_time_local(6) = segment_time_local(6) + segment_tend - segment_tstart    
+#endif  
      return
-  end subroutine calculate_chemical_production_rate_dummy
-!! ------------------------------------------------------------------------------------------------    
-#endif
+  end subroutine calculate_chemical_production_rate  
+!! ------------------------------------------------------------------------------------------------ 
 end module chemistry
 

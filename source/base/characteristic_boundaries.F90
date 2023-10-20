@@ -64,7 +64,6 @@ contains
      
      !! Y source terms if any
      Ysource = zero     
-#ifdef react
      !! Loop over species and build source terms
      do ispec = 1,nspec
         !Lchar(5+ispec) is zero (hopefully!) and unchanged
@@ -73,12 +72,9 @@ contains
                             Lchar(5+ispec))
      end do
      Ysource = Ysource*Rgas_universal/Rgas_mix(i)                                       
-#endif     
    
      Lchar(2) = gammagasm1*(Lchar(1)+Lchar(5))/c/c &
-#ifdef react
               + tmpro*gammagasm1*sumoverspecies_homega(j)/p(i) &              
-#endif     
               + tmpro*Ysource         !! species source terms
               ! + (ro/T)*dT/dt
                            
@@ -164,9 +160,9 @@ contains
 
      !Lchar(1) is outgoing, don't modify
      Lchar(2) = (T_bound(j)-T(i))*c*nscbc_coeff/L_domain_x/gammagas &  !! Track T_bound(j)
-#ifdef react
+
               + (gammagas-one)*sumoverspecies_homega(j)/c/c &     !! Source terms
-#endif
+
               - (v(i)*gradb_ro(2) + tmpro*gradb_v(2) + &                !! Transverse terms
                  v(i)*gradb_p(2)/c/c + gammagas*p(i)*gradb_v(2)/c/c) &
               - (w(i)*gradb_ro(3) + tmpro*gradb_w(3) + &
@@ -178,9 +174,9 @@ contains
               - v(i)*gradb_w(2) - w(i)*gradb_w(3) - gradb_p(3)/ro(i) !! transverse terms
 
      Lchar(5) = (u(i)-u_inflow_local(j))*nscbc_coeff*(one-Ma)*c*c*one/L_domain_x &      !! Track u_inflow
-#ifdef react
+
               - half*(gammagas-one)*sumoverspecies_homega(j) &                 !! Source terms
-#endif
+
               - half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2))  & !! transverse 1 conv. terms
               - half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))    !! transverse 2 conv. terms  
              
@@ -236,9 +232,7 @@ contains
     
      !! Fixed temperature option       
      Lchar(2) = (gammagas-one)*(Lchar(1)+Lchar(5))/c/c &
-#ifdef react
               - tmpro*(gammagas-one)*sumoverspecies_homega(j)/p(i) &
-#endif     
               + zero
 !              - gammagasm1*tmpro*gradb_v(2) &   !! trans 1 term
 !              - gammagasm1*tmpro*gradb_w(3)     !! Trans 2 term 
@@ -310,9 +304,9 @@ contains
      if(u(i).gt.zero) then !! inflow options
         !Lchar(1) is outgoing, don't modify
         Lchar(2) = (T_bound(j)-T(i))*c*nscbc_coeff/L_domain_x/gammagas &  !! Track T_bound(j)
-#ifdef react
+
                  + (gammagas-one)*sumoverspecies_homega(j)/c/c &     !! Source terms
-#endif
+
                  - (v(i)*gradb_ro(2) + tmpro*gradb_v(2) + &                !! Transverse terms
                     v(i)*gradb_p(2)/c/c + gammagas*p(i)*gradb_v(2)/c/c) &
                  - (w(i)*gradb_ro(3) + tmpro*gradb_w(3) + &
@@ -324,18 +318,18 @@ contains
                  - v(i)*gradb_w(2) - w(i)*gradb_w(3) - gradb_p(3)/ro(i) !! transverse terms
 
         Lchar(5) = (u(i)-u_inflow_local(j))*nscbc_coeff*(one-Ma)*c*c*one/L_domain_x &      !! Track u_inflow
-#ifdef react
+
                  - half*(gammagas-one)*sumoverspecies_homega(j) &                 !! Source terms
-#endif
+
                  - half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2)+tmpro*c*v(i)*gradb_u(2))  & !! transverse 1 conv. terms
                  - half*(w(i)*gradb_p(3)+gammagas*p(i)*gradb_w(3)+tmpro*c*w(i)*gradb_u(3))    !! transverse 2 conv. terms  
 
 !! 4/8/23 - noticed what seems to be a bug, but can't remember. Commented for now and replaced
 !! wit hthe above 6 lines. Will delete in due course.
 !!        Lchar(5) = (p(i)-P_inflow)*nscbc_coeff*c*(one-Ma*Ma)/two/L_domain_x &      !! Track p_inflow
-!!#ifdef react
+!!
 !!                 - half*(gammagas-one)*sumoverspecies_homega(j) &                 !! Source terms
-!!#endif
+!!
 !!                 + zero
 !!!                 - (one-Ma)*half*(v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2)+ &
 !!!                   tmpro*c*v(i)*gradb_u(2))  & !! transverse 1 conv. terms
@@ -354,9 +348,7 @@ contains
         !Lchar(4) is outgoing
         !Lchar(5+1:5+nspec) is outgoing 
         Lchar(5) = (p(i)-p_inflow)*nscbc_coeff*c*(one-Ma*Ma)/two/L_domain_x &        !! track p_outflow
-#ifdef react
                  - half*(gammagas-one)*sumoverspecies_homega(j) &
-#endif
                  + zero !! Neglecting transverse terms
      end if
 #endif      
@@ -406,11 +398,8 @@ contains
      
         gammagas = cp(i)/(cp(i)-Rgas_mix(i))     
         Lchar(1) = (p(i)-p_outflow)*nscbc_coeff*c*(one-Ma*Ma)*half/L_domain_x &   !! track p_outflow
-#ifdef react
-                 - half*(gammagas-one)*sumoverspecies_homega(j) &
-#endif
-
-                 - half*tmpro*c*(grav(1)+driving_force(1)/tmpro)
+                 - half*(gammagas-one)*sumoverspecies_homega(j) &   !! reacting source terms
+                 - half*tmpro*c*(grav(1)+driving_force(1)/tmpro)    !! Body force source terms
                  !! N.B. It's more stable to just follow Sutherland 2003 and neglect transverse terms 
                  !- (one-Ma)*half*( &
 !                  v(i)*gradb_p(2)+gammagas*p(i)*gradb_v(2)-tmpro*c*v(i)*gradb_u(2)) !& !! trans1 conv.
