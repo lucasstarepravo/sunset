@@ -3,11 +3,11 @@
 #
 # ========================== OPTIONS ==============================================================
 # -------------------------------------------------------------------------------------------------
-# thermo     Isothermal (0) or thermal (1) flow                                        (default: 1)
-# react      Reacting (1) or inert (0) flow                                            (default: 0)
-# restart    Start from initial conditions (0) or restart file (1)                     (default: 0)
-# mpi        Shared only (0) or distributed-shared (1) acceleration                    (default: 0)          
+# mpi        Shared only (0) or distributed-shared (1) acceleration                    (default: 1)          
 # dim3       Two (0) or three (1) dimensional simulation                               (default: 0)
+# react      Reacting (1) or inert (0) flow                                            (default: 0)
+# thermo     Isothermal (0) or thermal (1) flow                                        (default: 1)
+# restart    Start from initial conditions (0) or restart file (1)                     (default: 0)
 # pgrad      Drive the flow with a pressure gradient and P.I.D control                 (default: 0)
 # tdtp       Temperature dependent transport properties (1) or constant (0)            (default: 0)
 # flout      Output the flame structure (1) or don't (0)                               (default: 0)
@@ -27,7 +27,7 @@
 
 #
 # Choose compiler depending on whether mpi
-ifeq ($(mpi),1)
+ifneq ($(mpi),0)
 FC := mpifort
 LD := mpifort
 else
@@ -64,7 +64,7 @@ FFLAGS += -Drestart
 endif
 
 # Multiprocessor? (use mpi?)
-ifeq ($(mpi),1)
+ifneq ($(mpi),0)
 FFLAGS += -Dmp
 endif
 

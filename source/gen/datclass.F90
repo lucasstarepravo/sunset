@@ -105,7 +105,7 @@ case(4) !! Poiseuille flow setup
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.0125d0!0.0125d0  ! channel width
+     yl=0.025d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
      dx0=xl/1000.0       !15
      xbcond=0;ybcond=1
