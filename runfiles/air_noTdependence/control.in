@@ -1,16 +1,16 @@
 !! This is the control file for sunset code
 
 !! Characteristic length-scale (L_char)
-0.01d0
-
-!! Characteristic velocity scale (U_char)
 1.0d0
 
+!! Characteristic velocity scale (U_char)
+0.5d0
+
 !! Start and end time (in multiples of L_char/Uchar)
-0.0d0 20.0d0
+0.0d0 100.0d0
 
 !! Output period (in multiples of L_char/U_char), stats output period
-1.0d-3 1.0d-4
+1.0d-2 1.0d-4
 
 !! Gravity vector (grav)
 0.0d0 0.0d0 0.0d0
@@ -19,13 +19,13 @@
 1.0d0
 
 !! Reference temp (for TDTP)
-3.0d-2
+0.991075509369512d0
 
 !! Reference viscosity (at T_ref)
-1.8d-5
+1.0d-3
 
 !! Reference pressure
-1.0d5
+285.7142857142857d0
 
 !! Prandtl number
 0.71d0
@@ -40,13 +40,13 @@
 0.0d0
 
 !! INFLOWS type (non-reflecting (0), hard (1), inout (2))
-0
+1
 
 !! Inflow velocity control parameters (profile, temporal control?, Ustart,Uend,ramp-time <- all dimensionless)
 1 0 1.0d0 1.0d0 0.5d0
 
 !! adiabatic(0) or isothermal (1) wall boundaries
-0
+1
 
 !! Initial base flow (0=zero, 1=uniform, 2=parabolic)
 1

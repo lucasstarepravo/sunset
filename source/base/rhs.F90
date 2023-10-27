@@ -478,8 +478,6 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
         !! Body force molecular diffusion heating term
         body_force = tmpro*grav + driving_force
         store_diff_E(i) = store_diff_E(i) - dot_product(body_force,speciessum_roVY(i,:))
-
-                                               
 #endif                                               
      end do
      !$omp end parallel do          
@@ -554,7 +552,6 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
         
         !! Viscous forces due to non-uniform viscosity
 #ifdef tdtp
-!        gradvisc(:) = r_temp_dependence*visc(i)*gradT(i,:)/T(i)
         f_visc_u = f_visc_u + gradvisc(i,1)*(fourthirds*gradu(i,1) - twothirds*(gradv(i,2)+gradw(i,3))) &
                             + gradvisc(i,2)*(gradu(i,2)+gradv(i,1)) &
                             + gradvisc(i,3)*(gradu(i,3)+gradw(i,1))
@@ -577,9 +574,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
         !! Store u.(F_visc + F_body/ro) for use in energy eqn later 
         store_diff_E(i) = store_diff_E(i) + u(i)*(f_visc_u + body_force_u) &
                                           + v(i)*(f_visc_v + body_force_v) &
-                                          + w(i)*(f_visc_w + body_force_w)
-                        
-                        
+                                          + w(i)*(f_visc_w + body_force_w)                        
         !! RHS 
         rhs_rou(i) = -tmp_scal_u - gradp(i,1) + body_force_u + f_visc_u 
         rhs_rov(i) = -tmp_scal_v - gradp(i,2) + body_force_v + f_visc_v
@@ -723,11 +718,12 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
   subroutine calc_rhs_roE
      !! Construct the RHS for energy equation. Do (almost) nothing if isothermal
 #ifndef isoT     
-     integer(ikind) :: i,j
+     integer(ikind) :: i,j,fla
      real(rkind) :: tmp_conv,tmp_visc,tmp_p,tmp_E
      real(rkind),dimension(:,:),allocatable :: grad2T
-     real(rkind) :: lapT_tmp
-     real(rkind),dimension(:,:),allocatable :: gradlambda     
+     real(rkind) :: lapT_tmp,dutdt
+     real(rkind),dimension(:,:),allocatable :: gradlambda  
+     real(rkind),dimension(2) :: gradulocal,gradvlocal,gradwlocal   
          
     
      !! Thermal conductivity gradient
@@ -762,6 +758,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
                  + (fourthirds*gradw(i,3) - twothirds*gradu(i,1) - twothirds*gradv(i,2))*gradw(i,3) &
                  + (gradu(i,2)+gradv(i,1))**two + (gradu(i,3)+gradw(i,1))**two + (gradv(i,3)+gradw(i,2))**two        
         store_diff_E(i) = store_diff_E(i) + visc(i)*tmp_visc
+
         
         !! Thermal diffusion term: div.(lambda*gradT + heating due to molecular diffusion)
         store_diff_E(i) = store_diff_E(i) + lambda_th(i)*lapT(i)  
@@ -770,6 +767,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
                 
         !! Build final RHS
         rhs_roE(i) = tmp_conv + tmp_p + tmp_E + store_diff_E(i)
+
      end do
      !$omp end parallel do
      
@@ -778,16 +776,32 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
      if(nb.ne.0)then
         allocate(grad2T(nb,3))
         call calc_grad2bound(T,grad2T)          
-        !$omp parallel do private(i,tmp_visc,lapT_tmp)
+        !$omp parallel do private(i,tmp_visc,lapT_tmp,gradulocal,gradvlocal,gradwlocal,xn,yn,fla)
         do j=1,nb
            i=boundary_list(j)
    
-           !! Viscous energy term: div.(tau u) (N.B. for walls, many terms in tmp_visc will =0)
-           tmp_visc = (fourthirds*gradu(i,1) - twothirds*gradv(i,2) - twothirds*gradw(i,3))*gradu(i,1) &
-                    + (fourthirds*gradv(i,2) - twothirds*gradw(i,3) - twothirds*gradu(i,1))*gradv(i,2) &
-                    + (fourthirds*gradw(i,3) - twothirds*gradu(i,1) - twothirds*gradv(i,2))*gradw(i,3) &
-                    + (gradu(i,2)+gradv(i,1))**two + (gradu(i,3)+gradw(i,1))**two &
-                    + (gradv(i,3)+gradw(i,2))**two         
+           !! Viscous energy term: div.(tau u) (N.B. for walls, we need to rotate gradients)
+           if(node_type(i).eq.0) then
+              xn=rnorm(i,1);yn=rnorm(i,2)           
+              gradulocal(1) = xn*gradu(i,1) - yn*gradu(i,2)  !! Convert gradients to x-y-z coordinates
+              gradvlocal(1) = xn*gradv(i,1) - yn*gradv(i,2)
+              gradwlocal(1) = xn*gradw(i,1) - yn*gradw(i,2)
+              gradulocal(2) = yn*gradu(i,1) + xn*gradu(i,2)
+              gradvlocal(2) = yn*gradv(i,1) + xn*gradv(i,2)
+              gradwlocal(2) = yn*gradw(i,1) + xn*gradw(i,2)           
+           
+              tmp_visc = (fourthirds*gradulocal(1) - twothirds*gradvlocal(2) - twothirds*gradw(i,3))*gradulocal(1) &
+                       + (fourthirds*gradvlocal(2) - twothirds*gradw(i,3) - twothirds*gradulocal(1))*gradvlocal(2) &
+                       + (fourthirds*gradw(i,3) - twothirds*gradulocal(1) - twothirds*gradvlocal(2))*gradw(i,3) &
+                       + (gradulocal(2)+gradvlocal(1))**two + (gradu(i,3)+gradwlocal(1))**two &
+                       + (gradv(i,3)+gradwlocal(2))**two   
+           else
+              tmp_visc = (fourthirds*gradu(i,1) - twothirds*gradv(i,2) - twothirds*gradw(i,3))*gradu(i,1) &
+                       + (fourthirds*gradv(i,2) - twothirds*gradw(i,3) - twothirds*gradu(i,1))*gradv(i,2) &
+                       + (fourthirds*gradw(i,3) - twothirds*gradu(i,1) - twothirds*gradv(i,2))*gradw(i,3) &
+                       + (gradu(i,2)+gradv(i,1))**two + (gradu(i,3)+gradw(i,1))**two &
+                       + (gradv(i,3)+gradw(i,2))**two         
+           endif
            store_diff_E(i) = store_diff_E(i) + visc(i)*tmp_visc           
 
            !! Evaluate temperature Laplacian and zero parts as required
@@ -802,10 +816,15 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
            store_diff_E(i) = store_diff_E(i) + lambda_th(i)*lapT_tmp + dot_product(gradlambda(i,:),gradT(i,:))               
                      
            !! RHS (visc + cond + transverse + source)
-           rhs_roE(i) = - v(i)*gradroE(i,2) - roE(i)*gradv(i,2) - w(i)*gradroE(i,3) - roE(i)*gradw(i,3) &
-                      - p(i)*gradv(i,2) - v(i)*gradp(i,2) - p(i)*gradw(i,3) - w(i)*gradp(i,3) &
-                      + store_diff_E(i) 
-                                            
+           if(node_type(i).eq.0) then          
+              !! u,v,w=0 on wall, so velocity gradients are also zero along wall. Only diffusion terms.
+              rhs_roE(i) = store_diff_E(i) 
+           else                      
+              rhs_roE(i) = - v(i)*gradroE(i,2) - roE(i)*gradv(i,2) - w(i)*gradroE(i,3) - roE(i)*gradw(i,3) &
+                         - p(i)*gradv(i,2) - v(i)*gradp(i,2) - p(i)*gradw(i,3) - w(i)*gradp(i,3) &
+                         + store_diff_E(i) 
+           end if                                                               
+                                                               
         end do
         !$omp end parallel do
         deallocate(grad2T)

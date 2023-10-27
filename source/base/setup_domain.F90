@@ -267,7 +267,7 @@ contains
         end if
      end do    
      
-     !! Setup the flags for flux-zeroing
+     !! Setup the flags for flux-zeroing (ZNF=zero-normal-flux)
      if(nb.ne.0)then
         allocate(znf_mdiff(nb),znf_tdiff(nb),znf_vdiff(nb),znf_vtdiff(nb))
         do j=1,nb

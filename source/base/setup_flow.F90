@@ -82,7 +82,7 @@ contains
 !     call load_flame_file
 
      !! Make the initial conditions for a Rayleigh-Taylor instability
-!     call make_RT_initial_conditions(-0.0d0,2.0d-4,2.366d3)
+!     call make_RT_initial_conditions(-0.0d0,2.0d-4,two*T_ref)
      
      !! A messy routine to play with for other initial conditions
 !     call hardcode_initial_conditions     
@@ -354,7 +354,7 @@ contains
      integer(ikind) :: i,ispec,j
      real(rkind),intent(in) :: flame_location,flame_thickness,T_products
      real(rkind) :: fl_thck
-     real(rkind) :: c,Rmix_local,x,y,z,ro_inflow
+     real(rkind) :: c,Rmix_local,x,y,z,ro_ref_hot,ro_ref_cold,ro_ref_local
      real(rkind) :: T_y0,dcdy,p_local
 
      !! Scale thickness because position vectors are scaled...
@@ -368,27 +368,22 @@ contains
      Rmix_local = Rmix_local*Rgas_universal     
 
      !! Inflow density
-     ro_inflow = p_ref/(Rmix_local*T_ref)
-     
-     !! Temperature at y0
-     T_y0 = T_ref + half*(T_products - T_ref)
-    
+     ro_ref_cold = p_ref/(Rmix_local*T_ref)
+     ro_ref_hot = p_ref/(Rmix_local*T_products)
+         
      !! Loop over all nodes and impose values
-     !$omp parallel do private(x,y,z,c,Rmix_local,ispec,dcdy,p_local)
+     !$omp parallel do private(x,y,z,c,Rmix_local,ispec,dcdy,ro_ref_local)
      do i=1,npfb
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
                 
         !! Error function based progress variable
-        z = 0.00d0*sin(two*pi*x/(xmax-xmin))
-        c = half*(one + erf((flame_location-y+z)/fl_thck))        
-        dcdy = zero*(one/one)*half*(two/(fl_thck*sqrt(pi)))*exp(-((flame_location-y+z)/fl_thck)**two)
-        
+        c = half*(one + erf((flame_location-x)/fl_thck))        
+
         !! Temperature profile
-        T(i) = T(i) + (T_products - T(i))*c
-        
+         
         !! Composition
         do ispec = 1,nspec
-           Yspec(i,ispec) = (one-c)*Yspec_reactants(ispec) + c*Yspec_products(ispec)
+!           Yspec(i,ispec) = (one-c)*Yspec_reactants(ispec) + c*Yspec_products(ispec)
         end do
         
         !! Local mixture gas constant
@@ -398,16 +393,24 @@ contains
         end do
         Rmix_local = Rmix_local*Rgas_universal
         
-        !! Local pressure:
-        p_local = (p_ref/(Rmix_local*T_y0))*Rmix_local*T(i)*exp( &
-                  -(-grav(2)/(Rmix_local*T(i)) + (T_products-T_ref)*dcdy/T(i))*y)
-!write(934,*) y,dcdy,c
-
+        
+        if(x.lt.zero) then !! Cold region
+           T(i) = T_ref
+           ro_ref_local = ro_ref_cold
+        else               !! Hot region
+           T(i) = T_products
+           ro_ref_local = ro_ref_hot
+        end if
+        
         !! Density
-        ro(i) = p_local/(Rmix_local*T(i))
+!        ro(i) = ro_ref_local*exp(grav(2)*x/(Rmix_local*T(i)))
+        ro(i) = p_ref/(Rmix_local*T(i))        
+        
+        !! Local pressure
+        p(i) = ro(i)*Rmix_local*T(i)        
         
         !! Adjust the velocity
-        u(i) = u(i)*ro_inflow/ro(i)
+        u(i) = u(i)!*ro_ref_cold/ro(i)        
         v(i) = zero
         w(i) = zero
                         
@@ -489,6 +492,7 @@ contains
      real(rkind) :: Rmix_local,x,y,z,ro_inflow
 
 
+#ifndef isoT
      !! Inflow mixture gas constant
      Rmix_local = zero
      do ispec=1,nspec
@@ -498,9 +502,12 @@ contains
 
      !! Inflow density based on reference pressure and temperature
      ro_inflow = p_ref/(Rmix_local*T_ref)
+#else
+     ro_inflow = rho_char
+#endif     
     
      !! Loop over all nodes and impose values
-     !$omp parallel do private(x,y,z,Rmix_local,ispec)
+     !$omp parallel do private(x,y,z,ispec)
      do i=1,npfb
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
               

@@ -42,13 +42,14 @@ program datgen
   
 
   write(*,*) 'Cases: '
-  write(*,*) '  case 1:  box for Rayleigh-Taylor'
-  write(*,*) '  case 2:  unit torus with 4 cylinders'
+  write(*,*) '  case 1:  Currently empty'
+  write(*,*) '  case 2:  Periodic channel'
   write(*,*) '  case 3:  unit torus'
-  write(*,*) '  case 4:  porous blobby'
-  write(*,*) '  case 5:  NACA 0012'  
-  write(*,*) '  case 6:  Channel flows with obstacle'    
-  write(*,*) '  case 7:  Something periodic with obstacle'      
+  write(*,*) '  case 4:  Rayleigh-Taylor'
+  write(*,*) '  case 5:  Simple flame tube'  
+  write(*,*) '  case 6:  Hong Im style bluff body'    
+  write(*,*) '  case 7:  Porous geometry with inflow/outflow'
+  write(*,*) '  case 8:  Isometric cylinder array'      
   write(*,*) '  '
   write(*,*) 'Input test case number: '
   read(*,*) itest
@@ -58,7 +59,25 @@ program datgen
 !! ------------------------------------------------------------------------------------------------
   case(1) !! EMPTY
 !! ------------------------------------------------------------------------------------------------
-  case(2) !! EMPTY
+  case(2) !! Poiseuille flow
+
+     yl=1.0d0
+     xl=yl/2.0d0
+     dx0=yl/200.0d0
+     xbcond=1;ybcond=0
+     
+     nb_patches = 4
+     allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
+     allocate(b_type(nb_patches))
+     b_type(:) = (/ 0, 3, 0, 3/)  
+     b_node(1,:) = (/-0.5d0*xl, -0.5d0*yl /)
+     b_node(2,:) = (/0.5d0*xl, -0.5d0*yl /)
+     b_node(3,:) = (/0.5d0*xl, 0.5d0*yl /)
+     b_node(4,:) = (/-0.5d0*xl, 0.5d0*yl /)
+     nb_blobs = 0;n_blob_coefs=0
+
+     dxmin = dx0/1.0d0
+     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...  
 !! ------------------------------------------------------------------------------------------------
   case(3) !! Kolmogorov flow
 
@@ -82,33 +101,38 @@ program datgen
 
 
 !! ------------------------------------------------------------------------------------------------
-case(4) !! Poiseuille flow setup
+case(4) !! Rayleigh-Taylor geometry
 
-     yl=1.0d0
-     xl=yl/4.0d0
-     dx0=yl/400.0d0
-     xbcond=1;ybcond=0
+     yl=0.5d0!0.0125d0  ! channel width
+     xl=1.0d0 ! channel length
+     dx0=xl/200.0       !15
+     xbcond=0;ybcond=2
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
      allocate(b_type(nb_patches))
-     b_type(:) = (/ 0, 3, 0, 3/)  
-     b_node(1,:) = (/-0.5d0*xl, -0.5d0*yl /)
-     b_node(2,:) = (/0.5d0*xl, -0.5d0*yl /)
-     b_node(3,:) = (/0.5d0*xl, 0.5d0*yl /)
-     b_node(4,:) = (/-0.5d0*xl, 0.5d0*yl /)
-     nb_blobs = 0;n_blob_coefs=0
+     b_type(:) = (/ 3, 2, 3, 1/)  
+     b_node(1,:) = (/ -0.5d0*xl, -0.5d0*yl /)
+     b_node(2,:) = (/ 0.5d0*xl, -0.5d0*yl /)
+     b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
+     b_node(4,:) = (/ -0.5d0*xl, 0.5d0*yl /)
+     nb_blobs = 0;n_blob_coefs=6
+!     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs))
+!     blob_centre(1,:)=(/0.d0,0.d0/); !! Central
+!     do i=1,nb_blobs
+!        blob_coeffs(i,:)=h0*(/1.0d0,0.4d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0
+!     end do
 
      dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...
+     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx0*1.0d0  !! dx for solids and in/outs..
 
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.025d0!0.0125d0  ! channel width
+     yl=0.0125d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
      dx0=xl/1000.0       !15
-     xbcond=0;ybcond=1
+     xbcond=0;ybcond=2
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))

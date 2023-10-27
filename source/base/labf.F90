@@ -927,17 +927,17 @@ contains
      call openblas_set_num_threads(1)
 
 
-     !$OMP PARALLEL DO PRIVATE(iii,nsize,k,j,rij,rad,qq,x,y,xx,yy, &
+     !$OMP PARALLEL DO PRIVATE(i,nsize,k,j,rij,rad,qq,x,y,xx,yy, &
      !$OMP ff1,gvec,xvec,i1,i2,hh,amati2,amati3,amati4 &
      !$OMP ,bveci2,bveci3,bveci4,xveci,gveci)
      do ii=1,nb
-        iii=boundary_list(ii)  !! Index of boundary node
+        i=boundary_list(ii)  !! Index of boundary node
         nsize = nsizeG
         amati2=zero;amati3=zero;amati4=zero
         hh=h(i)
-        do k=1,ij_count(iii)
-           j = ij_link(k,iii) 
-           rij(:) = rp(iii,:) - rp(j,:) + two*s(iii)*rnorm(iii,:)
+        do k=1,ij_count(i)
+           j = ij_link(k,i) 
+           rij(:) = rp(i,:) - rp(j,:) + two*s(i)*rnorm(i,:)
            x = -rij(1);y = -rij(2)
            
            !! Different types of ABF need different arguments (xx,yy)
@@ -1014,9 +1014,9 @@ contains
         call dgesv(nsize,1,amati4,nsize,i1,bveci4,nsize,i2)
 
         !! Another loop of neighbours to calculate interparticle weights for interpolation i0 to i3 and i4
-        do k=1,ij_count(iii)  !! Note, we're looping over neighbours of i0
-           j = ij_link(k,iii) 
-           rij(:) = rp(iii,:) - rp(j,:) + two*s(iii)*rnorm(iii,:)
+        do k=1,ij_count(i)  !! Note, we're looping over neighbours of i0
+           j = ij_link(k,i) 
+           rij(:) = rp(i,:) - rp(j,:) + two*s(i)*rnorm(i,:)
            x=-rij(1);y=-rij(2)
 
            !! Calculate arguments (diff ABFs need args over diff ranges)
@@ -1043,9 +1043,9 @@ contains
                    
         end do          
         !! Another loop of neighbours to calculate interparticle weights for interpolation i1 to i3 and i4
-        do k=1,ij_count(iii+1) !! Note we're looping over neighbours of i1
-           j = ij_link(k,iii+1) 
-           rij(:) = rp(iii,:) - rp(j,:) + two*s(iii)*rnorm(iii,:)
+        do k=1,ij_count(i+1) !! Note we're looping over neighbours of i1
+           j = ij_link(k,i+1) 
+           rij(:) = rp(i,:) - rp(j,:) + two*s(i)*rnorm(i,:)
            x=-rij(1);y=-rij(2)
 
            !! Calculate arguments (diff ABFs need args over diff ranges)
@@ -1079,7 +1079,7 @@ contains
      !$OMP END PARALLEL DO
      deallocate(gvec,xvec)   
      deallocate(bveci2,bveci3,bveci4,gveci,xveci,amati2,amati3,amati4)
-!stop             
+
      return
   end subroutine calc_interp  
 !! ------------------------------------------------------------------------------------------------

@@ -132,8 +132,7 @@ contains
         cp(i) = cp(i)*tmpro !! Divide by ro to get cp
 
         !! Evaluate the pressure        
-        p(i) = ro(i)*Rgas_mix(i)*T(i)   
-  
+        p(i) = ro(i)*Rgas_mix(i)*T(i)
      end do
      !$omp end parallel do
      
@@ -148,7 +147,7 @@ contains
      !$omp end parallel do      
      
 #endif     
-        
+         
      !! Profiling
      segment_tend = omp_get_wtime()
      segment_time_local(9) = segment_time_local(9) + segment_tend - segment_tstart  

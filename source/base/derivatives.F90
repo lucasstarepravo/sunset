@@ -121,9 +121,9 @@ contains
     real(rkind),dimension(:),intent(in) :: phi1,phi2
 #endif
     real(rkind),dimension(:),intent(inout) :: divphi
-    integer :: i,j,k
+    integer :: i,j,k,jj
 !    real(rkind),dimension(2) :: fji
-    real(rkind) :: divtmp
+    real(rkind) :: divtmp,xn,yn,dudn,dvdn
     
     segment_tstart = omp_get_wtime()         
     
@@ -151,6 +151,32 @@ contains
     end do
     !$OMP END PARALLEL DO  
 #endif   
+  
+    !! Different formulation for walls due to coordinate rotation
+    if(nb.ne.0) then
+       !$omp parallel do private(i,j,k,xn,yn,dudn,dvdn)
+       do jj=1,nb
+          i=boundary_list(jj)
+          if(node_type(i).eq.0)then  !! in bound norm coords for walls
+             xn=rnorm(i,1);yn=rnorm(i,2)
+             
+             !! Calculate gradients of u and v
+             dudn = zero;dvdn=zero
+             do k=1,ij_count(i)
+                j=ij_link(k,i)
+                dudn = dudn + (phi1(j)-phi1(i))*ij_w_grad(1,k,i)  
+                dvdn = dvdn + (phi2(j)-phi2(i))*ij_w_grad(1,k,i)
+             end do
+
+             divphi(i) = xn*dudn + yn*dvdn
+
+          end if
+       end do
+       !$omp end parallel do
+
+       !! No need to add dw/dz as we know this is zero on walls.
+    end if
+
     
     !! Profiling
     segment_tend = omp_get_wtime()

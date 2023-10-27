@@ -281,7 +281,7 @@ contains
         
         !! Calculate hydrostatic energy gradient
         rij = rp(j,:)-rp(i,:)
-        delta_roE = ro(i)*dot_product(grav,rij)!/gammagasm1  MODIFY
+        delta_roE = zero!ro(i)*dot_product(grav,rij)!/gammagasm1  MODIFY
          
         roE(j) = roE(i) + delta_roE
         do ispec=1,nspec
