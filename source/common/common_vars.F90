@@ -30,8 +30,8 @@ module common_vars
 
   !! Control flags
   integer(ikind) :: flag_mix_av,flag_inflow_type,flag_wall_type 
-  integer(ikind) :: flag_uinflow_control,flag_inflow_profile
-  integer(ikind) :: flag_base_flow  
+  integer(ikind) :: flag_uinflow_control
+  integer(ikind) :: flag_base_flow_profile  
 
   
   !! Evolved fluid quantities

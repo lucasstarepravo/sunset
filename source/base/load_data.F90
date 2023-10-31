@@ -141,7 +141,7 @@ contains
 
      !! Read inflow velocity control parameters
      read(12,*)
-     read(12,*) flag_inflow_profile,flag_uinflow_control,u_inflow_start,u_inflow_end,u_inflow_ramptime
+     read(12,*) flag_uinflow_control,u_inflow_start,u_inflow_end,u_inflow_ramptime
      read(12,*)     
      u_inflow_start=u_inflow_start*u_char
      u_inflow_end = u_inflow_end*u_char
@@ -154,7 +154,7 @@ contains
 
      !! Read in base flow type
      read(12,*)
-     read(12,*) flag_base_flow
+     read(12,*) flag_base_flow_profile
 !     read(12,*)  
 
      

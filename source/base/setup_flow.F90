@@ -306,6 +306,7 @@ contains
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
                 
         !! Error function based progress variable
+        z=0.01*sin(two*pi*y/(ymax-ymin))
         c = half*(one + erf((x-flame_location)/fl_thck))
         
         !! Temperature profile
@@ -523,11 +524,11 @@ contains
         ro(i) = ro_inflow
         
         !! Velocity
-        if(flag_base_flow.eq.0) then !! Zero flow
+        if(flag_base_flow_profile.eq.0) then !! Zero flow
            u(i) = zero
-        else if(flag_base_flow.eq.1) then !! Uniform flow
+        else if(flag_base_flow_profile.eq.1) then !! Uniform flow
            u(i) = u_inflow_start
-        else if(flag_base_flow.eq.2) then !! Parabolic flow
+        else if(flag_base_flow_profile.eq.2) then !! Parabolic flow
            y=y/(ymax-ymin)
            u(i) = u_inflow_start*six*(half-y)*(half+y)         
         end if
