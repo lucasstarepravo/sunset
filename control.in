@@ -43,7 +43,7 @@
 1
 
 !! Inflow velocity control parameters (profile, temporal control?, Ustart,Uend,ramp-time <- all dimensionless)
-1 0 1.0d0 1.0d0 0.5d0
+0 1.0d0 1.0d0 0.5d0
 
 !! WALLS: adiabatic(0) or isothermal (1)
 0
