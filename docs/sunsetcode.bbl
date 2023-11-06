@@ -1,4 +1,4 @@
-\begin{thebibliography}{12}
+\begin{thebibliography}{14}
 \expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
 \providecommand{\url}[1]{\texttt{#1}}
 \providecommand{\href}[2]{#2}
@@ -28,6 +28,19 @@
 \newblock \bibinfo{journal}{Journal of Computational Physics}
   \bibinfo{volume}{449} (\bibinfo{year}{2022}) \bibinfo{pages}{110760}.
   \DOIprefix\doi{https://doi.org/10.1016/j.jcp.2021.110760}.
+%Type = Misc
+\bibitem[{King(2023)}]{king_2023}
+\bibinfo{author}{J.~R.~C. King}, \bibinfo{title}{A mesh-free framework for
+  high-order direct numerical simulations of combustion in complex geometries},
+  \bibinfo{year}{2023}. \href{http://arxiv.org/abs/2310.02200}{{\tt
+  arXiv:2310.02200}}.
+%Type = Techreport
+\bibitem[{Gordon and McBride(1971)}]{gordon_1971}
+\bibinfo{author}{S.~Gordon}, \bibinfo{author}{B.~J. McBride},
+  \bibinfo{title}{Computer program for calculation of complex chemical
+  equilibrium compositions, rocket per- formance, incident and reflected
+  shocks, and {C}hapman-{J}ouguet detonations}, \bibinfo{type}{Technical
+  Report} \bibinfo{number}{SP273}, NASA, \bibinfo{year}{1971}.
 %Type = Techreport
 \bibitem[{Kee et~al.(1986)Kee, Dixon-Lewis, Warnatz, Coltrin, and
   Miller}]{kee_1986}
@@ -37,22 +50,6 @@
   package for the evaluation of gas-phase multicomponent transport properties},
   \bibinfo{type}{Technical Report} \bibinfo{number}{SAND86-8246}, Sandia
   National Laboratories, \bibinfo{year}{1986}.
-%Type = Article
-\bibitem[{Giacomazzi et~al.(2008)Giacomazzi, Picchia, and
-  Arcidiacono}]{giacomazzi_2008}
-\bibinfo{author}{E.~Giacomazzi}, \bibinfo{author}{F.~R. Picchia},
-  \bibinfo{author}{N.~Arcidiacono},
-\newblock \bibinfo{title}{A review of chemical diffusion: Criticism and limits
-  of simplified methods for diffusion coefficient calculation},
-\newblock \bibinfo{journal}{Combustion Theory and Modelling}
-  \bibinfo{volume}{12} (\bibinfo{year}{2008}) \bibinfo{pages}{135--158}.
-  \DOIprefix\doi{10.1080/13647830701550370}.
-%Type = Book
-\bibitem[{Hirschfelder et~al.(1964)Hirschfelder, Curtiss, and
-  Bird}]{hirschfelder_curtiss}
-\bibinfo{author}{J.~O. Hirschfelder}, \bibinfo{author}{C.~F. Curtiss},
-  \bibinfo{author}{R.~B. Bird}, \bibinfo{title}{{Molecular theory of gases and
-  liquids}}, \bibinfo{year}{1964}.
 %Type = Book
 \bibitem[{Ern and Giovangigli(1994)}]{ern_1994}
 \bibinfo{author}{A.~Ern}, \bibinfo{author}{V.~Giovangigli},
@@ -67,6 +64,12 @@
 \newblock \bibinfo{journal}{Journal of Computational Physics}
   \bibinfo{volume}{120} (\bibinfo{year}{1995}) \bibinfo{pages}{105--116}.
   \DOIprefix\doi{10.1006/jcph.1995.1151}.
+%Type = Book
+\bibitem[{Hirschfelder et~al.(1964)Hirschfelder, Curtiss, and
+  Bird}]{hirschfelder_curtiss}
+\bibinfo{author}{J.~O. Hirschfelder}, \bibinfo{author}{C.~F. Curtiss},
+  \bibinfo{author}{R.~B. Bird}, \bibinfo{title}{{Molecular theory of gases and
+  liquids}}, \bibinfo{year}{1964}.
 %Type = Article
 \bibitem[{Fornberg and Flyer(2015)}]{fornberg_2015a}
 \bibinfo{author}{B.~Fornberg}, \bibinfo{author}{N.~Flyer},
@@ -92,6 +95,11 @@
 \newblock \bibinfo{journal}{Applied Numerical Mathematics} \bibinfo{volume}{14}
   (\bibinfo{year}{1994}) \bibinfo{pages}{397 -- 433}.
   \DOIprefix\doi{10.1016/0168-9274(94)00004-2}.
+%Type = Book
+\bibitem[{Poinsot and Veynante(2005)}]{poinsot_2005}
+\bibinfo{author}{T.~Poinsot}, \bibinfo{author}{D.~Veynante},
+  \bibinfo{title}{Theoretical and numerical combustion}, \bibinfo{publisher}{RT
+  Edwards, Inc.}, \bibinfo{year}{2005}.
 %Type = Article
 \bibitem[{Sutherland and Kennedy(2003)}]{sutherland_2003}
 \bibinfo{author}{J.~C. Sutherland}, \bibinfo{author}{C.~A. Kennedy},

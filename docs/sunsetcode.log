@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2023.6.1)  30 OCT 2023 16:55
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2023.6.1)  6 NOV 2023 16:27
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -425,40 +425,26 @@ LaTeX Info: Redefining \nameref on input line 11.
 Class revtex4-1 Info: Taking \maketitle back from hyperref on input line 11.
 \openout3 = `sunsetcodeNotes.bib'.
 
- [1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}] [2] [3] [4] [5]
-<./stencil.png, id=188, 927.465pt x 694.595pt>
-File: ./stencil.png Graphic file (type png)
-<use ./stencil.png>
-Package pdftex.def Info: ./stencil.png  used on input line 192.
-(pdftex.def)             Requested size: 306.00311pt x 229.17467pt.
-<./aerofoil_dist.png, id=194, 2091.815pt x 1033.8625pt>
-File: ./aerofoil_dist.png Graphic file (type png)
-<use ./aerofoil_dist.png>
-Package pdftex.def Info: ./aerofoil_dist.png  used on input line 201.
-(pdftex.def)             Requested size: 504.9028pt x 249.53609pt.
- [6 <./stencil.png>] [7 <./aerofoil_dist.png>]
-
-Package amsmath Warning: Foreign command \atopwithdelims;
-(amsmath)                \frac or \genfrac should be used instead
-(amsmath)                 on input line 236.
-
-[8]
-Overfull \hbox (16.69908pt too wide) in paragraph at lines 258--269
- []$ 
- []
-
-[9] (./sunsetcode.bbl [10]) [11] (./sunsetcode.aux)
+ [1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}] [2] [3] [4] [5] [6] [7]
+ [8] [9] [10]
+<case7.png, id=310, 1102.1175pt x 790.955pt>
+File: case7.png Graphic file (type png)
+<use case7.png>
+Package pdftex.def Info: case7.png  used on input line 349.
+(pdftex.def)             Requested size: 458.99689pt x 329.4109pt.
+ (./sunsetcode.bbl [11]
+[12 <./case7.png>]) [13] (./sunsetcode.aux)
 Package rerunfilecheck Info: File `sunsetcode.out' has not changed.
-(rerunfilecheck)             Checksum: C08562FACF97732E1B622D7A48FC35DF;3806.
+(rerunfilecheck)             Checksum: 7002237B035A1EA9694D776A408D09DC;5354.
  ) 
 Here is how much of TeX's memory you used:
- 11170 strings out of 480247
- 170532 string characters out of 5896152
- 501150 words of memory out of 5000000
- 28851 multiletter control sequences out of 15000+600000
- 479935 words of font info for 64 fonts, out of 8000000 for 9000
+ 11174 strings out of 480247
+ 170566 string characters out of 5896152
+ 487606 words of memory out of 5000000
+ 28859 multiletter control sequences out of 15000+600000
+ 479165 words of font info for 62 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
- 60i,11n,63p,1263b,508s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 60i,11n,63p,1134b,529s stack positions out of 5000i,500n,10000p,200000b,80000s
  </home/jack/.texlive2021/texmf-var/fonts/pk/ljfour/jknappen/ec/tcrm1000.600p
 k></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></us
 r/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/shar
@@ -467,23 +453,23 @@ ve/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/share/texlive/tex
 mf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive/texmf-dis
 t/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/share/texlive/texmf-dist/fonts
 /type1/public/amsfonts/cm/cmmi7.pfb></usr/share/texlive/texmf-dist/fonts/type1/
-public/amsfonts/cm/cmmi9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/
-amsfonts/cm/cmmib10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfo
-nts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/
-cmr5.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb
-></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/s
-hare/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/tex
-live/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/share/texlive/tex
-mf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dis
-t/fonts/type1/public/amsfonts/cm/cmsy5.pfb></usr/share/texlive/texmf-dist/fonts
-/type1/public/amsfonts/cm/cmsy6.pfb></usr/share/texlive/texmf-dist/fonts/type1/
-public/amsfonts/cm/cmsy7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/
-amsfonts/cm/cmsy9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfont
-s/cm/cmti9.pfb>
-Output written on sunsetcode.pdf (11 pages, 2988886 bytes).
+public/amsfonts/cm/cmmib10.pfb></usr/share/texlive/texmf-dist/fonts/type1/publi
+c/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfo
+nts/cm/cmr5.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/c
+mr7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb>
+</usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/sh
+are/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/te
+xlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy5.pfb></usr/share/texlive/t
+exmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/share/texlive/texmf-di
+st/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/texlive/texmf-dist/font
+s/type1/public/amsfonts/cm/cmti10.pfb></usr/share/texlive/texmf-dist/fonts/type
+1/public/amsfonts/cm/cmti9.pfb></usr/share/texlive/texmf-dist/fonts/type1/publi
+c/amsfonts/cm/cmtt10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsf
+onts/cm/cmtt9.pfb>
+Output written on sunsetcode.pdf (13 pages, 453175 bytes).
 PDF statistics:
- 414 PDF objects out of 1000 (max. 8388607)
- 349 compressed objects within 4 object streams
- 115 named destinations out of 1000 (max. 500000)
- 171 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 459 PDF objects out of 1000 (max. 8388607)
+ 393 compressed objects within 4 object streams
+ 114 named destinations out of 1000 (max. 500000)
+ 270 words of extra memory for PDF output out of 10000 (max. 10000000)
 

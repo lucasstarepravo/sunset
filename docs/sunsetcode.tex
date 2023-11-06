@@ -10,14 +10,14 @@
 
 \begin{document}
 %front matter
-\title{A scalable high-order mesh-free framework for direct numerical simulations of combustion}
+\title{SUNSET-code documentation}
 
 \author{J. R. C. King}
 \email{jack.king@manchester.ac.uk}
-\affiliation{Department of Mechanical, Aerospace and Civil Engineering, The University of Manchester, Manchester, M13 9PL, UK}
+\affiliation{School of Engineering, The University of Manchester, UK}
 \date{\today}
 \begin{abstract}
-This document details the governing equations and numerical methods used in the \textbf{S}calable \textbf{U}nstructured \textbf{N}ode-\textbf{SET} code (aka. SUNSET code).
+This document details the governing equations and numerical methods used in the \textbf{S}calable \textbf{U}nstructured \textbf{N}ode-\textbf{SET} code (aka. SUNSET code), and provides brief instructions for configuration and running of the code.
 
 \end{abstract}
 
@@ -26,30 +26,26 @@ This document details the governing equations and numerical methods used in the 
 
 \section{Introduction}
 
-This document describes the \textbf{S}calable \textbf{U}nstructured \textbf{N}ode-\textbf{SET} code (aka. SUNSET code). The code is designed for direct numerical simulations of compressible turbulent reacting flows in complex geometries. It builds on the work in~\cite{king_2020,king_2022}, using the Local Anisotropic Basis Function Method (LABFM) for spatial discretisation, combined with high-order finite differences in the third dimension, and a third-order Runge-Kutta time integration.
+This document describes the \textbf{S}calable \textbf{U}nstructured \textbf{N}ode-\textbf{SET} code (aka. SUNSET code). The code is designed for direct numerical simulations of compressible turbulent reacting flows in non-trivial geometries. It builds on the work in~\cite{king_2020,king_2022}, using the Local Anisotropic Basis Function Method (LABFM) for spatial discretisation, combined with high-order finite differences in the third dimension, and a third-order Runge-Kutta time integration. This guide should be read in conjunction with the preprint~\cite{king_2023}.
 
-Key features:
+\subsection{Key features at a glance:}
 \begin{itemize}
-\item Nearly arbitrary geometries in the $x_{1}-x_{2}$ plane. Homogeneous in the $x_{3}$ direction.
-\item High-order ($8^{th}$) discretisation in space dropping to $4^{th}$ order at boundaries.
-\item $3^{rd}$ order time integration.
-\item NSCBC formulation for (non-reflecting) inflows and outflows, and isothermal or adiabatic walls.
-\item Periodic/symmetry boundaries also available.
-\item Spatially variable resolution, including on boundaries.
-\item Parallelised for MPI+OpenMP, scales well up to $>1000$ cores.
-\item Can handle any desired level of chemistry (e.g. single-step, $21$ step $H_{2}$, $25$ step $CH_{4}$)
+\item Solves the fully compressible multi-species reacting Navier-Stokes equations, with detailed chemistry, on an unstructured node-set.
+\item Resolution may be non-uniform in space, including along boundaries.
+\item Spatial discretisation uses LABFM in the $x_{1}-x_{2}$ plane, combined with high-order finite differences in the (homogeneous) third dimension $x_{3}$.
+\item High-order (up to $10^{th}$) discretisation in space dropping to $4^{th}$ order at boundaries.
+\item $3^{rd}$ order explicit Rungke-Kutta time integration with adaptive error control.
+\item Boundary conditions using NSCBC: (non-reflecting) inflows \& outflows, isothermal or adiabatic walls.
+\item Periodic/symmetry/low-order-wall boundaries also available.
+\item Written in \verb|Fortran 90|, accelerated with MPI \& OpenMP.
 \end{itemize}
 
 
 \subsection{A comment on notation}
 
-Subscripts $i$, $j$, and $k$ are vector indices for Einstein notation.
-Subscripts $\alpha$ and $\beta$ indicate chemical species.
-Subscripts $a$ and $b$ indicate collocation point indices.
-Subscripts $l$ and $L$ are used for polynomial coefficient indices.
-Subscript $m$ is for chemical reaction number (regular $m$ is polynomial order).
+Subscripts $i$, $j$, and $k$ are vector indices for Einstein notation, and for these indices, repetition implies summation. Subscripts $\alpha$ and $\beta$ indicate chemical species. Subscripts $a$ and $b$ indicate collocation point indices. Subscripts $l$ and $L$ are used for polynomial coefficient indices. Subscript $m$ is for chemical reaction number (regular-size $m$ is polynomial order). Note that this is consistent with~\cite{king_2023}, but not~\cite{king_2020,king_2022}, in which we used $i$ and $j$ to indicate collocation point indices.
 
-\section{Governing Equations}\label{ge}
+\section{The Governing Equations}\label{ge}
 
 The code solves the compressible Navier-Stokes equations in conservative form
 \begin{subequations}\begin{align}
@@ -76,14 +72,11 @@ The system is closed with an ideal gas equation of state
 \begin{equation}\frac{p}{\rho}={R}_{mix}T=\frac{R_{0}T}{W_{mix}}={R}_{0}T\displaystyle\sum_{\alpha}\frac{Y_{\alpha}}{W_{\alpha}}\label{eq:eos}\end{equation}
 where $R_{mix}$ is the gas constant for the mixture, $R_{0}$ is the universal gas constant, and $W_{\alpha}$ is the molar mass of species $\alpha$, and $W_{mix}$ is the molar mass of the mixture.
 
-Reaction rates $\dot\omega_{\alpha}$ are obtained through finite rate chemical kinetics mechanisms - details/refsXX. XX Including Lindemann steps, gibbs backwards rates and third bodies.
-Specific heat capacities, enthalpies and gibbs functions are obtained through CHEMKIN/NASA polynomials XXrefXX.
-
 \subsection{Evaluation of temperature and heat capacity}
 
 The temperature dependence of the specific heat capacity of species $\alpha$ is given by a polynomial of order $L$
 \begin{equation}c_{p,\alpha}=\displaystyle\sum_{l=1}^{L}a_{\alpha,l}T^{l-1},\end{equation}
-which is valid over a specified temperature range $T\in\left[T_{low},T_{high}\right]$, and in which the coefficients $a_{\alpha,l}$ are taken from CHEMKIN tables. Integration of this yields an expression for the enthalpy
+which is valid over a specified temperature range $T\in\left[T_{low},T_{high}\right]$, and in which the coefficients $a_{\alpha,l}$ are constructed to fit the standard NASA polynomials~\cite{gordon_1971}. Integration of this yields an expression for the enthalpy
 \begin{equation}h_{\alpha}=\displaystyle\sum_{l=1}^{L}\frac{a_{\alpha,l}}{l}T^{l} + a_{\alpha,L+1},\end{equation}
 whilst the temperature derivative of $c_{p,\alpha}$ is
 \begin{equation}\frac{dc_{p,\alpha}}{dT}=\displaystyle\sum_{l=1}^{L}\left(l-1\right)a_{\alpha,l}T^{l-2}.\end{equation}
@@ -123,25 +116,17 @@ where $Le_{\alpha}$ is the Lewis number for species $\alpha$, which is assumed c
 In this model the diffusive flux is given by 
 \begin{equation}\rho\hat{V}_{\alpha,k}Y_{\alpha}=-\rho{D}_{\alpha}\frac{\partial{Y}_{\alpha}}{\partial{x}_{k}}-\rho{D}_{\alpha}Y_{\alpha}\left(\frac{\partial\ln{T}}{\partial{x}_{k}}+\frac{\partial\ln\rho}{\partial{x}_{k}}-\frac{W_{\alpha}}{\rho{R}_{0}T}\frac{\partial{p}}{\partial{x}_{k}}\right),\end{equation}
 
-
-Chemkin polynomial fits for transport data~\cite{kee_1986}
-Review of transport models in~\cite{giacomazzi_2008}.
-Mixture-averaged transport for diffusion using Hirschfelder-Curtiss approximation~\cite{hirschfelder_curtiss}.
-Combination rule for viscosity and thermal conductivity following~\cite{ern_1994,ern_1995}.
-
-Here the transport properties for individual species and species pairs are evaluated using polynomials [xx ref xx], where
+Here the transport properties for individual species and species pairs are evaluated using standard polynomial fits~\cite{kee_1986}
 \begin{subequations}\begin{align}
 \ln\mu_{\alpha}&=\displaystyle\sum_{l=1}^{L}c_{\mu,\alpha,l}\left(\ln\left(\frac{T}{T_{ref}}\right)\right)^{l-1}\\
 \ln\lambda_{\alpha}&=\displaystyle\sum_{l=1}^{L}c_{\lambda,\alpha,l}\left(\ln\left(\frac{T}{T_{ref}}\right)\right)^{l-1}\\
 \ln{D}_{\alpha\beta}&=\ln\left(\frac{p_{ref}}{p}\right)+\displaystyle\sum_{lj=1}^{L}c_{D,\alpha\beta,l}\left(\ln\left(\frac{T}{T_{ref}}\right)\right)^{l-1},
 \end{align}\end{subequations}
-in which the $c_{\dots,l}$ are constants, and $L=4$. [xx more details xx].
-
-The transport properties are then obtained from combination rules as
+in which the $c_{\dots,l}$ are constants, and $L=4$. The transport properties are then obtained from combination rules following~\cite{ern_1994,ern_1995} as
 \begin{equation}\mu=\left[\displaystyle\sum_{\alpha}X_{\alpha}\mu_{\alpha}^{n_{\mu}}\right]^{\frac{1}{n_{\mu}}},\end{equation}
 with $n_{\mu}=6$, 
 \begin{equation}\lambda=\left[\displaystyle\sum_{\alpha}X_{\alpha}\lambda_{\alpha}^{n_{\lambda}}\right]^{\frac{1}{n_{\lambda}}},\end{equation}
-with $n_{\lambda}=1/4$, and
+with $n_{\lambda}=1/4$, and the combination rule for molecular diffusivity follows the Hirschfelder-Curtiss approximation~\cite{hirschfelder_curtiss}
 \begin{equation}D_{\alpha}=\frac{\displaystyle\sum_{\beta\ne\alpha}X_{\beta}{W}_{\beta}}{W_{mix}\displaystyle\sum_{\beta\ne\alpha}\frac{X_{\beta}}{D_{\alpha\beta}}}.\end{equation}
 Note that the molar concentration $X_{\alpha}=Y_{\alpha}W_{mix}/W_{\alpha}$.
 Soret and Dufour effects are neglected.
@@ -166,7 +151,8 @@ with $A_{m}$, $n_{m}$ and $E_{a,m}$ being specified constants representing the p
 The backwards rate constant is related to the forward rate constant via
 \begin{equation}\ln{k}_{b,m}=\ln{k}_{f,m} + \displaystyle\sum_{\alpha}\left(\nu^{\prime\prime}_{\alpha,m}-\nu^{\prime}_{\alpha,m}\right)\left(\frac{\hat{g}_{\alpha}}{R_{0}T}+\ln\left(\frac{P_{0}}{R_{0}}\right)-\ln{T}\right),\end{equation}
 in which $P_{0}$ is a reference pressure, and $\hat{g}_{\alpha}$ is the Gibbs function for species $\alpha$, which is given by
-\begin{equation}\frac{\hat{g}_{\alpha}}{W_{\alpha}T}=\frac{a_{\alpha,J+1}}{T}-a_{\alpha,1}\ln{T}+\left(a_{\alpha,1}-a_{\alpha,J+2}\right)-\displaystyle\sum_{j=2}^{J}\frac{a_{\alpha,j}}{j\left(j-1\right)}T^{j-1}.\end{equation}
+\begin{equation}\frac{\hat{g}_{\alpha}}{W_{\alpha}T}=\frac{a_{\alpha,J+1}}{T}-a_{\alpha,1}\ln{T}+\left(a_{\alpha,1}-a_{\alpha,J+2}\right)-\displaystyle\sum_{j=2}^{J}\frac{a_{\alpha,j}}{j\left(j-1\right)}T^{j-1},\end{equation}
+with the coefficients again following the standard NASA polynomials~\cite{gordon_1971}.
 
 \subsubsection{Third bodies}
 
@@ -180,28 +166,15 @@ Where the Arrhenius form is insufficient to describe the reaction rate, a pressu
 \begin{equation}k_{f,m}=k_{\infty,m}\left(\frac{P_{r}}{1+P_{r}}\right)F_{m},\end{equation}
 where $F_{m}$ is the Troe fall-off rate, and a constant for steps with Lindemann form. $P_{r}$ is a reduced pressure given by
 \begin{equation}P_{r}=\frac{k_{0,m}}{k_{\infty,m}},\end{equation}
-$k_{0,m}$ is the Arrhenius rate of the reaction, and $k_{\infty,m}$ is a second Arrhenius rate. Hence for Lindemann steps, in addition to the three Arrhenius coefficients, the constant $F_{m}$ is prescribed, along with the pre-exponential factor, the temperature dependence of the pre-exponential factor and the activation energy for $k_{\infty,m}$. Note that after evaluation of the rate constants for Lindemann steps, the third-body concentration of the step is reset to unity.
+$k_{0,m}$ is the Arrhenius rate of the reaction, and $k_{\infty,m}$ is a second Arrhenius rate. Hence for Lindemann steps, in addition to the three Arrhenius coefficients, the constant $F_{m}$ is prescribed, along with the pre-exponential factor, the temperature dependence of the pre-exponential factor and the activation energy for $k_{\infty,m}$. Note that after evaluation of the rate constants for Lindemann steps, the third-body concentration of the step is reset to unity. Steps with non-constant Troe fall-off rate are not yet implemented.
 
-\section{Numerical implementation}\label{ni}
+\section{The Numerical Methods}\label{ni}
 
-The spatial discretisation is based on the Local Anisotropic Basis Function Method (LABFM) in the first two dimensions, and high-order finite differences in the third dimension. LABFM has been detailed and extensively analysed in~\cite{king_2020,king_2022}, and we refer the reader to these works for a complete description.
+The spatial discretisation is based on the Local Anisotropic Basis Function Method (LABFM) in the first two dimensions, and high-order finite differences in the third dimension. LABFM has been detailed and extensively analysed in~\cite{king_2020,king_2022}, and the present implementation is described in~\cite{king_2023} and we refer the reader to these works for a complete description.
 
-The domain is discretised in the $x_{1}-x_{2}$ plane with an unstructured point cloud of $N_{12}$ nodes. The discretisation in the third dimension is uniform: there are $N_{3}$ copies of each node in the $x_{1}-x_{2}$ plane, equispaced along the $x_{3}$ axis. Hence, there are a total of $N=N_{12}N_{3}$ nodes in the domain. Each node $a\in\left[1,N\right]$ has position $x_{a,i}$, a distribution lengthscale $s_{a}$, and a computational stencil lengthscale $h_{a}$. $s_{a}$ is the average node spacing around node $a$, and is analagous to the grid spacing in a finite difference scheme. The spacing in $x_{3}$ is denoted $s_{3}$, and is uniform throughout the domain, whilst $s_{a}$ can vary as a function of $x_{1}$ and $x_{2}$. Each node holds the conservative variables $\rho_{a}$, $\rho{u}_{i,a}$, $\rho{E}_{a}$ and $\rho{Y}_{\alpha,a}$. The governing equations are solved on the set of $N$ nodes. 
+To summarise, the domain is discretised in the $x_{1}-x_{2}$ plane with an unstructured point cloud of $N_{12}$ nodes. The discretisation in the third dimension is uniform: there are $N_{3}$ copies of each node in the $x_{1}-x_{2}$ plane, equispaced along the $x_{3}$ axis. Hence, there are a total of $N=N_{12}N_{3}$ nodes in the domain. Each node $a\in\left[1,N\right]$ has position $x_{a,i}$, a distribution lengthscale $s_{a}$, and a computational stencil lengthscale $h_{a}$. $s_{a}$ is the average node spacing around node $a$, and is analagous to the grid spacing in a finite difference scheme. The spacing in $x_{3}$ is denoted $s_{3}$, and is uniform throughout the domain, whilst $s_{a}$ can vary as a function of $x_{1}$ and $x_{2}$. Each node holds the conservative variables $\rho_{a}$, $\rho{u}_{i,a}$, $\rho{E}_{a}$ and $\rho{Y}_{\alpha,a}$. The governing equations are solved on the set of $N$ nodes. 
 
-\begin{figure}
-\includegraphics[width=0.6\textwidth]{./stencil.png}
-\caption{A typical stencil for a three-dimensional simulation. The nodes shown are those in the stencil of the central node in blue. The unstructured nodes in yellow lie in the same plane (same value of $x_{3}$) as the central node. The nodes in red are those in the finite difference stencil for the $x_{3}$ direction.\label{fig:disc2}}
-\end{figure}
-
-The difference between properties at two nodes is denoted $\left(\cdot\right)_{ba}=\left(\cdot\right)_{b}-\left(\cdot\right)_{a}$. The computational stencil for each node $a$ is denoted $\mathcal{N}_{a}$, and is constructed to contain all nodes $b$ in the same $x_{1}-x_{2}$ plane such that $\lvert{x}_{i,ba}x_{i,ba}\rvert\le4h_{a}^{2}$, (with the repeated subscript $i$ implying summation), alongside all the nodes with $x_{1,ba}=x_{2,ba}$ required to build a finite difference stencil in the $x_{3}$ dimension. Figure~\ref{fig:disc2} shows a typical computational stencil.
-
-Figure~\ref{fig:disc1} shows an example discretisation in the present framework for an aerofoil. Wall, inflow and outflow boundaries are discretised with a locally structured node distribution, whilst the remaining space is filled with a quasi-uniform point cloud. XX. The resolution is non-uniform, and in the present example $s$ varies by a factor of $10$ through the domain. The unstructured nodes are created to fill the domain using a variation of the propagating front algorithm of~\cite{fornberg_2015a}, following~\cite{king_2022}.
-
-\begin{figure}
-\includegraphics[width=0.99\textwidth]{./aerofoil_dist.png}
-\caption{Example of an unstructured node distribution around an aerofoil. The colour represents the local resolution length-scale $s$ normalised by the aerofoil chord length $C$.\label{fig:disc1}}
-\end{figure}
-
+The difference between properties at two nodes is denoted $\left(\cdot\right)_{ba}=\left(\cdot\right)_{b}-\left(\cdot\right)_{a}$. The computational stencil for each node $a$ is denoted $\mathcal{N}_{a}$, and is constructed to contain all nodes $b$ in the same $x_{1}-x_{2}$ plane such that $\lvert{x}_{i,ba}x_{i,ba}\rvert\le4h_{a}^{2}$, (with the repeated subscript $i$ implying summation), alongside all the nodes with $x_{1,ba}=x_{2,ba}=0$ required to build a finite difference stencil in the $x_{3}$ dimension. The unstructured nodes in the $x_{1}-x_{2}$ plane are created to fill the domain using a variation of the propagating front algorithm of~\cite{fornberg_2015a}, following~\cite{king_2022}.
 
 \subsection{Evaluation of spatial derivatives}
 
@@ -209,7 +182,7 @@ Spatial derivative operators take the form
 \begin{equation}L^{d}_{a}\left(\cdot\right)=\displaystyle\sum_{b}\left(\cdot\right)_{ba}w^{d}_{ba},\label{eq:general_do}\end{equation}
 where $d$ identifies the derivative of interest (e.g. $d=x_{1}$ indicates the operator $L^{d}$ approximates $\partial\left(\cdot\right)/\partial{x}_{1}$, and $d=x_{i}x_{i}$ (summation implied) indicates the operator approximates the Laplacian), and $w^{d}_{ba}$ are a set of inter-node weights for the operator. Note that the construction of~\eqref{eq:general_do} takes the same form for both LABFM-based and finite difference-based derivative approximations. For derivatives in the $x_{3}$ dimension, the weights $w^{d}_{ba}$ are simply central finite difference weights of order $m$. For derivatives in the $x_{1}-x_{2}$ plane, LABFM is used to set the $w^{d}_{ba}$, which is constructed from a weighted sum of anisotropic basis functions centred on node $a$. The basis functions used herein are formed from bi-variate Hermite polynomials multiplied by a radial basis function, and the basis function weights are set such that the operator achieves a specified polynomial consistency $m$. Calculation of these weights is done as a pre-processing step, and described in detail in~\cite{king_2022}. 
 
-The order of the spatial discretisation can be specified between $m=4$ and $m=10$, and although there is capability for this to be spatially (or temporally) varying, in this work we set $m=8$ uniformly away from boundaries (except where explicitly stated in our investigations of the effects of changing $m$). This provides a good compromise between accuracy and computational cost. At non-periodic boundaries, the consistency of the LABFM reconstruction is smoothly reduced to $m=4$. The stencil scale $h_{a}$ is initialised to $h_{a}=2.7s_{a}$ in the bulk of the domain, and $h_{a}=2.4s_{a}$ near boundaries (choices informed through experience as being large enough to ensure stability). In bulk of the domain, the stencil scale is then reduced following the optimisation procedure described in~\cite{king_2022}. This has the effect of both reducing computational costs, and increasing the resolving power of LABFM, yielding the smallest stencil size $h_{a}$ for which the discretisation remains stable.
+The order of the spatial discretisation can be specified between $m=4$ and $m=10$, but is set by default to $m=8$ uniformly away from boundaries. This provides a good compromise between accuracy and computational cost. At non-periodic boundaries, the consistency of the LABFM reconstruction is smoothly reduced to $m=4$. The stencil scale $h_{a}$ is initialised to $h_{a}=2.7s_{a}$ in the bulk of the domain, and $h_{a}=2.4s_{a}$ near boundaries (choices informed through experience as being large enough to ensure stability). In bulk of the domain, the stencil scale is then reduced following the optimisation procedure described in~\cite{king_2022}. This has the effect of both reducing computational costs, and increasing the resolving power of LABFM, yielding the smallest stencil size $h_{a}$ for which the discretisation remains stable.
 
 The evaluation of derivatives using~\eqref{eq:general_do} constitutes the bulk of the computational cost, and it is hence desirable only use it where essential, and where possible to use analytic expressions to relate derivatives of secondary properties to those evaluated via~\eqref{eq:general_do}. First derivatives of $\rho$, ${u}_{i}$, $\rho{E}$ and ${Y}_{\alpha}$, alongside the temperature $T$ and pressure $p$, are evaluated directly using~\eqref{eq:general_do}. Convective terms are then constructed from combinations thereof: for example
 \begin{equation}\frac{\partial\rho{u}_{i}E}{\partial{x}_{i}}=u_{i}\frac{\partial\rho{E}}{\partial{x}_{i}}+\rho{E}\frac{\partial{u}_{i}}{\partial{x}_{i}}.\end{equation}
@@ -227,97 +200,155 @@ For the mixture averaged model, gradients of $\mu$, $\lambda$ and $\rho{D}_{\alp
 
 \subsection{Temporal integration and filtering}
 
-The governing equations are integrated in time using a four-step third-order, low-storage explicit Runge-Kutta scheme, with embedded second order error estimation, denoted RK3(2)4[2R+]C in the classification system of~\citet{kennedy_2000}. The value of the time step is set adaptively using a PID controller to keep time-integration errors below a specified threshold (set to $10^{-4}$ in throughout the present work). 
-
-The solution is de-aliased after each time-step by high-order spatial filtering using the filters described in~\cite{king_2022} combined with a finite difference filter following~\cite{kennedy_1994}. 
-The combined filter is defined by
-\begin{equation}F\left(\phi\right)=-\left(-1\right)^{m/2}\left(\frac{s_{3}}{2}\right)^{m}\frac{\partial^{m}}{\partial{x}_{3}^{m}}\left[\left(1+\kappa_{m}\nabla_{x_{1}x_{2}}^{m}\right)\phi\right]\label{eq:filt},\end{equation}
-where $\kappa_{m}$ is the filter coefficient, specific to each node, calculated as in~\cite{king_2022}, and $\nabla_{x_{1}x_{2}}^{m}$ is the two-dimensional Laplacian raised to the power of $m/2$ (as used in the filtering in~\cite{king_2022}), defined in index notation as
-\begin{equation}\nabla_{x_{1}x_{2}}^{m}=\displaystyle\sum_{n=0}^{m}{m\choose n}\frac{\partial^{m}}{\partial{x}_{1}^{m-n}\partial{x}_{2}^{n}}.\end{equation}
-The term within the square brackets in~\eqref{eq:filt} is the two-dimensional filter in the $x_{1}-x_{2}$ plane, whilst the operator outside the square brackets is the filter in the $x_{3}$ dimension. The filters are applied sequentially in this manner because the filter does not include any cross-components in $x_{1}x_{3}$ or $x_{2}x_{3}$. This approach follows those used in finite difference codes, where the dimensions are filtered sequentially. With the LABFM filter, the $x_{1}$ and $x_{2}$ dimensions are filtered simultaneously, because the filter includes cross-derivative terms.
-
-For density, momenta and energy, we simply apply the filter as defined by~\eqref{eq:filt}, such that the filtered variables passed to the next time step are
-\begin{equation}\widetilde{\phi}=F\left(\phi\right)\qquad\text{for}\quad\phi=\rho,\rho{u}_{i},\rho{E}\end{equation}
-
-As with the molecular diffusion terms, the filtering procedure does not guarantee satisfaction of the compatibility criteria~\eqref{eq:sumY}. Hence, we introduce a new correction to the filtering procedure for the species mass fractions, which takes inspiration from the the diffusion correction velocity. We modify the procedure with the addition of a filter correction term $F_{c}$ such that
-\begin{equation}\widetilde{\rho{Y}_{\alpha}}=F\left(\rho{Y}_{\alpha}\right)+F_{c},\end{equation}
-where 
-\begin{equation}F_{c}=\frac{1}{N_{S}}\left[\widetilde{\rho}-\displaystyle\sum_{\alpha}F\left(\rho{Y}_{\alpha}\right)\right]\end{equation}
-This approach ensures that
-\begin{equation}\displaystyle\sum_{\alpha}\widetilde{Y}_{\alpha}=1\label{eq:filtsumY}\end{equation}
-by construction. This method results in the maximum error in~\eqref{eq:filtsumY} remaining below machine precision. In all our simulations, the maximum error in~\eqref{eq:filtsumY} is below $3\times{10}^{-18}$.
+The governing equations are integrated in time using a four-step third-order, low-storage explicit Runge-Kutta scheme, with embedded second order error estimation, denoted RK3(2)4[2R+]C in the classification system of~\citet{kennedy_2000}. The value of the time step is set adaptively using a PID controller to keep time-integration errors below a specified threshold, set to $10^{-4}$ as a default. The solution is de-aliased after each time-step by high-order spatial filtering using the filters described in~\cite{king_2022} combined with a finite difference filter following~\cite{kennedy_1994}. Details of the filtering procedure can be found in~\cite{king_2023}.
 
 
 \subsection{Boundaries}
 
-The boundary framework largely follows that described in detail for isothermal flows in~\cite{king_2022}, extended to accommodate thermal and reacting flows. The discretisations on boundaries are detailed in Table~\ref{tab:boundaries}. At wall, inflow and outflow boundaries, the node-set is structured, with a band of $5$ rows of uniformly spaced nodes. Wall boundaries may be curved, and the resolution along boundaries need not be uniform. On boundaries, normal derivatives are calculated using one-sided $5$-point finite difference stencils, whilst tangential (in the $x_{1}-x_{2}$ plane) derivatives are obtained with a one-dimensional formulation of LABFM detailed in~\cite{king_2022} with $m=6$. For the first row in from the boundaries (Row $1$), first derivatives are evaluated using asymmetric finite differences (normal) and one-dimensional LABFM (tangential), whilst second derivatives and filters are obtained from two-dimensional LABFM with $m=4$. For nodes in row $2$, all operators use two-dimensional LABFM with $m=4$. For rows $3$ and $4$, all operators use two-dimensional LABFM with $m=6$. Note that at all nodes including boundary nodes, all operators in the third dimension use central finite differences.
-
-\begin{table}
-\begin{center}
-\caption{Schemes for derivatives near boundaries.\label{tab:boundaries}}
-\begin{tabular}{|l|c|c|c|c||}
-\hline
-\textbf{Node} & Boundary normal derivative & Boundary tangential derivative (in $x_{1}-x_{2}$ plane) & Second derivatives & Filtering operator \\
-\hline
-Boundary & One-sided FD & 1D-LABFM & FD + 1D-LABFM & FD + 1D-LABFM \\
-Row $1$ & Asymmetric FD & 1D-LABFM & LABFM ($m=4$) & LABFM ($m=4$) \\
-Row $2$ & LABFM ($m=4$) & LABFM ($m=4$) & LABFM ($m=4$) & LABFM ($m=4$) \\
-Row $3$ & LABFM ($m=6$) & LABFM ($m=6$) & LABFM ($m=6$) & LABFM ($m=6$)  \\
-Row $4$ & LABFM ($m=6$) & LABFM ($m=6$) & LABFM ($m=6$) & LABFM ($m=6$) \\
-\hline
-\end{tabular}
-\end{center}
-\end{table}
-
-Symmetry and periodic boundary conditions are available, alongside no-slip wall boundaries (isothermal or adiabatic), inflows (both partially non-relfecting and ``hard''), non-reflecting outflows. Walls, inflows and outflows are imposed through the Navier Stokes characteristic boundary condition (NSCBC) formalism, following~\cite{sutherland_2003}. The improved outflow conditions of~\cite{yoo_2007} has been implemented, but was found to be less stable to the passage of flames than the method of~\cite{sutherland_2003}.
-
+For full details of the implementation of boundaries we refer the reader to~\cite{king_2022,king_2023}. To summarise, the node distribution is locally structured at the boundaries, in the vicinity of which derivative operators are constructed from combinations of LABFM and asymmetric finite differences. Numerical boundary conditions are imposed through the Navier-Stokes Characteristic Boundary Condition formalism, details of which can be found in~\cite{poinsot_2005,sutherland_2003,yoo_2007}. For walls and hard inflows, we follow the procedures described in~\cite{poinsot_2005}. For non-reflecting outflows we follow the approach of~\cite{sutherland_2003}. For non-reflecting inflows we use the \emph{improved} formulation of~\cite{yoo_2007}.
 
 \subsection{Parallelisation}
 
-The code is accelerated with a shared-distributed framework, using both OpenMP and MPI. A non-uniform block-structured three-dimensional domain decomposition scheme is used, with the physical sizes of subdomains set such that each MPI rank contains the same number of nodes. The decomposition takes as input the desired number of processors in each dimension $N_{P1}$, $N_{P2}$, and $N_{P3}$, giving a total of $N_{P}=N_{P1}N_{P2}N_{P3}$ processors. The allocation of nodes to processors then forms a preprocessing step, following the algorithm:
-\begin{enumerate}
-\item Generate the node discretisation in the $x_{1}-x_{2}$ plane.
-\item Re-arrange the nodes in order of increasing $x_{1}$.
-\item Split the discretisation into $N_{P1}$ slice each containing the same number of nodes.
-\item For each slice
-\begin{enumerate}
-\item Re-arrange the nodes in order of increasing $x_{2}$.
-\item Split the slice into $N_{P2}$ blocks each containing the same number of nodes.
-\item For each slice, create the $x_{3}$ discretisation by creating $N_{3}$ copies equispaced along the $x_{3}$ axis, and split into $N_{P3}$ processor domains.
-\end{enumerate}
-\end{enumerate}
-This approach results in each processor containing the same number of nodes, and load balancing is typically achieved to within $5\%$. 
+The code is accelerated with MPI and OpenMP, and uses a static non-uniform block-structured three-dimensional domain decomposition. The distributed parallelism with MPI scales extremely well ($>96\%$ from $4$ to $1024$ MPI ranks). The shared parallelism is limited by memory access competition, and scales poorly for more than $4$ OpenMP threads per MPI rank. In general, we use $1$, $2$ or $4$ threads per MPI rank.
+
+In the $x_{1}$ and $x_{3}$ directions, periodic boundary conditions are imposed through the MPI structure, whilst in the $x_{2}$ direction they are imposed locally on each MPI rank. Communications are blocking, and due to the cyclical structure for any domain periodicity, \textbf{an even number of MPI ranks is required in each direction}.
+
+
+\section{The Code}
+
+\subsection{Directory structure}
+
+The code is in a directory called \verb|sunset_code|, and has a structure as follows:
+\begin{itemize}
+\item \verb|data_out| - contains
+\begin{itemize}
+\item files called \verb|nodesxxxxx|, where \verb|xxxxx| is equal to $10000$ plus the processor number associated with that node file. (e.g. the nodes file saved by processor $4$ is called \verb|nodes10003|).
+\item files called \verb|fieldsxxxxx_xxx|, where \verb|xxxxx| again indicates the processor, and \verb|_xxx| gives the number of the output (e.g. \verb|fields10003_123| is the $123^{rd}$ output of the $4^{th}$ processor.
+\item \verb|time.out|, which lists the output fields files and the number of nodes in each file.
+\item a directory \verb|statistics| which contains a set of files holding the temporal variation of various global statistics. 
+\end{itemize}
+\item \verb|docs| - contains this document and associated latex files.
+\item \verb|obj| - contains the object/mod files generated on compilation.
+\item \verb|paraview_files| - holds .vtu files (once produced by the code in \verb|vtk_conv|) which can be loaded into Paraview.
+\item \verb|runfiles| - contains subdirectories each holding template control files for various levels of chemistry.
+\item \verb|restart| - contains files needed to restart the simulation from a previous run.
+\item \verb|source| - contains the source code for the main program in directories \verb|base| and \verb|common|, and source code used to generate input discretisations in \verb|gen| and \verb|ishift|.
+\item \verb|vtk_conv| - contains a small code written in Fortran which converts the \verb|fieldsxxxxx_xxx| into .vtu files in the \verb|paraview_files| directory.
+\end{itemize}
+
+\subsection{Code structure}
+
+The code has a modular stucture, with each module (each file in \verb|source/base/|) containing routines which perform similar operations, or which perform operations in a similar context. For example, routines which evaluate spatial derivatives are located in \verb|source/base/derivatives.F90|, and routines which evaluation thermodynamic quantities (e.g. $T$ from $\rho{E}$, $\rho{u}_{i}$ and $Y_{\alpha}$, or $c_{p}$ from $T$) are contained within \verb|source/base/thermodynamics.F90|.
+
+At the high level, the code has the following structure. The main program is in \verb|source/base/sunset.F90|, which
+\begin{itemize}
+\item Calls routines to setup the domain, domain decomposition, LABFM and FD operators, and initial/restart conditions.
+\item Initialises value of time-step $\delta{t}$, then starting at $t=0$, loops whilst $t<t_{max}$
+\begin{itemize}
+\item Calls output routines if it is the correct time to output data
+\item Calls routines to evaluate the time-step $\delta{t}$.
+\item Calls a routine in \verb|source/base/step.F90| which conducts one full RK time step, consisting of
+\begin{itemize}
+\item Calling routines in \verb|source/base/rhs.F90| to evaluate the RHS of the equations
+\item Integrating forward one substep
+\item Re-applying BCs
+\item MPI communications
+\item Repeating the above 4 steps for all substeps
+\item Filtering the solution
+\item Re-applying BCs
+\item MPI communications
+\end{itemize}
+\end{itemize}
+\item Cleans up and ends the simulation.
+\end{itemize}
+
+The routines in \verb|source/base/rhs.F90| call other routines to evaluate thermodynamic and transport properties, derivatives, chemical source terms, and characteristic boundary conditions.
+
+\subsection{Prerequisites}
+
+The code is largely free of dependencies on external libraries, with the exception of \verb|openblas|, which is used for solving the local consistency matrices for LABFM. An in-house SVD routine has been tested and implemented for systems where \verb|openblas| is not available, but the performance is better with \verb|openblas|, and the SVD routine is not included by default.
+
+It also requires a system with \verb|gfortran| (for non-MPI runs, and compilation of the codes in \verb|vtk_conv|, \verb|source/gen/| and \verb|source/ishift|), \verb|mpifort| (for MPI runs), and the OpenMP libraries. These requirements should be trivial to satisfy for most Unix systems. For other compilers, modify the \verb|Makefile| as required.
+
+\section{Running the code}
+
+\subsection{Generating the discretisation}
+
+The first step in running the code is to generate a node discretisation for the desired geometry. This is done by navigating to \verb|source/gen/|, modifying \verb|datclass.F90|, compiling it (just use \verb|make|), and running it (using \verb|.gen2D|). This little code has a number of cases (e.g. doubly periodic, periodic channel, simple flame-tube, inflow-outflow with obstacle/bluff body) which you can choose at runtime. More can be added. Changing geometry and parameters controlling the resolution etc is done by hard-coding and recompiling for each case. This code uses the propagating front algorithm (which some tweaks) of~\cite{fornberg_2015a} to generate the distribution. See Appendix~\ref{ap:datclass} for more (important) details.
+
+
+The next step is to prepare the discretisation for the main \verb|sunset-code|. To do this, navigate to \verb|source/ishift/| and compile the code herein (use \verb|make|). First, run \verb|./ishift| and enter $1$ at the prompt. This will perform $50$ iterations of a simple shifting procedure, which makes the node distribution slightly smoother and better suited to LABFM.
+
+Next re-run the \verb|./ishift|, but at the prompt enter $0$. The next prompts will request the number of MPI processors in the $x$, $y$ and $z$ (i.e. $x_{1}$, $x_{2}$ and $x_{3}$ directions). For 2D simulations choose $1$ for the number in $z$. In general, if the number of processors in any direction is not equal to $1$, it should be \textbf{even}. Otherwise there is a risk the code will get stuck on a blocking MPI communication and just hang. For example, to run a two-dimensional simulation with $24$ MPI processors, we would run \verb|./ishift|, then enter $0$, $6$, $4$, $1$.
+
+Note that care must be taken to ensure the number of processors in any direction is not too large for the resolution in that direction. For the above example with a $6$ by $4$ decomposition schedule, if the domain is a very long narrow flame-tube, the sub-domains will be too narrow (smaller than the computational stencil), and the \verb|sunset_code| will crash. The code \verb|ishift| provides a warning if the decomposition schedule is likely to result in MPI domains which are too small, but it is not foolproof. In general, for domains with significantly varying resolution, it is harder to find a decomposition schedule which doesn't cause these problems.
+
+With the above steps complete, a file called \verb|IPART| will be placed in the main directory. This file contains the decomposition schedule and a list of all the nodes, and is read in by \verb|sunset_code| at the start of the simulation.
+
+\subsection{Control}
+
+The simulation is then controlled by three files, all with the suffix \verb|.in|: \verb|control.in|, \verb|thermochem.in| and \verb|transport.in|. These contain the main control parameters, the thermochemistry of the fluids being simulated, and the transport properties (respectively). The latter two are less likely to require editing.
+
+Clean copies of all three files are located within the sub-directories of \verb|runfiles/| for the different chemistries available. Note, formatting of these files is sensitive: if you add an erroneous blank line to any of these files, \verb|sunset_code| will read it incorrectly.
+
+The parameters in \verb|control.in| are largely self-explanatory, but more detail will be added to this document in due course. 
+
+\subsection{Setting the initial flow field}
+
+This is partially controlled by \verb|control.in|, for example in the specification of a base-flow profile (zero, uniform or parabolic), and partly done by hard-coding in~\verb|source/base/setup_flow.F90|, where calls to a number of subroutines to create error-function base flames or Gaussian hotspots can be modified or commented out. More of the flow initialisation will be moved to the control files in due course.
+
+\subsection{From initial conditions}
+
+\begin{itemize}
+\item Run the above steps to generate \verb|IPART|
+\item Copy the control files from the appropriate sub-directory with \verb|runfiles| and modify as required.
+\item Modify \verb|source/base/setup_flow.F90| to specify the required initial conditions.
+\item Compile sunset code using (e.g.) \verb|make react=1|
+\item Ensure the OpenMP environment variable is correctly specified (e.g. \verb|export OMP_NUM_THREADS=1|).
+\item Run the code on the correct number of processors using (e.g.) \verb|mpirun -n 24 ./sunset|
+\end{itemize}
+
+Note that if you forget to specify \verb|OMP_NUM_THREADS|, it will automatically allocate the maximum number of threads on the system to each MPI rank, and you end up trying to run with more parallelism that the system has (e.g. $24$ MPI ranks each with $48$ threads for a system with $24$ physical cores plus hyperthreading). If this happens, the code will run extremely slowly.
+
+\subsection{Restarting the code}
+
+\begin{itemize}
+\item Copy \verb|data_out/nodes*| to \verb|restart/.|.
+\item Copy \verb|data_out/*xxx| to \verb|restart/.|, where xxx indicates the number of the output file from which you wish to restart.
+\item Within \verb|restart|, run \verb|sh fnm_strip.sh| $a+1$ times, where $a$ is the number of digits in xxx above. This removes the underscore and all subsequent characters from the \verb|fieldsxxxxx_xxx| filenames, ready for the code to load them on restart. e.g. if you're restarting from output file $xxx=123$, run \verb|sh fnm_strip.sh| $4$ times. 
+\item If the previous run was a restart, you're ready to go. Otherwise, store any output files you wish to save, then in the main directory, \verb|make clean|, then (e.g.) \verb|make react=1 restart=1|.
+\item Run the code, using (e.g.) \verb|mpirun -n 8 ./sunset|
+\end{itemize}
+
+Note that the file \verb|IPART| in the main directory for a restarted run needs to be the same (exactly the same) as the one used for the original run. It is not (at present) possible to change the decomposition schedule between original and restarted runs.
+
+\subsection{Screen output}
+
+If running the code interactively (i.e. not via a grid-engine/jobscript/queue system), it is best to use a terminal $80\times{24}$ characters. Every $100$ time-steps the screen will be updated with information on the simulation, including maxima and minima for density, velocity, pressure and temperature, the time-step, and some information on profiling and performance.
 
 \appendix
-\section{Equations written out in full, in Einstein notation}\label{fulleqns}
 
-The following is valid for constant Lewis numbers. For mixtured-averaged diffusion, there are even more terms in the energy and species equations.
+\section{Details on generating a discretisation}\label{ap:datclass}
 
-\begin{equation}\frac{\partial\rho}{\partial{t}}+\frac{\partial\rho{u}_{i}}{\partial{x}_{i}}=0\end{equation}
+Within each case in \verb|datclass.F90| there are several steps. Figure~\ref{fig:case7} shows a snippet of code for an example case, of a porous geometry (an array of cylinders) with inflow and outflow conditions. Running through the case in order, we have:
+\begin{itemize}
+\item Lines $195$ to $200$: specifying the domain size \verb|xl| and \verb|yl|, and other lengthscales relevant to the geometry. In this case \verb|D_cyl| is the cylinder diameter, \verb|S_cyl| is the cylinder spacing, \verb|h0| is the cylinder radius, and \verb|dx0| is the \emph{baseline} resolution.
+\item Line $201$: specifying the non-NSCBC boundaries with \verb|xbcond| and \verb|ybcond|. Values of $1$, $2$ and $3$ indicate periodic, symmetry and low-order walls respectively. A value of $0$ is used where the boundary is going to be set by the NSCBC (i.e. for isothermal/adiabatic walls, or inflow/outflow conditions).
+\item Lines $203$ to $210$: Creating the outer geometry. The domain is a rectangle, defined by $4$ boundary patches connection the $4$ nodes specified in lines $207$ to $210$. The entries in the array \verb|b_type| define the type of boundary on the respective patch. Values of $0$, $1$ and $2$ indicate isothermal/adiabatic walls, inflows, and outflows respectively. A value of $3$ indicates the non-NSCBC boundary conditions defined by \verb|xbcond| and \verb|ybcond| are to be used. In this example, the first and third patches (lower and upper) have periodic conditions, whilst the second (right) and fourth (left) are outflow and inflow respectively.
+\item Lines $211$ to $231$: define a set of \emph{blobs} which are the solid obstacles making up the porous media. Each blob is defined by the coordinates of its centre \verb|blob_centre|, a set of coefficients \verb|blob_coeffs|, and a rotation \verb|blob_rotation|. The shape of the blob is then defined in polar coordinates (about the its centre) as
+\begin{equation}r_{blob}\left(\theta\right)=\displaystyle\sum_{n=1}^{\verb|n_blob_coefs|}a_{n}cos\left(2\pi{n}\left(\theta+\theta_{0}\right)\right),\end{equation}
+where the $a_{n}$ are the blob-coefficients, $\theta_{0}$ is the blob rotation, and $r_{blob}$ and $\theta$ are the polar coordinates with origin at the blob centre. This construction can be used to make quite a variety of shapes, provided a) the centre of area lies within the blob (i.e. no horseshoes), and b) the maximum curvature of the blob surface can be resolved by the resolution. I have a Matlab script which generates coefficients, and has been tested for rounded edge squares, triangles, and aerofoils. In the present example, the blobs are circular, so $\verb|blob_coeffs|=\verb|h0|,0,0,0\dots$.
+\item Lines $233$ and $234$: specify the resolution variation (within the hard-coded constraints). \verb|dxmin| is the smallest resolution in the domain, and is automatically used at blob surfaces. \verb|dx_wall|, \verb|dx_in| and \verb|dx_out| are the resolutions at walls, inflows and outflows on the outer geometry. There are some contrivances in this section - it has not been well automated - and for some cases additional scaling factors are included to (e.g.) stretch regions of fine resolution where a flame is likely to occur.
+\end{itemize}
 
-\begin{equation}\frac{\partial\rho{u}_{i}}{\partial{t}}+\rho{u}_{j}\frac{\partial{u}_{i}}{\partial{x}_{j}}+u_{i}\frac{\partial\rho{u}_{j}}{\partial{x}_{j}}=-\frac{\partial{p}}{\partial{x}_{i}}+\mu\left[\frac{\partial^{2}u_{i}}{\partial{x}_{j}\partial{x}_{j}}-\frac{1}{3}\frac{\partial}{\partial{x}_{i}}\left(\frac{\partial{u}_{j}}{\partial{x}_{j}}\right)\right]+\left[\frac{\partial{u}_{i}}{\partial{x}_{j}}+\frac{\partial{u}_{j}}{\partial{x}_{i}}-\frac{2}{3}\delta_{ij}\frac{\partial{u}_{k}}{\partial{x}_{k}}\right]\frac{\partial\mu}{\partial{x}_{j}}+\rho{f}_{i}\end{equation}
+\subsection{Troubleshooting}
 
+If after running \verb|gen2D| you run \verb|ishift| and get a segmentation fault (often stating an index of \verb|ij_count| is out of range), it's likely the discretisation generated by \verb|gen2D| needs modifying. The (current) best approach is to generate a discretisation with \verb|gen2D|, run \verb|ishift| twice, then run \verb|sunset-code| and use paraview to visualise the first output file.
 
-\begin{eqnarray}
-\frac{\partial\rho{E}}{\partial{t}}+u_{i}\frac{\partial\rho{E}}{\partial{x}_{i}}=&-&\rho{E}\frac{\partial{u}_{i}}{\partial{x}_{i}}-u_{i}\frac{\partial{p}}{\partial{x}_{i}}-p\frac{\partial{u}_{i}}{\partial{x}_{i}}\\
-&+&u_{i}\left\{\frac{\mu}{\rho}\left[\frac{\partial^{2}u_{i}}{\partial{x}_{j}\partial{x}_{j}}-\frac{1}{3}\frac{\partial}{\partial{x}_{i}}\left(\frac{\partial{u}_{j}}{\partial{x}_{j}}\right)\right]+\frac{1}{\rho}\left[\frac{\partial{u}_{i}}{\partial{x}_{j}}+\frac{\partial{u}_{j}}{\partial{x}_{i}}-\frac{2}{3}\delta_{ij}\frac{\partial{u}_{k}}{\partial{x}_{k}}\right]\frac{\partial\mu}{\partial{x}_{j}}\right\}\\
-&+&\mu\left(\frac{\partial{u}_{i}}{\partial{x}_{j}}+\frac{\partial{u}_{j}}{\partial{x}_{i}}-\frac{2}{3}\delta_{ij}\frac{\partial{u}_{k}}{\partial{x}_{k}}\right)\frac{\partial{u}_{i}}{\partial{x}_{j}}\\
-&+&\lambda\frac{\partial^{2}{T}}{\partial{x}_{k}\partial{x}_{k}}+\frac{\partial\lambda}{\partial{x}_{k}}\frac{\partial{T}}{\partial{x}_{k}}\\
-&+&\displaystyle\sum_{\alpha}\left\{\rho{D}_{\alpha}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}\frac{\partial{h}_{\alpha}}{\partial{x}_{i}}+{h}_{\alpha}\left[\rho{D}_{\alpha}\frac{\partial^{2}Y_{\alpha}}{\partial{x}_{i}\partial{x}_{i}}
-+\frac{\partial\rho{D}_{\alpha}}{\partial{x}_{i}}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}\right]\right\}\\
-&-&\displaystyle\sum_{\alpha}{Y}_{\alpha}h_{\alpha}\displaystyle\sum_{\beta}\left[\rho{D}_{\beta}\frac{\partial^{2}{Y}_{\beta}}{\partial{x}_{i}\partial{x}_{i}}+\frac{\partial\rho{D}_{\beta}}{\partial{x}_{i}}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}\right]\\
-&-&\displaystyle\sum_{\alpha}\left[h_{\alpha}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}+Y_{\alpha}\frac{\partial{h}_{\alpha}}{\partial{x}_{i}}\right]\displaystyle\sum_{\beta}\rho{D}_{\beta}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}\\
-&+&\rho\displaystyle\sum_{\alpha}Y_{\alpha}f_{i}\left({u}_{i}-V_{\alpha,i}\right)
-\end{eqnarray}
-and
-\begin{eqnarray}
-\frac{\partial\rho{Y}_{\alpha}}{\partial{t}}+\rho{u}_{i}\frac{{Y}_{\alpha}}{\partial{x}_{i}}+Y_{\alpha}\frac{\partial\rho{u}_{i}}{\partial{x}_{i}}=&&\dot\omega_{\alpha}
-+\left[\rho{D}_{\alpha}\frac{\partial^{2}Y_{\alpha}}{\partial{x}_{i}\partial{x}_{i}}+\frac{\partial{\rho{D}}_{\alpha}}{\partial{x}_{i}}\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}\right]\\
-&-&Y_{\alpha}\displaystyle\sum_{\beta}\left[\rho{D}_{\beta}\frac{\partial^{2}Y_{\beta}}{\partial{x}_{i}\partial{x}_{i}}+\frac{\partial\rho{D}_{\beta}}{\partial{x}_{i}}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}\right]-\frac{\partial{Y}_{\alpha}}{\partial{x}_{i}}\displaystyle\sum_{\beta}\rho{D}_{\beta}\frac{\partial{Y}_{\beta}}{\partial{x}_{i}}
-\end{eqnarray}
-
-Note, I haven't expanded out $V_{\alpha,i}$ in the body force term in the energy equation in full.
-
+\begin{figure}
+\includegraphics[width=0.9\textwidth]{case7.png}
+\caption{Code snippet for an example case.\label{fig:case7}}
+\end{figure}
 
 
 \bibliographystyle{elsarticle-num-names}
