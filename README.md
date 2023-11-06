@@ -23,6 +23,6 @@ Developed by Dr Jack King, University of Manchester.
 
 - LABFM fundamentals: King, Lind & Nasar (2020) JCP 415:109549 https://doi.org/10.1016/j.jcp.2020.109549
 - LABFM fundamentals + BCs: King & Lind (2022) JCP 449:110760 https://doi.org/10.1016/j.jcp.2021.110760
-- More to follow.
+- LABFM/FD for combustion: King (2023) https://arxiv.org/abs/2310.02200
 
 
