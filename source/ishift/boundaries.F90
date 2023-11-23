@@ -28,12 +28,14 @@ contains
      !! -----:  vrelation(j)=4 means that u(j) = -u(i), v(j) = -v(i)
     real(rkind),dimension(dims) :: rcorn
     real(rkind) :: cdist
-    integer(ikind) :: i,j,imp,k,ybcond_m
+    integer(ikind) :: i,j,imp,k,ybcond_U_m,ybcond_L_m
     integer(ikind) :: nmirror,nmirror_esti
       
     !! For the purpose of mirror generation, ybcond=3 is the same as ybcond=2  
-    ybcond_m = ybcond
-    if(ybcond.eq.3) ybcond_m = 2
+    ybcond_U_m = ybcond_U
+    ybcond_L_m = ybcond_L
+    if(ybcond_U.eq.3) ybcond_U_m = 2
+    if(ybcond_L.eq.3) ybcond_L_m = 2    
       
     nmirror_esti = 5*npfb  ! Estimate for max number of mirrors
     allocate(irelation(npfb+1:npfb+nmirror_esti))      
@@ -44,12 +46,12 @@ contains
        
        !! LEFT AND RIGHT BOUNDARIES
        if(rp(i,1).le.xmin+ss*h0)then ! Close to left bound
-          if(xbcond.eq.1)then ! Periodic
+          if(xbcond_L.eq.1)then ! Periodic
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=1
              rp(k,1) = rp(i,1) + xmax - xmin;rp(k,2)=rp(i,2)
-          else if(xbcond.eq.2)then ! Symmetric
+          else if(xbcond_L.eq.2)then ! Symmetric
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=2
@@ -58,12 +60,12 @@ contains
        end if   
        
        if(rp(i,1).ge.xmax-ss*h0)then ! Close to right bound
-          if(xbcond.eq.1)then ! Periodic
+          if(xbcond_U.eq.1)then ! Periodic
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=1
              rp(k,1) = rp(i,1) - xmax + xmin;rp(k,2)=rp(i,2)
-          else if(xbcond.eq.2)then ! Symmetric
+          else if(xbcond_U.eq.2)then ! Symmetric
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=2
@@ -73,12 +75,12 @@ contains
        
        !! UPPER AND LOWER BOUNDARIES
        if(rp(i,2).le.ymin+ss*h0)then ! Close to lower bound
-          if(ybcond_m.eq.1)then ! Periodic
+          if(ybcond_L_m.eq.1)then ! Periodic
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=1
              rp(k,1) = rp(i,1);rp(k,2)=rp(i,2) + ymax - ymin
-          else if(ybcond_m.eq.2)then ! Symmetric
+          else if(ybcond_L_m.eq.2)then ! Symmetric
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=3
@@ -87,12 +89,12 @@ contains
        end if   
        
        if(rp(i,2).ge.ymax-ss*h0)then ! Close to upper bound
-          if(ybcond_m.eq.1)then ! Periodic
+          if(ybcond_U_m.eq.1)then ! Periodic
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=1
              rp(k,1) = rp(i,1);rp(k,2)=rp(i,2) - ymax + ymin
-          else if(ybcond_m.eq.2)then ! Symmetric
+          else if(ybcond_U_m.eq.2)then ! Symmetric
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=3
@@ -103,20 +105,20 @@ contains
        rcorn = (/xmin,ymin,0.0d0/)
        cdist = sqrt(dot_product(rcorn-rp(i,:),rcorn-rp(i,:)))
        if(cdist.le.ss*h0)then  !! Close to lower left corner
-          if(xbcond.ne.0.and.ybcond_m.ne.0)then ! if a mirror node is required
+          if(xbcond_L.ne.0.and.ybcond_L_m.ne.0)then ! if a mirror node is required
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i
-             if(xbcond.eq.1.and.ybcond_m.eq.1)then
+             if(xbcond_L.eq.1.and.ybcond_L_m.eq.1)then
                 rp(k,1) = rp(i,1) + xmax - xmin;rp(k,2) = rp(i,2) + ymax - ymin
                 vrelation(k)=1
-             else if(xbcond.eq.2.and.ybcond_m.eq.1)then
+             else if(xbcond_L.eq.2.and.ybcond_L_m.eq.1)then
                 rp(k,1) = 2.0d0*xmin - rp(i,1);rp(k,2) = rp(i,2) + ymax - ymin
                 vrelation(k)=2          
-             else if(xbcond.eq.1.and.ybcond_m.eq.2)then
+             else if(xbcond_L.eq.1.and.ybcond_L_m.eq.2)then
                 rp(k,1) = rp(i,1) + xmax - xmin;rp(k,2) = 2.0d0*ymin - rp(i,2)
                 vrelation(k)=3          
-             else if(xbcond.eq.2.and.ybcond_m.eq.2)then
+             else if(xbcond_L.eq.2.and.ybcond_L_m.eq.2)then
                 rp(k,1) = 2.0d0*xmin - rp(i,1);rp(k,2) = 2.0d0*ymin - rp(i,2)
                 vrelation(k)=4         
              end if
@@ -126,20 +128,20 @@ contains
        rcorn = (/xmax,ymin,0.0d0/)
        cdist = sqrt(dot_product(rcorn-rp(i,:),rcorn-rp(i,:)))
        if(cdist.le.ss*h0)then  !! close to lower right corner
-          if(xbcond.ne.0.and.ybcond_m.ne.0)then ! if a mirror node is required
+          if(xbcond_U.ne.0.and.ybcond_L_m.ne.0)then ! if a mirror node is required
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i
-             if(xbcond.eq.1.and.ybcond_m.eq.1)then
+             if(xbcond_U.eq.1.and.ybcond_L_m.eq.1)then
                 rp(k,1) = rp(i,1) - xmax + xmin;rp(k,2) = rp(i,2) + ymax - ymin
                 vrelation(k)=1
-             else if(xbcond.eq.2.and.ybcond_m.eq.1)then
+             else if(xbcond_U.eq.2.and.ybcond_L_m.eq.1)then
                 rp(k,1) = 2.0d0*xmax - rp(i,1);rp(k,2) = rp(i,2) + ymax - ymin
                 vrelation(k)=2          
-             else if(xbcond.eq.1.and.ybcond_m.eq.2)then
+             else if(xbcond_U.eq.1.and.ybcond_L_m.eq.2)then
                 rp(k,1) = rp(i,1) - xmax + xmin;rp(k,2) = 2.0d0*ymin - rp(i,2)
                 vrelation(k)=3          
-             else if(xbcond.eq.2.and.ybcond_m.eq.2)then
+             else if(xbcond_U.eq.2.and.ybcond_L_m.eq.2)then
                 rp(k,1) = 2.0d0*xmax - rp(i,1);rp(k,2) = 2.0d0*ymin - rp(i,2)
                 vrelation(k)=4         
              end if
@@ -149,20 +151,20 @@ contains
        rcorn = (/xmin,ymax,0.0d0/)
        cdist = sqrt(dot_product(rcorn-rp(i,:),rcorn-rp(i,:)))
        if(cdist.le.ss*h0)then  !! close to upper left corner
-          if(xbcond.ne.0.and.ybcond_m.ne.0)then ! if a mirror node is required
+          if(xbcond_L.ne.0.and.ybcond_U_m.ne.0)then ! if a mirror node is required
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i
-             if(xbcond.eq.1.and.ybcond_m.eq.1)then
+             if(xbcond_L.eq.1.and.ybcond_U_m.eq.1)then
                 rp(k,1) = rp(i,1) + xmax - xmin;rp(k,2) = rp(i,2) - ymax + ymin
                 vrelation(k)=1
-             else if(xbcond.eq.2.and.ybcond_m.eq.1)then
+             else if(xbcond_L.eq.2.and.ybcond_U_m.eq.1)then
                 rp(k,1) = 2.0d0*xmin - rp(i,1);rp(k,2) = rp(i,2) - ymax + ymin
                 vrelation(k)=2          
-             else if(xbcond.eq.1.and.ybcond_m.eq.2)then
+             else if(xbcond_L.eq.1.and.ybcond_U_m.eq.2)then
                 rp(k,1) = rp(i,1) + xmax - xmin;rp(k,2) = 2.0d0*ymax - rp(i,2)
                 vrelation(k)=3          
-             else if(xbcond.eq.2.and.ybcond_m.eq.2)then
+             else if(xbcond_L.eq.2.and.ybcond_U_m.eq.2)then
                 rp(k,1) = 2.0d0*xmin - rp(i,1);rp(k,2) = 2.0d0*ymax - rp(i,2)
                 vrelation(k)=4         
              end if
@@ -172,20 +174,20 @@ contains
        rcorn = (/xmax,ymax,0.0d0/)
        cdist = sqrt(dot_product(rcorn-rp(i,:),rcorn-rp(i,:)))
        if(cdist.le.ss*h0)then  !! Close to upper right corner
-          if(xbcond.ne.0.and.ybcond_m.ne.0)then ! if a mirror node is required
+          if(xbcond_U.ne.0.and.ybcond_U_m.ne.0)then ! if a mirror node is required
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i
-             if(xbcond.eq.1.and.ybcond_m.eq.1)then
+             if(xbcond_U.eq.1.and.ybcond_U_m.eq.1)then
                 rp(k,1) = rp(i,1) - xmax + xmin;rp(k,2) = rp(i,2) - ymax + ymin
                 vrelation(k)=1
-             else if(xbcond.eq.2.and.ybcond_m.eq.1)then
+             else if(xbcond_U.eq.2.and.ybcond_U_m.eq.1)then
                 rp(k,1) = 2.0d0*xmax - rp(i,1);rp(k,2) = rp(i,2) - ymax + ymin
                 vrelation(k)=2          
-             else if(xbcond.eq.1.and.ybcond_m.eq.2)then
+             else if(xbcond_U.eq.1.and.ybcond_U_m.eq.2)then
                 rp(k,1) = rp(i,1) - xmax + xmin;rp(k,2) = 2.0d0*ymax - rp(i,2)
                 vrelation(k)=3          
-             else if(xbcond.eq.2.and.ybcond_m.eq.2)then
+             else if(xbcond_U.eq.2.and.ybcond_U_m.eq.2)then
                 rp(k,1) = 2.0d0*xmax - rp(i,1);rp(k,2) = 2.0d0*ymax - rp(i,2)
                 vrelation(k)=4         
              end if

@@ -41,7 +41,7 @@ contains
      open(13,file='../gen/IPART')
      read(13,*) nb,npfb,dummy      !! dummy is largest s(i) in domain...
      read(13,*) xmin,xmax,ymin,ymax
-     read(13,*) xbcond,ybcond     
+     read(13,*) xbcond_L,xbcond_U,ybcond_L,ybcond_U
      !! For the purposes of shifting, ybcond=3 (no-slip) is the same as ybcond=2 (symmetry)
      
      !! Calculate some useful constants
@@ -124,7 +124,7 @@ contains
      open(unit=13,file='../gen/IPART')
      write(13,*) nb,npfb-nrw*nbw-nrio*nbio,smax  !! NEWBC
      write(13,*) xmin,xmax,ymin,ymax
-     write(13,*) xbcond,ybcond         
+     write(13,*) xbcond_L,xbcond_U,ybcond_L,ybcond_U
      do i=1,npfb
         if(node_type(i).ge.0) then
            write(13,*) rp(i,1),rp(i,2),node_type(i),rnorm(i,1),rnorm(i,2),s(i)     
@@ -244,7 +244,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      open(13,file='../gen/IPART')
      read(13,*) nb,npfb,dummy      !! dummy is largest s(i) in domain...
      read(13,*) xmin,xmax,ymin,ymax
-     read(13,*) xbcond,ybcond     
+     read(13,*) xbcond_L,xbcond_U,ybcond_L,ybcond_U
      !! For the purposes of shifting, ybcond=3 (no-slip) is the same as ybcond=2 (symmetry)
      
      !! Calculate some useful constants
@@ -313,7 +313,7 @@ write(6,*) "Shifting iteration",ll,"of ",kk
      open(212,file='../../IPART')
      write(212,*) nb,n*nprocsZ,smax
      write(212,*) xmin,xmax,ymin,ymax
-     write(212,*) xbcond,ybcond
+     write(212,*) xbcond_L,xbcond_U,ybcond_L,ybcond_U
      write(212,*) nprocsX,nprocsY,nprocsZ
   
      !! Write out stard and end indices of each column (repeated for decomposition in z)

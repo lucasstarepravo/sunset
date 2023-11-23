@@ -86,7 +86,7 @@ contains
      L_domain_z = L_domain_y
 
      
-     read(13,*) xbcond,ybcond
+     read(13,*) xbcond_L,xbcond_U,ybcond_L,ybcond_U
      !! Calculate some useful constants
      h0 = hovs*dummy;sup_size = ss*h0;h2=h0*h0;h3=h2*h0
          

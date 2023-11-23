@@ -21,7 +21,7 @@ program datgen
   integer ipart
   integer i,j,icha,nn,ve_model,ii,jj
   double precision h0,r_mag,yl,D_cyl,S_cyl
-  integer xbcond,ybcond
+  integer xbcond_L,xbcond_U,ybcond_L,ybcond_U
   
   double precision :: a0,a1,a2,a3,a4,a5 !! NACA coefficients
   double precision :: temp,tmp2,tmp
@@ -64,7 +64,7 @@ program datgen
      yl=1.0d0
      xl=yl/2.0d0
      dx0=yl/200.0d0
-     xbcond=1;ybcond=0
+     xbcond_L=1;xbcond_U=1;ybcond_L=0;ybcond_U=0
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -84,7 +84,7 @@ program datgen
      yl=2.0d0*pi
      xl=yl
      dx0=xl/100.0d0
-     xbcond=1;ybcond=1     
+     xbcond_L=1;xbcond_U=1;ybcond_L=1;ybcond_U=1
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -106,7 +106,7 @@ case(4) !! Rayleigh-Taylor geometry
      yl=0.5d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
      dx0=xl/200.0       !15
-     xbcond=0;ybcond=2
+     xbcond_L=0;xbcond_U=0;ybcond_L=2;ybcond_U=2
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -132,7 +132,7 @@ case(5) !! Inflow/outflow tube for simple flames
      yl=0.0125d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
      dx0=xl/1000.0       !15
-     xbcond=0;ybcond=1
+     xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -160,7 +160,7 @@ case(6) !! Hong Im flameholder setup
      h0=xl/50.0d0   !cylinder radius
      yl=xl/5.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
      dx0=xl/(40.0d0*25.0d0)!25.0       !15
-     xbcond=0;ybcond=1     
+     xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -198,7 +198,7 @@ case(7) !! Porous with in-out
      xl = sqrt(3.0d0)*S_cyl
      h0=D_cyl/2.0d0      !cylinder radius    
      dx0=D_cyl/60.0       !75
-     xbcond=0;ybcond=1     
+     xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -240,7 +240,7 @@ case(8) !! Array of circles
      h0=xl/40.0d0   !cylinder radius
      yl=xl/5.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
      dx0=h0/50.0       !15
-     xbcond=0;ybcond=1     
+     xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -482,7 +482,7 @@ end select
   open(13,file='./IPART')
   write(13,*) nb,npfb,dx0
   write(13,*) xb_min,xb_max,yb_min,yb_max
-  write(13,*) xbcond,ybcond
+  write(13,*) xbcond_L,xbcond_U,ybcond_L,ybcond_U
   do i=1,npfb
      if(node_type(i).ge.0.and.node_type(i).le.2) then
         write(13,*) xp(i), yp(i),node_type(i),xnorm(i),ynorm(i),dxp(i)

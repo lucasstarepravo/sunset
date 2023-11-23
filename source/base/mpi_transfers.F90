@@ -232,11 +232,11 @@ contains
            iproc_S_LR(nprocsY+1:2*nprocsY) = iproc_thiscolumn(:) + nprocsY
         end if
         !! Left & periodic
-        if(xbcond.eq.1.and.iprocX.eq.0) then
+        if(xbcond_L.eq.1.and.iprocX.eq.0) then
            iproc_S_LR(1:nprocsY) = iproc_thiscolumn(:) - nprocsY + nprocsX*nprocsY           
         end if              
         !! Right & periodic
-        if(xbcond.eq.1.and.iprocX.eq.nprocsX-1)then
+        if(xbcond_U.eq.1.and.iprocX.eq.nprocsX-1)then
            iproc_S_LR(nprocsY+1:2*nprocsY) = iproc_thiscolumn(:) + nprocsY - nprocsX*nprocsY
         end if                         
      end if
@@ -299,11 +299,11 @@ contains
            iproc_R_LR(nprocsY+1:2*nprocsY) = iproc_thiscolumn(:) - nprocsY
         end if
         !! right & periodic
-        if(xbcond.eq.1.and.iprocX.eq.nprocsX-1) then
+        if(xbcond_U.eq.1.and.iprocX.eq.nprocsX-1) then
            iproc_R_LR(1:nprocsY) = iproc_thiscolumn(:) + nprocsY - nprocsX*nprocsY           
         end if              
         !! Left & periodic
-        if(xbcond.eq.1.and.iprocX.eq.0)then
+        if(xbcond_L.eq.1.and.iprocX.eq.0)then
            iproc_R_LR(nprocsY+1:2*nprocsY) = iproc_thiscolumn(:) - nprocsY + nprocsX*nprocsY
         end if                                      
      end if   
@@ -1170,7 +1170,7 @@ contains
      end do
 
      !! Adjust positions for X-periodicity
-     if(xbcond.eq.1.and.nprocsX.gt.1) then
+     if(xbcond_L.eq.1.and.nprocsX.gt.1) then
         if(iprocX.eq.0) then
            do k=2+nprocsY+1,2+2*nprocsY
               is = nrecstart(k);ie = is + inhalo_LR(k-2)-1

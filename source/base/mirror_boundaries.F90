@@ -44,8 +44,9 @@ contains
      !! -----:  z is always periodic, so w(j) = w(i) always.
     real(rkind),dimension(dims) :: rcorn
     real(rkind) :: cdist
-    integer(ikind) :: i,imp,k,xbcond_noMPI,ybcond_noMPI
+    integer(ikind) :: i,imp,k,xbcond_L_noMPI,xbcond_U_noMPI,ybcond_L_noMPI,ybcond_U_noMPI
     integer(ikind) :: nmirror,nmirror_esti
+    logical :: stopflag
       
     nmirror_esti = 5*npfb  ! Estimate for max number of mirrors
     allocate(irelation(npfb+1:npfb+nmirror_esti))      
@@ -54,10 +55,23 @@ contains
                       
     !! In certain circumstances, periodic boundaries are built into MPI decomposition
     !! rather than implemented here. This switch turns them off here if necessary.                      
-    xbcond_noMPI=xbcond
-    ybcond_noMPI=ybcond
+    xbcond_L_noMPI=xbcond_L;xbcond_U_noMPI=xbcond_U;
+    ybcond_L_noMPI=ybcond_L;ybcond_U_noMPI=ybcond_U;
+    stopflag=.false.
+    if(xbcond_L.eq.1.and.xbcond_U.ne.1) stopflag=.true.
+    if(xbcond_U.eq.1.and.xbcond_L.ne.1) stopflag=.true.
+    if(ybcond_L.eq.1.and.ybcond_U.ne.1) stopflag=.true.
+    if(ybcond_U.eq.1.and.ybcond_L.ne.1) stopflag=.true.
+    if(stopflag) then
+       write(6,*) "Warning: periodic boundary conditions incorrectly specified with bcond"
+       write(6,*) "STOPPING"
+       stop
+    end if
 #ifdef mp
-    if(xbcond.eq.1.and.nprocsX.gt.1) xbcond_noMPI=0
+    if(xbcond_L.eq.1.and.nprocsX.gt.1) then
+       xbcond_L_noMPI=0
+       xbcond_U_noMPI=0
+    end if
 !    if(ybcond.eq.1.and.nprocsY.gt.1) ybcond_noMPI=0    
 #endif
   
@@ -66,12 +80,12 @@ contains
        
        !! LEFT AND RIGHT BOUNDARIES
        if(rp(i,1).le.xmin+ss*h(i)*1.2d0)then ! Close to left bound
-          if(xbcond_noMPI.eq.1)then ! Periodic
+          if(xbcond_L_noMPI.eq.1)then ! Periodic
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=1
              rp(k,1) = rp(i,1) + xmax - xmin;rp(k,2)=rp(i,2);rp(k,3)=rp(i,3)
-          else if(xbcond_noMPI.eq.2)then ! Symmetric
+          else if(xbcond_L_noMPI.eq.2)then ! Symmetric
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=2
@@ -80,12 +94,12 @@ contains
        end if   
        
        if(rp(i,1).ge.xmax-ss*h(i)*1.2d0)then ! Close to right bound
-          if(xbcond_noMPI.eq.1)then ! Periodic
+          if(xbcond_U_noMPI.eq.1)then ! Periodic
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=1
              rp(k,1) = rp(i,1) - xmax + xmin;rp(k,2)=rp(i,2);rp(k,3)=rp(i,3)
-          else if(xbcond_noMPI.eq.2)then ! Symmetric
+          else if(xbcond_U_noMPI.eq.2)then ! Symmetric
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=2
@@ -95,17 +109,17 @@ contains
        
        !! UPPER AND LOWER BOUNDARIES
        if(rp(i,2).le.ymin+ss*h(i)*1.2d0)then ! Close to lower bound
-          if(ybcond_noMPI.eq.1)then ! Periodic
+          if(ybcond_L_noMPI.eq.1)then ! Periodic
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=1
              rp(k,1) = rp(i,1);rp(k,2)=rp(i,2) + ymax - ymin;rp(k,3)=rp(i,3)
-          else if(ybcond_noMPI.eq.2)then ! Symmetric
+          else if(ybcond_L_noMPI.eq.2)then ! Symmetric
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=3
              rp(k,1) = rp(i,1);rp(k,2)= two*ymin - rp(i,2);rp(k,3)=rp(i,3)
-          else if(ybcond_noMPI.eq.3)then ! No-slip
+          else if(ybcond_L_noMPI.eq.3)then ! No-slip
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=4
@@ -114,17 +128,17 @@ contains
        end if   
        
        if(rp(i,2).ge.ymax-ss*h(i)*1.2d0)then ! Close to upper bound
-          if(ybcond_noMPI.eq.1)then ! Periodic
+          if(ybcond_U_noMPI.eq.1)then ! Periodic
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=1
              rp(k,1) = rp(i,1);rp(k,2)=rp(i,2) - ymax + ymin;rp(k,3)=rp(i,3)
-          else if(ybcond_noMPI.eq.2)then ! Symmetric
+          else if(ybcond_U_noMPI.eq.2)then ! Symmetric
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=3
              rp(k,1) = rp(i,1);rp(k,2)= two*ymax - rp(i,2);rp(k,3)=rp(i,3)
-          else if(ybcond_noMPI.eq.3)then ! No-slip
+          else if(ybcond_U_noMPI.eq.3)then ! No-slip
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i;vrelation(k)=4
@@ -136,20 +150,20 @@ contains
        rcorn = (/xmin,ymin,zero/)
        cdist = sqrt(dot_product(rcorn-rp(i,:),rcorn-rp(i,:)))
        if(cdist.le.ss*h(i)*1.2d0)then  !! Close to lower left corner
-          if(xbcond_noMPI.ne.0.and.ybcond_noMPI.ne.0)then ! if a mirror node is required
+          if(xbcond_L_noMPI.ne.0.and.ybcond_L_noMPI.ne.0)then ! if a mirror node is required
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i
-             if(xbcond_noMPI.eq.1.and.ybcond_noMPI.eq.1)then
+             if(xbcond_L_noMPI.eq.1.and.ybcond_L_noMPI.eq.1)then
                 rp(k,1) = rp(i,1) + xmax - xmin;rp(k,2) = rp(i,2) + ymax - ymin;rp(k,3)=rp(i,3)
                 vrelation(k)=1
-             else if(xbcond_noMPI.eq.2.and.ybcond_noMPI.eq.1)then
+             else if(xbcond_L_noMPI.eq.2.and.ybcond_L_noMPI.eq.1)then
                 rp(k,1) = two*xmin - rp(i,1);rp(k,2) = rp(i,2) + ymax - ymin;rp(k,3)=rp(i,3)
                 vrelation(k)=2          
-             else if(xbcond_noMPI.eq.1.and.ybcond_noMPI.eq.2)then
+             else if(xbcond_L_noMPI.eq.1.and.ybcond_L_noMPI.eq.2)then
                 rp(k,1) = rp(i,1) + xmax - xmin;rp(k,2) = two*ymin - rp(i,2);rp(k,3)=rp(i,3)
                 vrelation(k)=3          
-             else if(xbcond_noMPI.eq.2.and.ybcond_noMPI.eq.2)then
+             else if(xbcond_L_noMPI.eq.2.and.ybcond_L_noMPI.eq.2)then
                 rp(k,1) = two*xmin - rp(i,1);rp(k,2) = two*ymin - rp(i,2);rp(k,3)=rp(i,3)
                 vrelation(k)=4         
              end if
@@ -159,20 +173,20 @@ contains
        rcorn = (/xmax,ymin,zero/)
        cdist = sqrt(dot_product(rcorn-rp(i,:),rcorn-rp(i,:)))
        if(cdist.le.ss*h(i)*1.2d0)then  !! close to lower right corner
-          if(xbcond_noMPI.ne.0.and.ybcond_noMPI.ne.0)then ! if a mirror node is required
+          if(xbcond_U_noMPI.ne.0.and.ybcond_L_noMPI.ne.0)then ! if a mirror node is required
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i
-             if(xbcond_noMPI.eq.1.and.ybcond_noMPI.eq.1)then
+             if(xbcond_U_noMPI.eq.1.and.ybcond_L_noMPI.eq.1)then
                 rp(k,1) = rp(i,1) - xmax + xmin;rp(k,2) = rp(i,2) + ymax - ymin;rp(k,3)=rp(i,3)
                 vrelation(k)=1
-             else if(xbcond_noMPI.eq.2.and.ybcond_noMPI.eq.1)then
+             else if(xbcond_U_noMPI.eq.2.and.ybcond_L_noMPI.eq.1)then
                 rp(k,1) = two*xmax - rp(i,1);rp(k,2) = rp(i,2) + ymax - ymin;rp(k,3)=rp(i,3)
                 vrelation(k)=2          
-             else if(xbcond_noMPI.eq.1.and.ybcond_noMPI.eq.2)then
+             else if(xbcond_U_noMPI.eq.1.and.ybcond_L_noMPI.eq.2)then
                 rp(k,1) = rp(i,1) - xmax + xmin;rp(k,2) = two*ymin - rp(i,2);rp(k,3)=rp(i,3)
                 vrelation(k)=3          
-             else if(xbcond_noMPI.eq.2.and.ybcond_noMPI.eq.2)then
+             else if(xbcond_U_noMPI.eq.2.and.ybcond_L_noMPI.eq.2)then
                 rp(k,1) = two*xmax - rp(i,1);rp(k,2) = two*ymin - rp(i,2);rp(k,3)=rp(i,3)
                 vrelation(k)=4         
              end if
@@ -182,20 +196,20 @@ contains
        rcorn = (/xmin,ymax,zero/)
        cdist = sqrt(dot_product(rcorn-rp(i,:),rcorn-rp(i,:)))
        if(cdist.le.ss*h(i)*1.2d0)then  !! close to upper left corner
-          if(xbcond_noMPI.ne.0.and.ybcond_noMPI.ne.0)then ! if a mirror node is required
+          if(xbcond_L_noMPI.ne.0.and.ybcond_U_noMPI.ne.0)then ! if a mirror node is required
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i
-             if(xbcond_noMPI.eq.1.and.ybcond_noMPI.eq.1)then
+             if(xbcond_L_noMPI.eq.1.and.ybcond_U_noMPI.eq.1)then
                 rp(k,1) = rp(i,1) + xmax - xmin;rp(k,2) = rp(i,2) - ymax + ymin;rp(k,3)=rp(i,3)
                 vrelation(k)=1
-             else if(xbcond_noMPI.eq.2.and.ybcond_noMPI.eq.1)then
+             else if(xbcond_L_noMPI.eq.2.and.ybcond_U_noMPI.eq.1)then
                 rp(k,1) = two*xmin - rp(i,1);rp(k,2) = rp(i,2) - ymax + ymin;rp(k,3)=rp(i,3)
                 vrelation(k)=2          
-             else if(xbcond_noMPI.eq.1.and.ybcond_noMPI.eq.2)then
+             else if(xbcond_L_noMPI.eq.1.and.ybcond_U_noMPI.eq.2)then
                 rp(k,1) = rp(i,1) + xmax - xmin;rp(k,2) = two*ymax - rp(i,2);rp(k,3)=rp(i,3)
                 vrelation(k)=3          
-             else if(xbcond_noMPI.eq.2.and.ybcond_noMPI.eq.2)then
+             else if(xbcond_L_noMPI.eq.2.and.ybcond_U_noMPI.eq.2)then
                 rp(k,1) = two*xmin - rp(i,1);rp(k,2) = two*ymax - rp(i,2);rp(k,3)=rp(i,3)
                 vrelation(k)=4         
              end if
@@ -205,20 +219,20 @@ contains
        rcorn = (/xmax,ymax,zero/)
        cdist = sqrt(dot_product(rcorn-rp(i,:),rcorn-rp(i,:)))
        if(cdist.le.ss*h(i)*1.2d0)then  !! Close to upper right corner
-          if(xbcond_noMPI.ne.0.and.ybcond_noMPI.ne.0)then ! if a mirror node is required
+          if(xbcond_U_noMPI.ne.0.and.ybcond_U_noMPI.ne.0)then ! if a mirror node is required
              imp = imp + 1
              k = npfb + imp
              irelation(k)=i
-             if(xbcond_noMPI.eq.1.and.ybcond_noMPI.eq.1)then
+             if(xbcond_U_noMPI.eq.1.and.ybcond_U_noMPI.eq.1)then
                 rp(k,1) = rp(i,1) - xmax + xmin;rp(k,2) = rp(i,2) - ymax + ymin;rp(k,3)=rp(i,3)
                 vrelation(k)=1
-             else if(xbcond_noMPI.eq.2.and.ybcond_noMPI.eq.1)then
+             else if(xbcond_U_noMPI.eq.2.and.ybcond_U_noMPI.eq.1)then
                 rp(k,1) = two*xmax - rp(i,1);rp(k,2) = rp(i,2) - ymax + ymin;rp(k,3)=rp(i,3)
                 vrelation(k)=2          
-             else if(xbcond_noMPI.eq.1.and.ybcond_noMPI.eq.2)then
+             else if(xbcond_U_noMPI.eq.1.and.ybcond_U_noMPI.eq.2)then
                 rp(k,1) = rp(i,1) - xmax + xmin;rp(k,2) = two*ymax - rp(i,2);rp(k,3)=rp(i,3)
                 vrelation(k)=3          
-             else if(xbcond_noMPI.eq.2.and.ybcond_noMPI.eq.2)then
+             else if(xbcond_U_noMPI.eq.2.and.ybcond_U_noMPI.eq.2)then
                 rp(k,1) = two*xmax - rp(i,1);rp(k,2) = two*ymax - rp(i,2);rp(k,3)=rp(i,3)
                 vrelation(k)=4         
              end if

@@ -134,7 +134,7 @@ module common_vars
   integer(ikind),dimension(:),allocatable :: irelation,vrelation  ! used for periodic and symmetric boundaries
   real(rkind) :: xmin,xmax,ymin,ymax  !! Global domain size (required for NRBCs)
   real(rkind) :: L_domain_x,L_domain_y,L_domain_z
-  integer(ikind) :: xbcond,ybcond !! BC flags for "simple" geometries without boundary nodes...
+  integer(ikind) :: xbcond_L,xbcond_U,ybcond_L,ybcond_U !!flags for non NSCBC bounds
   integer(ikind),dimension(:),allocatable :: btype !! What type of BC is node i?
   integer(ikind),dimension(:),allocatable :: fd_parent !! pointer to the boundary node which is parent 
   
