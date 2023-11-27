@@ -103,15 +103,15 @@ program datgen
 !! ------------------------------------------------------------------------------------------------
 case(4) !! Rayleigh-Taylor geometry
 
-     yl=0.5d0!0.0125d0  ! channel width
+     yl=0.25d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
      dx0=xl/200.0       !15
-     xbcond_L=0;xbcond_U=0;ybcond_L=2;ybcond_U=2
+     xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
      allocate(b_type(nb_patches))
-     b_type(:) = (/ 3, 2, 3, 1/)  
+     b_type(:) = (/ 3, 2, 3, 0/)  
      b_node(1,:) = (/ -0.5d0*xl, -0.5d0*yl /)
      b_node(2,:) = (/ 0.5d0*xl, -0.5d0*yl /)
      b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
@@ -129,9 +129,9 @@ case(4) !! Rayleigh-Taylor geometry
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.0125d0!0.0125d0  ! channel width
+     yl=0.025d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/1000.0       !15
+     dx0=xl/500.0       !15
      xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
      
      nb_patches = 4
