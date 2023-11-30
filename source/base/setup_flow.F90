@@ -73,7 +73,7 @@ contains
         
         
      !! Make a 1D flame: pass X-position,flame_thickness and T_hot
-     call make_1d_flame(-0.0d0,2.0d-4,2.366d3)  !-0.275d0
+     call make_1d_flame(-0.3d0,5.0d-4,1.50d3)  !-0.275d0,2.366d3
      
      !! Make a gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
 !     call make_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
@@ -208,7 +208,7 @@ contains
   subroutine initialise_composition
      !! This subroutine evaluates the reactant and product mass fractions for the given
      !! stoichiometry.
-     real(rkind) :: Yin_H2,Yin_O2,Yin_N2,Yout_H2O
+     real(rkind) :: Yin_H2,Yin_O2,Yin_N2,Yout_H2O,Yout_O2
      real(rkind) :: o2n2_ratio,h2o2_stoichiometric,h2o2_ratio
      real(rkind) :: Yin_CH4,Yout_CO2
      real(rkind) :: ch4o2_ratio,ch4o2_stoichiometric,co2h2o_ratio     
@@ -231,6 +231,7 @@ contains
      end if
     
      !! 9-species H2 chemistry
+     !! Assuming lean conditions, so some O2 remains in products
      if(nspec.eq.9) then
         o2n2_ratio = one*molar_mass(2)/(3.76d0*molar_mass(9))
         h2o2_stoichiometric = two*molar_mass(1)/(one*molar_mass(2))
@@ -239,14 +240,16 @@ contains
         Yin_O2 = one/(one + h2o2_ratio + one/o2n2_ratio)
         Yin_H2 = Yin_O2*h2o2_ratio
         Yin_N2 = one - Yin_H2 - Yin_O2            
-        Yout_H2O = one - Yin_N2      
+        Yout_O2 = Yin_O2*(one-phi_in)
+        Yout_H2O = one - Yin_N2 - Yout_O2   
 
         Yspec_reactants(1) = Yin_H2
         Yspec_reactants(2) = Yin_O2
         Yspec_reactants(3:8) = zero
         Yspec_reactants(9) = Yin_N2
         
-        Yspec_products(1:2) = zero
+        Yspec_products(1) = zero
+        Yspec_products(2) = Yout_O2
         Yspec_products(3) = Yout_H2O
         Yspec_products(4:8) = zero
         Yspec_products(9) = Yin_N2      
