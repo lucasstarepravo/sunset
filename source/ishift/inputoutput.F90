@@ -24,7 +24,7 @@ module inputoutput
   integer(ikind),parameter :: maxiters_diffusion = 200
   integer(ikind) :: nbw,nbio
   integer(ikind),parameter :: nrio=4
-  integer(ikind),parameter :: nrw=3  !! Number of rows
+  integer(ikind),parameter :: nrw=4  !! Number of rows
 
 contains
 !! ------------------------------------------------------------------------------------------------  

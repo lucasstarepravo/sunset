@@ -157,8 +157,8 @@ case(5) !! Inflow/outflow tube for simple flames
 case(6) !! Hong Im flameholder setup
 
      xl=1.0d0 ! channel length
-     h0=xl/50.0d0   !cylinder radius
-     yl=xl/5.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
+     h0=xl/40.0d0   !cylinder radius
+     yl=xl/1.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
      dx0=xl/(40.0d0*25.0d0)!25.0       !15
      xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
      
@@ -170,7 +170,7 @@ case(6) !! Hong Im flameholder setup
      b_node(2,:) = (/ 0.5d0*xl, -0.5d0*yl /)
      b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
      b_node(4,:) = (/ -0.50d0*xl, 0.5d0*yl /)
-     nb_blobs=3
+     nb_blobs=1
      open(unit=191,file="blob_fcoefs.in")
      read(191,*) n_blob_coefs
      allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs))
@@ -178,17 +178,17 @@ case(6) !! Hong Im flameholder setup
         read(191,*) blob_coeffs(1,i)
      end do
      close(191)
-     blob_coeffs(1,:) = 0.0d0;blob_coeffs(1,1) = 1.0d0;blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi
-     blob_coeffs(2,:) = blob_coeffs(1,:);blob_rotation(2)=-0.0d0*pi
-     blob_coeffs(3,:) = blob_coeffs(1,:);blob_rotation(3)=-0.0d0*pi    
+     blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi
+!     blob_coeffs(2,:) = blob_coeffs(1,:);blob_rotation(2)=-0.0d0*pi
+!     blob_coeffs(3,:) = blob_coeffs(1,:);blob_rotation(3)=-0.0d0*pi    
 
      blob_centre(1,:)=(/ -0.275d0*xl, 0.0d0*yl/);
-     blob_centre(2,:)=(/ -0.275d0*xl,-0.5d0*yl/);
-     blob_centre(3,:)=(/ -0.275d0*xl, 0.5d0*yl/);     
+!     blob_centre(2,:)=(/ -0.275d0*xl,-0.5d0*yl/);
+!     blob_centre(3,:)=(/ -0.275d0*xl, 0.5d0*yl/);     
 
 
-     dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=2.0d0*dx0  !! dx for solids and in/outs...!! 
+     dxmin = dx0/2.0d0
+     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.0d0*dx0  !! dx for solids and in/outs...!! 
 !! ------------------------------------------------------------------------------------------------
 case(7) !! Porous with in-out
 
@@ -323,7 +323,7 @@ end select
            if(i.gt.nbio.and.temp.le.dist2bound) dist2bound = temp
            if(i.le.nbio.and.temp/dxp(i).le.dist2io) dist2io = temp/dxp(i)
            i=i+1
-           if(dist2bound.le.3.25*dxp(i-1)) keepgoing = .false. !! Too close to solid bound, leave it.  !!NEWBC
+           if(dist2bound.le.4.25*dxp(i-1)) keepgoing = .false. !! Too close to solid bound, leave it.  !!NEWBC
         end do     
 
         if(dist2io.le.4.25) keepgoing = .false. !! Too close to io bound, leave it.  !!NEWBC              
@@ -368,7 +368,7 @@ end select
            call random_number(temp);temp = temp -0.5d0;xp(ipart) = pdp_x(j) + temp*dxmin*0.5d0
            call random_number(temp);temp = temp -0.5d0;yp(ipart) = pdp_y(j) + temp*dxmin*0.5d0
            dxp(ipart) = dx  
-           if(dist2bound.le.4.5d0*dx) node_type(ipart)=998
+!           if(dist2bound.le.4.5d0*dx) node_type(ipart)=998
 !           if(dist2bound.le.3.0d0*dx) node_type(ipart)=997
         end if           
         

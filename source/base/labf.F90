@@ -226,18 +226,18 @@ contains
         end if 
 #endif    
 #if ORDER>=5
-        if(node_type(i).eq.-1)then !! for rows 1, drop to 4th order
-           do i1=1,nsizeG
-              amathyp(i1,15:nsizeG)=zero        
-           end do
-           do i1=15,nsizeG
-              amathyp(i1,1:nsizeG)=zero
-              amathyp(i1,i1)=one
-           end do
-           bvechyp(:)=zero;bvechyp(10)=-one;bvechyp(12)=-two;bvechyp(14)=-one
-           bvechyp(:)=bvechyp(:)/hh/hh/hh/hh        
-           i1=0;i2=0;nsize=nsizeG 
-        end if 
+!        if(node_type(i).eq.-1)then !! for rows 1, drop to 4th order
+!           do i1=1,nsizeG
+!              amathyp(i1,15:nsizeG)=zero        
+!           end do
+!           do i1=15,nsizeG
+!              amathyp(i1,1:nsizeG)=zero
+!              amathyp(i1,i1)=one
+!           end do
+!           bvechyp(:)=zero;bvechyp(10)=-one;bvechyp(12)=-two;bvechyp(14)=-one
+!           bvechyp(:)=bvechyp(:)/hh/hh/hh/hh        
+!           i1=0;i2=0;nsize=nsizeG 
+!        end if 
 #endif    
 
         call dgesv(nsize,1,amathyp,nsize,i1,bvechyp,nsize,i2)
@@ -436,7 +436,7 @@ contains
      allocate(ijlink_tmp(nplink))
      do jj=1,nb
         i=boundary_list(jj)
-        if(node_type(i).eq.1.or.node_type(i).eq.2)then
+!        if(node_type(i).eq.1.or.node_type(i).eq.2)then
            kk = node_type(i)  !! Type of node i
            nsize = ij_count(i)   !! Copy ij_count to temporary storage        
            ijlink_tmp(1:nsize) = ij_link(1:nsize,i)  !! Copy ij_link to temporary array
@@ -455,7 +455,7 @@ contains
                  end if
               end if
            end do
-        end if
+!        end if
      end do   
      deallocate(ijlink_tmp)   
 
@@ -472,7 +472,8 @@ contains
         ij_w_grad(:,:,i) = zero;ij_wb_grad2(:,:,jj) = zero;ij_w_hyp(:,i)=zero
         
         !! Build new FD operators
-        if(node_type(i).eq.1.or.node_type(i).eq.2) then !! inflow/outflows, 5 point stencils
+!        if(node_type(i).eq.1.or.node_type(i).eq.2) then !! inflow/outflows, 5 point stencils
+        if(.true.)then
            do k=1,ij_count(i)
               j=ij_link(k,i)       
               if(j.gt.npfb) cycle !! Eliminate halos and ghosts from search (entire FD stencil in one processor)
@@ -537,7 +538,8 @@ contains
         dx = s(i)     
         ij_w_grad(:,:,i) = zero   
         
-        if(node_type(fd_parent(i)).eq.1.or.node_type(fd_parent(i)).eq.2) then !! inflow/outflow boundaries
+!        if(node_type(fd_parent(i)).eq.1.or.node_type(fd_parent(i)).eq.2) then !! inflow/outflow boundaries
+        if(.true.)then
            do k=1,ij_count(i)
               j=ij_link(k,i)   
               if(j.gt.npfb) cycle !! Eliminate halos and ghosts from search (entire FD stencil in one processor)              
@@ -622,7 +624,7 @@ contains
         call dgesv(nsize,1,amattt,nsize,i1,bvectt,nsize,i2)      
 
         !! Solve system for transverse hyperviscous filter   
-        bvecthyp(:)=zero;bvecthyp(6)=-one;i1=0;i2=0;nsize=nsizeG
+        bvecthyp(:)=zero;bvecthyp(6)=one;i1=0;i2=0;nsize=nsizeG
         call dgesv(nsize,1,amatthyp,nsize,i1,bvecthyp,nsize,i2)                  
 
 
@@ -1488,11 +1490,15 @@ write(6,*) i,i1,"stopping because of NaN",ii
         !! Set the filter coefficient (2/3 will result in A=1/3 at target wavenumber)
         filter_coeff(i) = (two/3.0d0)/lsum   !2/3
 
-        !! Reduce the filter coefficient near boundaries
-!        if(node_type(i).eq.-1) filter_coeff(i) = filter_coeff(i)*half*oosqrt2!*half*half
-!        if(node_type(i).eq.-2) filter_coeff(i) = filter_coeff(i)*half
-!        if(node_type(i).eq.-3) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half
-!        if(node_type(i).eq.-4.or.node_type(i).eq.998) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half                        
+        !! Reduce the filter coefficient near boundaries        
+        if(node_type(i).lt.0) then
+           if(node_type(fd_parent(i)).eq.0) then !! Walls only
+              if(node_type(i).eq.-1) filter_coeff(i) = filter_coeff(i)*half*oosqrt2!*half*half
+              if(node_type(i).eq.-2) filter_coeff(i) = filter_coeff(i)*half
+              if(node_type(i).eq.-3) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half
+              if(node_type(i).eq.-4.or.node_type(i).eq.998) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half 
+           end if
+        end if
 
      end do
      !$omp end parallel do
