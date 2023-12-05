@@ -76,10 +76,10 @@ contains
 !     call make_1d_flame(-0.3d0,5.0d-4,1.30d3)  !-0.275d0,2.366d3
      
      !! Make a gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
-     call make_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
+!     call make_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
 
      !! Load an existing 1D flame file
-!     call load_flame_file
+     call load_flame_file(0.0d0)
 
      !! Make the initial conditions for a Rayleigh-Taylor instability
 !     call make_RT_initial_conditions(-0.0d0,2.0d-4,two*T_ref)
@@ -555,67 +555,87 @@ contains
      return
   end subroutine make_baseflow  
 !! ------------------------------------------------------------------------------------------------  
-  subroutine load_flame_file
+  subroutine load_flame_file(flame_loc)
+     !! Load data for a one-dimensional flame generated with the oned branch on this code.
      use thermodynamics
+     real(rkind),intent(in) :: flame_loc !! Location of the flame
      integer(ikind) :: i,ispec,j,nflamein
-     real(rkind) :: flame_location,flame_thickness,cell_pos
-     real(rkind) :: P_flame,c,u_reactants,Rmix_local,x,y,z
-     real(rkind),dimension(:),allocatable :: flamein_ro,flamein_u,flamein_v,flamein_w,flamein_roE
-     real(rkind),dimension(:,:),allocatable :: flamein_Y
+     real(rkind) :: cell_pos,flamein_x0,flamein_xN
+     real(rkind) :: c,x,y,z
+     real(rkind) :: roR,roP,uR,uP,SL
+     real(rkind),dimension(:,:),allocatable :: flamein_data
      real(rkind) :: dx_flamein
 
      !! Open a file containing flame profile
      open(unit=19,file='init_flame.in')
-     
-     !! Specify the flame pressure
-     P_flame = p_ref
 
-     !! Read file, then close it.     
-     !! Format of the file is ro,ro*u,ro*v,ro*w,roE,ro*Y (all ispec) over 1001 evenly spaced steps covering 
-     !! a 0.01m long domain.
-     nflamein = 1002
-     dx_flamein = 0.01/(nflamein-2)
-     allocate(flamein_ro(nflamein),flamein_u(nflamein),flamein_v(nflamein),flamein_w(nflamein))
-     allocate(flamein_Y(nflamein,nspec))
-     allocate(flamein_roE(nflamein))
-     do i=1,nflamein-1
-        !! Load conservative data
-        read(19,*) flamein_ro(i),flamein_u(i),flamein_v(i),flamein_w(i), &
-                   flamein_roE(i),flamein_Y(i,1:nspec)
-
-        !! Divide by rho as required
-        flamein_u(i) = flamein_u(i)/flamein_ro(i)
-        flamein_v(i) = flamein_v(i)/flamein_ro(i)
-        flamein_w(i) = flamein_w(i)/flamein_ro(i)        
-        flamein_Y(i,:) = flamein_Y(i,:)/flamein_ro(i)                
+     !! Allocate space for the input data
+     read(19,*) nflamein
+     allocate(flamein_data(nflamein,9+nspec));
+     do i=1,nflamein
+        read(19,*) flamein_data(i,:)
      end do
-     flamein_ro(nflamein) = flamein_ro(nflamein-1)   !! Data for extra point at end
-     flamein_u(nflamein) = flamein_u(nflamein-1)
-     flamein_v(nflamein) = flamein_v(nflamein-1)
-     flamein_w(nflamein) = flamein_w(nflamein-1)
-     flamein_roE(nflamein) = flamein_roE(nflamein-1)
-     flamein_Y(nflamein,:) = flamein_Y(nflamein-1,:)   
      close(19)
+     
+     !! Flamein data spacing (assumed uniform)
+     dx_flamein = flamein_data(2,1)-flamein_data(1,1)
+     flamein_x0 = flamein_data(1,1)
+     flamein_xN = flamein_data(nflamein,1)
+     
+     !! Evaluate flame speed:
+     roR = flamein_data(1,6)   !! Reactant density
+     roP = minval(flamein_data(:,6))  !! Product density
+     uR = flamein_data(1,3)          !! Reactant velocity
+     uP = maxval(flamein_data(:,3))  !! Product velocity
+     SL = (uP-uR)*roP/(roR-roP)   !! (eqn 1)     
        
      !! Loop through all particles. Find the "cell" the particle resides in. Copy data.     
-     !$omp parallel do private(j,x,y,z,c,Rmix_local,ispec,cell_pos)
+     !$omp parallel do private(j,x,y,z,c,ispec,cell_pos)
      do i=1,npfb
-        x = (rp(i,1)+half)*L_char  !! Scale x - this requires L_char to match the length
-        !! also needs shifting depending on set up.
+        !! Dimensional coordinate of particle relative to desired flame position
+        x = (rp(i,1)-flame_loc)*L_char 
         
-        !! Nearest index in flame-in data (to left of x)
-        j = floor(x/dx_flamein) + 1      
+        !! Nearest index in flame-in data (to left of x) and position within "cell"
+        if(x.le.flamein_x0) then
+           j=0
+           ro(i) = flamein_data(j,6)
+!           u(i) = flamein_data(j,3);v(i) = flamein_data(j,4);w(i) = flamein_data(j,5)
+           roE(i) = flamein_data(j,7)
+           do ispec=1,nspec
+              Yspec(i,ispec) = flamein_data(j,9+ispec)
+           end do
+           T(i) = flamein_data(j,8)
+           p(i) = flamein_data(j,9)
+        else if(x.ge.flamein_xN) then
+           j=nflamein
+           ro(i) = flamein_data(j,6)
+!           u(i) = flamein_data(j,3);v(i) = flamein_data(j,4);w(i) = flamein_data(j,5)
+           roE(i) = flamein_data(j,7)
+           do ispec=1,nspec
+              Yspec(i,ispec) = flamein_data(j,9+ispec)
+           end do           
+           T(i) = flamein_data(j,8)
+           p(i) = flamein_data(j,9)
+        else
+           j = floor((x-flamein_x0)/dx_flamein) + 1
+           cell_pos = (x-flamein_data(j,1))/dx_flamein
+           ro(i) = flamein_data(j,6)*(one-cell_pos) + flamein_data(j+1,6)*cell_pos
+!           u(i) = flamein_data(j,3)*(one-cell_pos) + flamein_data(j+1,3)*cell_pos
+!           v(i) = flamein_data(j,4)*(one-cell_pos) + flamein_data(j+1,4)*cell_pos
+!           w(i) = flamein_data(j,5)*(one-cell_pos) + flamein_data(j+1,5)*cell_pos                                 
+           roE(i) = flamein_data(j,7)*(one-cell_pos) + flamein_data(j+1,7)*cell_pos           
+           do ispec=1,nspec
+              Yspec(i,ispec) = flamein_data(j,9+ispec)*(one-cell_pos) + flamein_data(j+1,9+ispec)*cell_pos           
+           end do
+           T(i) = flamein_data(j,8)*(one-cell_pos) + flamein_data(j+1,8)*cell_pos
+           p(i) = flamein_data(j,9)*(one-cell_pos) + flamein_data(j+1,9)*cell_pos
+        end if
         
-        !! proportion along cell
-        cell_pos= x/dx_flamein - dble(j-1)
-        
-        !! Copy data
-        ro(i) = flamein_ro(j)*(one - cell_pos) + flamein_ro(j+1)*cell_pos
-        u(i) = flamein_u(j)*(one - cell_pos) + flamein_u(j+1)*cell_pos
-        v(i) = flamein_v(j)*(one - cell_pos) + flamein_v(j+1)*cell_pos
-        w(i) = flamein_w(j)*(one - cell_pos) + flamein_w(j+1)*cell_pos
-        roE(i) = flamein_roE(j)*(one - cell_pos) + flamein_roE(j+1)*cell_pos   
-        Yspec(i,:) = flamein_Y(j,:)*(one - cell_pos) + flamein_Y(j+1,:)*cell_pos
+
+        !! Set velocities in case flame input file has different reactant velocity
+        u(i) = SL*(roR-ro(i))/ro(i) + u(i)
+        v(i) = zero
+        w(i) = zero
         
         !! Convert to conservative variables
         rou(i) = u(i)*ro(i)
@@ -625,14 +645,12 @@ contains
            Yspec(i,ispec) = Yspec(i,ispec)*ro(i)
         end do
 
-        !! Temporary assign p and T
-        T(i) = T_ref
-        p(i) = P_flame
      end do
      !$omp end parallel do
+               
      
      !! Free up space
-     deallocate(flamein_ro,flamein_u,flamein_v,flamein_w,flamein_roE,flamein_Y)
+     deallocate(flamein_data)
      
      !! Temporarily copy some energy data to halos and mirrors (it will be later overwritten, but
      !! just prevents the NR solver from crashing at set-up)
@@ -647,7 +665,7 @@ contains
      !$omp end parallel do
      
      !! Re-evaluate temperature from energy.  
-     call evaluate_temperature_and_pressure
+!     call evaluate_temperature_and_pressure
      
      !! Values on boundaries
      if(nb.ne.0)then

@@ -1492,12 +1492,12 @@ write(6,*) i,i1,"stopping because of NaN",ii
 
         !! Reduce the filter coefficient near boundaries        
         if(node_type(i).lt.0) then
-           if(node_type(fd_parent(i)).eq.0) then !! Walls only
+!           if(node_type(fd_parent(i)).eq.0) then !! Walls only
               if(node_type(i).eq.-1) filter_coeff(i) = filter_coeff(i)*half*oosqrt2!*half*half
               if(node_type(i).eq.-2) filter_coeff(i) = filter_coeff(i)*half
               if(node_type(i).eq.-3) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half
               if(node_type(i).eq.-4.or.node_type(i).eq.998) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half 
-           end if
+!           end if
         end if
 
      end do
