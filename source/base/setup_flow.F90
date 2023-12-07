@@ -76,10 +76,10 @@ contains
 !     call make_1d_flame(-0.3d0,5.0d-4,1.30d3)  !-0.275d0,2.366d3
      
      !! Make a gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
-!     call make_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
+     call make_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
 
      !! Load an existing 1D flame file
-     call load_flame_file(0.0d0)
+!     call load_flame_file(0.0d0)
 
      !! Make the initial conditions for a Rayleigh-Taylor instability
 !     call make_RT_initial_conditions(-0.0d0,2.0d-4,two*T_ref)

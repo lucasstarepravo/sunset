@@ -167,7 +167,7 @@ contains
            h(ii) = s(ii)*hovs_bound        
            k = ii !! k is the index of the parent node
            nb = nb + 1           
-           do j=1,4  !! Make additional nodes  !!NEWBC
+           do j=1,3  !! Make additional nodes  !!NEWBC
               ii = ii + 1
               rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
               rnorm(ii,:)=rnorm(k,:)          !! Copy normals

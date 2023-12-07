@@ -29,7 +29,7 @@ program datgen
   integer(ikind) :: iround,nround,nsearch,ipartrow,ipartrowm1,nnear,npdps,idown,iup,ibc
   logical :: keepgoing,keepgoing2,skip
   real(rkind),dimension(:,:),allocatable :: pdp
-  real(rkind) :: dist2bound,dxtmp,minpdp,dist2io
+  real(rkind) :: dist2bound,dxtmp,minpdp,dist2io,dist2iow
   real(rkind),dimension(:),allocatable :: tmpX
   real(rkind),dimension(:),allocatable :: pdp_x,pdp_y,pdp_dist2
   logical,dimension(:),allocatable :: pdp_active
@@ -77,7 +77,7 @@ program datgen
      nb_blobs = 0;n_blob_coefs=0
 
      dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...  
+     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx_in;dx_wallio=dx_in !! dx for solids and in/outs...!! Ratio for scaling far field...  
 !! ------------------------------------------------------------------------------------------------
   case(3) !! Kolmogorov flow
 
@@ -97,9 +97,7 @@ program datgen
      nb_blobs = 0;n_blob_coefs=0
 
      dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...
-
-
+     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx_in;dx_wallio=dx_in  !! dx for solids and in/outs.
 !! ------------------------------------------------------------------------------------------------
 case(4) !! Rayleigh-Taylor geometry
 
@@ -124,7 +122,7 @@ case(4) !! Rayleigh-Taylor geometry
 !     end do
 
      dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx0*1.0d0  !! dx for solids and in/outs..
+     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx0*1.0d0;dx_wallio=dx_in  !! dx for solids and in/outs..
 
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
@@ -150,7 +148,7 @@ case(5) !! Inflow/outflow tube for simple flames
 !     end do
 
      dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx0*1.0d0  !! dx for solids and in/outs..
+     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx0*1.0d0;dx_wallio=dx_in  !! dx for solids and in/outs..
 
      
 !! ------------------------------------------------------------------------------------------------
@@ -158,7 +156,7 @@ case(6) !! Hong Im flameholder setup
 
      xl=1.0d0 ! channel length
      h0=xl/40.0d0   !cylinder radius
-     yl=xl/1.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
+     yl=xl/10.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
      dx0=xl/(40.0d0*25.0d0)!25.0       !15
      xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
      
@@ -188,7 +186,7 @@ case(6) !! Hong Im flameholder setup
 
 
      dxmin = dx0/2.0d0
-     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.0d0*dx0  !! dx for solids and in/outs...!! 
+     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=4.0d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!! 
 !! ------------------------------------------------------------------------------------------------
 case(7) !! Porous with in-out
 
@@ -231,7 +229,7 @@ case(7) !! Porous with in-out
      end do
 
      dxmin = dx0/2.0d0
-     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=1.0d0*dx0  !! dx for solids and in/outs...!! Ratio for scaling far field...
+     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=1.0d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...
 
 !! ------------------------------------------------------------------------------------------------
 case(8) !! Array of circles
@@ -274,7 +272,7 @@ case(8) !! Array of circles
 
          
      dxmin = dx0/3.0d0
-     dx_wall=dxmin;dx_in=8.0d0*dx0;dx_out=4.0d0*dx0  !! dx for solids and in/outs...!!     
+     dx_wall=dxmin;dx_in=8.0d0*dx0;dx_out=4.0d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
      
 !! ------------------------------------------------------------------------------------------------     
 end select
@@ -317,16 +315,24 @@ end select
         !! How far are we from the boundaries?
         dist2bound = xb_max-xb_min + 100.0d0
         dist2io = xb_max-xb_min + 100.0d0
+        dist2iow = xb_max-xb_min + 100.0d0
         i=1
         do while(i.le.nb)
            tmpN(1) = x - xp(i);tmpN(2) = y - yp(i);temp = sqrt(dot_product(tmpN,tmpN))
            if(i.gt.nbio.and.temp.le.dist2bound) dist2bound = temp
-           if(i.le.nbio.and.temp/dxp(i).le.dist2io) dist2io = temp/dxp(i)
+           if(i.le.nbio) then
+              if(node_type(i).eq.0) then  !! Wall
+                 if(temp/dxp(i).le.dist2iow) dist2iow = temp/dxp(i)
+              else   !! In-out
+                 if(temp/dxp(i).le.dist2io) dist2io = temp/dxp(i)
+              end if
+           end if
            i=i+1
-           if(dist2bound.le.4.25*dxp(i-1)) keepgoing = .false. !! Too close to solid bound, leave it.  !!NEWBC
+           if(dist2bound.le.3.25*dxp(i-1)) keepgoing = .false. !! Too close to solid bound, leave it.  !!NEWBC
         end do     
 
         if(dist2io.le.4.25) keepgoing = .false. !! Too close to io bound, leave it.  !!NEWBC              
+        if(dist2iow.le.3.25) keepgoing = .false.
      
         !! Calculate the resolution locally
         call get_resolution(x,y,dist2bound,dx)
@@ -368,7 +374,7 @@ end select
            call random_number(temp);temp = temp -0.5d0;xp(ipart) = pdp_x(j) + temp*dxmin*0.5d0
            call random_number(temp);temp = temp -0.5d0;yp(ipart) = pdp_y(j) + temp*dxmin*0.5d0
            dxp(ipart) = dx  
-!           if(dist2bound.le.4.5d0*dx) node_type(ipart)=998
+           if(dist2bound.le.4.5d0*dx) node_type(ipart)=998
 !           if(dist2bound.le.3.0d0*dx) node_type(ipart)=997
         end if           
         
@@ -472,9 +478,9 @@ end select
   
   !! Write to fort file for quick visualisation
 !  write(31,*) npfb
-  do i=1,npfb
-     write(31,*) xp(i),yp(i),dxp(i)
-  end do
+!  do i=1,npfb
+!     write(31,*) xp(i),yp(i),dxp(i)
+!  end do
   !! Use Octave/Matlab and run  "A=load('fort.31');scatter(A(:,1),A(:,2),10,A(:,3),'filled');colorbar" 
   !! from this directory for instant visualisation.
   
@@ -594,7 +600,7 @@ end subroutine quicksort
               dxio = dx_out
               call get_resolution(xb_max,zero,1.0d10,dxio)
            end if
-           if(b_type(ib).eq.0) dxio = dx_wall
+           if(b_type(ib).eq.0) dxio = dx_wallio
            tmp = 0.5d0*dxio/m_be
            do while(tmp.lt.1.0-1.0d-10)   ! move along the patch in increments of dx
               ipart = ipart + 1

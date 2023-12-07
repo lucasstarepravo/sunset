@@ -6,7 +6,7 @@
       integer(ikind) :: np, npfb, nb,nbio
       integer(ikind) :: itest
 
-      real(rkind) :: dx,dx0,dxio,dx_in,dx_out,dx_wall,dxmin
+      real(rkind) :: dx,dx0,dxio,dx_in,dx_out,dx_wall,dxmin,dx_wallio
       real(rkind) :: xb_min, xb_max, yb_min, yb_max, xl
       real(rkind), dimension(:), allocatable :: xp, yp,thta,xnorm,ynorm,dxp
       integer(ikind),dimension(:),allocatable :: node_type

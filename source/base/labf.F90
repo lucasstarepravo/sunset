@@ -436,7 +436,7 @@ contains
      allocate(ijlink_tmp(nplink))
      do jj=1,nb
         i=boundary_list(jj)
-!        if(node_type(i).eq.1.or.node_type(i).eq.2)then
+        if(node_type(i).eq.1.or.node_type(i).eq.2)then
            kk = node_type(i)  !! Type of node i
            nsize = ij_count(i)   !! Copy ij_count to temporary storage        
            ijlink_tmp(1:nsize) = ij_link(1:nsize,i)  !! Copy ij_link to temporary array
@@ -455,7 +455,7 @@ contains
                  end if
               end if
            end do
-!        end if
+        end if
      end do   
      deallocate(ijlink_tmp)   
 
@@ -472,8 +472,8 @@ contains
         ij_w_grad(:,:,i) = zero;ij_wb_grad2(:,:,jj) = zero;ij_w_hyp(:,i)=zero
         
         !! Build new FD operators
-!        if(node_type(i).eq.1.or.node_type(i).eq.2) then !! inflow/outflows, 5 point stencils
-        if(.true.)then
+        if(node_type(i).eq.1.or.node_type(i).eq.2) then !! inflow/outflows, 5 point stencils
+!        if(.true.)then
            do k=1,ij_count(i)
               j=ij_link(k,i)       
               if(j.gt.npfb) cycle !! Eliminate halos and ghosts from search (entire FD stencil in one processor)
@@ -538,8 +538,8 @@ contains
         dx = s(i)     
         ij_w_grad(:,:,i) = zero   
         
-!        if(node_type(fd_parent(i)).eq.1.or.node_type(fd_parent(i)).eq.2) then !! inflow/outflow boundaries
-        if(.true.)then
+        if(node_type(fd_parent(i)).eq.1.or.node_type(fd_parent(i)).eq.2) then !! inflow/outflow boundaries
+!        if(.true.)then
            do k=1,ij_count(i)
               j=ij_link(k,i)   
               if(j.gt.npfb) cycle !! Eliminate halos and ghosts from search (entire FD stencil in one processor)              
@@ -802,7 +802,7 @@ contains
            end do
         end if
      end do
-     deallocate(fd_parent)
+!     deallocate(fd_parent)
      
 !     stop
 
@@ -1492,12 +1492,12 @@ write(6,*) i,i1,"stopping because of NaN",ii
 
         !! Reduce the filter coefficient near boundaries        
         if(node_type(i).lt.0) then
-!           if(node_type(fd_parent(i)).eq.0) then !! Walls only
+           if(node_type(fd_parent(i)).eq.0) then !! Walls only
               if(node_type(i).eq.-1) filter_coeff(i) = filter_coeff(i)*half*oosqrt2!*half*half
               if(node_type(i).eq.-2) filter_coeff(i) = filter_coeff(i)*half
               if(node_type(i).eq.-3) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half
               if(node_type(i).eq.-4.or.node_type(i).eq.998) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half 
-!           end if
+           end if
         end if
 
      end do
@@ -1544,7 +1544,7 @@ write(6,*) i,i1,"stopping because of NaN",ii
      !$omp end parallel do
     
      !! Deallocate coefficients
-     deallocate(filter_coeff)
+     deallocate(filter_coeff,fd_parent)
     
      return
   end subroutine filter_coefficients
