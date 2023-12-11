@@ -250,10 +250,10 @@ At the high level, the code has the following structure. The main program is in 
 \item Calls a routine in \verb|source/base/step.F90| which conducts one full RK time step, consisting of
 \begin{itemize}
 \item Calling routines in \verb|source/base/rhs.F90| to evaluate the RHS of the equations
-\item Integrating forward one substep
+\item Integrating forward one RK substep
 \item Re-applying BCs
 \item MPI communications
-\item Repeating the above 4 steps for all substeps
+\item Repeating the above 4 steps for all RK substeps
 \item Filtering the solution
 \item Re-applying BCs
 \item MPI communications
