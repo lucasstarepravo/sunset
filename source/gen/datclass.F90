@@ -103,7 +103,8 @@ case(4) !! Rayleigh-Taylor geometry
 
      yl=0.25d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/200.0       !15
+     dx0=xl/250.0       !15
+     h0 = xl/10.0d0
      xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
      
      nb_patches = 4
@@ -114,15 +115,15 @@ case(4) !! Rayleigh-Taylor geometry
      b_node(2,:) = (/ 0.5d0*xl, -0.5d0*yl /)
      b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
      b_node(4,:) = (/ -0.5d0*xl, 0.5d0*yl /)
-     nb_blobs = 0;n_blob_coefs=6
-!     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs))
-!     blob_centre(1,:)=(/0.d0,0.d0/); !! Central
-!     do i=1,nb_blobs
-!        blob_coeffs(i,:)=h0*(/1.0d0,0.4d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0
-!     end do
+     nb_blobs = 1;n_blob_coefs=6
+     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs))
+     blob_centre(1,:)=(/0.d0,0.d0/); !! Central
+     do i=1,nb_blobs
+        blob_coeffs(i,:)=h0*(/1.0d0,0.0d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=0.0d0
+     end do
 
      dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx0*1.0d0;dx_wallio=dx_in  !! dx for solids and in/outs..
+     dx_wall=dxmin;dx_in=1.5d0*dx0;dx_out=dx0*1.5d0;dx_wallio=dx_in  !! dx for solids and in/outs..
 
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames

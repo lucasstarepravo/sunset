@@ -79,7 +79,7 @@ contains
 !     call make_gaussian_hotspot(-0.23d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
 
      !! Load an existing 1D flame file
-     call load_flame_file(0.0d0)
+     call load_flame_file(0.125d0)
 
      !! Make the initial conditions for a Rayleigh-Taylor instability
 !     call make_RT_initial_conditions(-0.0d0,2.0d-4,two*T_ref)
@@ -597,7 +597,7 @@ contains
         
         !! Nearest index in flame-in data (to left of x) and position within "cell"
         if(x.le.flamein_x0) then
-           j=0
+           j=1
            ro(i) = flamein_data(j,6)
 !           u(i) = flamein_data(j,3);v(i) = flamein_data(j,4);w(i) = flamein_data(j,5)
            roE(i) = flamein_data(j,7)
