@@ -103,7 +103,7 @@ case(4) !! Rayleigh-Taylor geometry
 
      yl=0.25d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/250.0       !15
+     dx0=xl/300.0       !15
      h0 = xl/10.0d0
      xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
      
@@ -122,7 +122,7 @@ case(4) !! Rayleigh-Taylor geometry
         blob_coeffs(i,:)=h0*(/1.0d0,0.0d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=0.0d0
      end do
 
-     dxmin = dx0/1.0d0
+     dxmin = dx0/2.0d0
      dx_wall=dxmin;dx_in=1.5d0*dx0;dx_out=dx0*1.5d0;dx_wallio=dx_in  !! dx for solids and in/outs..
 
 !! ------------------------------------------------------------------------------------------------
@@ -329,11 +329,11 @@ end select
               end if
            end if
            i=i+1
-           if(dist2bound.le.3.25*dxp(i-1)) keepgoing = .false. !! Too close to solid bound, leave it.  !!NEWBC
+           if(dist2bound.le.4.25*dxp(i-1)) keepgoing = .false. !! Too close to solid bound, leave it.  !!NEWBC
         end do     
 
         if(dist2io.le.4.25) keepgoing = .false. !! Too close to io bound, leave it.  !!NEWBC              
-        if(dist2iow.le.3.25) keepgoing = .false.
+        if(dist2iow.le.4.25) keepgoing = .false.
      
         !! Calculate the resolution locally
         call get_resolution(x,y,dist2bound,dx)

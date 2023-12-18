@@ -30,6 +30,7 @@ module labf
 !! ABFs 2 and 3 are multiplied by an RBF (Wab(qq) set in sphtools).
 #define ABF 2
 #define ORDER 8
+!#define WALLNODES3
 
 contains
   subroutine calc_labf_weights
@@ -226,18 +227,18 @@ contains
         end if 
 #endif    
 #if ORDER>=5
-        if(node_type(i).eq.-1)then !! for rows 1, drop to 4th order
-           do i1=1,nsizeG
-              amathyp(i1,15:nsizeG)=zero        
-           end do
-           do i1=15,nsizeG
-              amathyp(i1,1:nsizeG)=zero
-              amathyp(i1,i1)=one
-           end do
-           bvechyp(:)=zero;bvechyp(10)=-one;bvechyp(12)=-two;bvechyp(14)=-one
-           bvechyp(:)=bvechyp(:)/hh/hh/hh/hh        
-           i1=0;i2=0;nsize=nsizeG 
-        end if 
+!        if(node_type(i).eq.-1)then !! for rows 1, drop to 4th order
+!           do i1=1,nsizeG
+!              amathyp(i1,15:nsizeG)=zero        
+!           end do
+!           do i1=15,nsizeG
+!              amathyp(i1,1:nsizeG)=zero
+!              amathyp(i1,i1)=one
+!           end do
+!           bvechyp(:)=zero;bvechyp(10)=-one;bvechyp(12)=-two;bvechyp(14)=-one
+!           bvechyp(:)=bvechyp(:)/hh/hh/hh/hh        
+!           i1=0;i2=0;nsize=nsizeG 
+!        end if 
 #endif    
 
         call dgesv(nsize,1,amathyp,nsize,i1,bvechyp,nsize,i2)
@@ -472,8 +473,11 @@ contains
         ij_w_grad(:,:,i) = zero;ij_wb_grad2(:,:,jj) = zero;ij_w_hyp(:,i)=zero
         
         !! Build new FD operators
+#ifdef WALLNODES3        
         if(node_type(i).eq.1.or.node_type(i).eq.2) then !! inflow/outflows, 5 point stencils
-!        if(.true.)then
+#else        
+        if(.true.)then
+#endif        
            do k=1,ij_count(i)
               j=ij_link(k,i)       
               if(j.gt.npfb) cycle !! Eliminate halos and ghosts from search (entire FD stencil in one processor)
@@ -537,9 +541,11 @@ contains
         i=boundary_list(jj)+1
         dx = s(i)     
         ij_w_grad(:,:,i) = zero   
-        
+#ifdef WALLNODES3        
         if(node_type(fd_parent(i)).eq.1.or.node_type(fd_parent(i)).eq.2) then !! inflow/outflow boundaries
-!        if(.true.)then
+#else        
+        if(.true.)then
+#endif        
            do k=1,ij_count(i)
               j=ij_link(k,i)   
               if(j.gt.npfb) cycle !! Eliminate halos and ghosts from search (entire FD stencil in one processor)              
@@ -830,6 +836,7 @@ contains
      !! Allocation
      allocate(linktmp0(nplink),linktmp1(nplink));linktmp0=0;linktmp1=0
 
+#ifdef WALLNODES3
      !! Add neighbours of i2 to neighbour list of i0 and i1 for walls only
      do ii=1,nb
         i=boundary_list(ii)
@@ -886,7 +893,7 @@ contains
         end do 
         end if
      end do
-
+#endif
 
 
      !! Set desired order::
@@ -1494,7 +1501,7 @@ write(6,*) i,i1,"stopping because of NaN",ii
         if(node_type(i).lt.0) then
            if(node_type(fd_parent(i)).eq.0) then !! Walls only
               if(node_type(i).eq.-1) filter_coeff(i) = filter_coeff(i)*half*oosqrt2!*half*half
-              if(node_type(i).eq.-2) filter_coeff(i) = filter_coeff(i)*half
+              if(node_type(i).eq.-2) filter_coeff(i) = filter_coeff(i)*half!*oosqrt2
               if(node_type(i).eq.-3) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half
               if(node_type(i).eq.-4.or.node_type(i).eq.998) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half 
            end if
@@ -1526,7 +1533,7 @@ write(6,*) i,i1,"stopping because of NaN",ii
         end do
         filter_coeff(i) = (one/3.0d0)/lsum  !(two/3.0d0)
         
-        filter_coeff(i) = filter_coeff(i)!*half*half
+        filter_coeff(i) = filter_coeff(i)*half*half
                 
      end do
      !$omp end parallel do
