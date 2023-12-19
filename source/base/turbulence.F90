@@ -27,15 +27,14 @@ module turbulence
 
 contains
 !! ------------------------------------------------------------------------------------------------
-  subroutine make_turbulent_velocity_field(Lturb_in,uturb_in)
+  subroutine make_turbulent_velocity_field
      !! This is the top-level routine for generating turbulent velocity field, which follows the
      !! diffusion method of Kempf, Klein & Janicka (2005) Flow, Turbulence & Combustion 74:67-84    
      integer(ikind) :: i
-     real(rkind),intent(in) :: Lturb_in,uturb_in
      
      !! Copy input parameters to main module variables
-     L_turb = Lturb_in
-     u_turb = uturb_in
+     L_turb = turb_lengthscale
+     u_turb = turb_intensity
   
   
      !! Store the existing velocity field and zero u,v,w

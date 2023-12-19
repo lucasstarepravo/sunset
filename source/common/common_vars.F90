@@ -28,11 +28,14 @@ module common_vars
 #endif  
   real(rkind) :: r_temp_dependence
 
-  !! Control flags
+  !! Control flags and setup parameters
   integer(ikind) :: flag_mix_av,flag_inflow_type,flag_wall_type 
   integer(ikind) :: flag_uinflow_control
   integer(ikind) :: flag_base_flow_profile  
-
+  integer(ikind) :: flag_flow_type
+  integer(ikind) :: flag_strat,flag_turbulent
+  real(rkind) :: turb_lengthscale,turb_intensity
+  real(rkind) :: fl_pos_x,fl_pos_y,fl_thck,T_hot  
   
   !! Evolved fluid quantities
   real(rkind), dimension(:), allocatable, target :: rou,rov,row,ro,roE

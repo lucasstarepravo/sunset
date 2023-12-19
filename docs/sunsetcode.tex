@@ -216,6 +216,16 @@ In the $x_{1}$ and $x_{3}$ directions, periodic boundary conditions are imposed 
 
 \section{The Code}
 
+There are currently four branches of the code, which are becoming increasingly divergent, but they are summarised as follows:
+\begin{enumerate}
+\item \verb|main| - the main branch which solves the equations above in dimensional form for multistep chemistry.
+\item \verb|nondim| - this branch solves for single-step chemistry in entirely non-dimensional form.
+\item \verb|oned| - this is a one-dimensional version which is suitable for quickly simulating laminar flames to generate input files for the main branch.
+\item \verb|ev| - solves the isothermal Navier-Stokes equations for a single species, along with a constitutive equation for viscoelastic flows. This branch is unrelated to combustion.
+\end{enumerate}
+
+Check github regularly for the most up to date versions. Please do not directly modify any of the above branches (especially main). Create a new branch to work on, and we will merge developments into \verb|main| later.
+
 \subsection{Directory structure}
 
 The code is in a directory called \verb|sunset_code|, and has a structure as follows:
@@ -293,11 +303,11 @@ Clean copies of all three files are located within the sub-directories of \verb|
 
 The parameters in \verb|control.in| are largely self-explanatory, but more detail will be added to this document in due course. 
 
-\subsection{Setting the initial flow field}
+\subsubsection{Setting the initial flow field}
 
-This is partially controlled by \verb|control.in|, for example in the specification of a base-flow profile (zero, uniform or parabolic), and partly done by hard-coding in~\verb|source/base/setup_flow.F90|, where calls to a number of subroutines to create error-function base flames or Gaussian hotspots can be modified or commented out. More of the flow initialisation will be moved to the control files in due course.
+This is partially controlled by \verb|control.in|, for example in the specification of a base-flow profile (zero, uniform or parabolic), the choice of flow type (e.g. flame, Gaussian hot-spot, loading a flame file), and coordinates/scales of initial flames. The routines which implement the initial flow state are in~\verb|source/base/setup_flow.F90|, and the routines which implement error-function based flame profiles, Gaussian hotspots, density stratification etc can be modified as required.
 
-\subsection{From initial conditions}
+\subsection{Running from initial conditions}
 
 \begin{itemize}
 \item Run the above steps to generate \verb|IPART|
@@ -310,7 +320,7 @@ This is partially controlled by \verb|control.in|, for example in the specificat
 
 Note that if you forget to specify \verb|OMP_NUM_THREADS|, it will automatically allocate the maximum number of threads on the system to each MPI rank, and you end up trying to run with more parallelism that the system has (e.g. $24$ MPI ranks each with $48$ threads for a system with $24$ physical cores plus hyperthreading). If this happens, the code will run extremely slowly.
 
-\subsection{Restarting the code}
+\subsection{Running from a restart file}
 
 \begin{itemize}
 \item Copy \verb|data_out/nodes*| to \verb|restart/.|.

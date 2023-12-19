@@ -19,6 +19,9 @@ module setup_flow
   implicit none
   
   real(rkind),dimension(:),allocatable :: Yspec_reactants,Yspec_products
+  integer(ikind), parameter :: n_modes=8
+  real(rkind),dimension(n_modes) :: mode_amp,mode_phase
+  real(rkind), parameter :: ptbn_size = zero!half*half   !! perturbation size in multiples of fl_thck
   
 contains
 !! ------------------------------------------------------------------------------------------------
@@ -61,33 +64,39 @@ contains
      !! Choose initial conditions
 #ifndef restart     
      !! Evaluate mass fractions of reactants and products assuming complete combustion
-     call initialise_composition        
+     call initialise_composition 
+
+     !! Initialise the perturbation
+     call initialise_perturbation            
 
      !! Make the base flow
      call make_baseflow   
      
-     !! HARD-CODED-CHOICE =====================================
-     !! Un-comment ONE of the following routines ==============
-     !! The routines themselves can be modified a bit to change
-     !! things like the shape of a hotspot
-        
-        
-     !! Make a 1D flame: pass X-position,flame_thickness and T_hot
-!     call make_1d_flame(-0.3d0,5.0d-4,2.366d3)  !-0.275d0,2.366d3
-     
-     !! Make a gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
-     call make_gaussian_hotspot(-0.13d0,zero,2.0d-4,2.366d3)   !-0.23d0 !0.045    
+     !! FLOW TYPE CHOICE =====================================       
+     if(flag_flow_type.eq.1) then        
+        !! Make a 1D flame: pass X-position,flame_thickness and T_hot
+        call make_1d_flame
+     else if(flag_flow_type.eq.2) then    
+        !! Make a gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
+        call make_gaussian_hotspot   
+     else if(flag_flow_type.eq.3) then
+        !! Load an existing 1D flame file
+        call load_flame_file
+     else if(flag_flow_type.eq.4) then
+        !! A messy routine to play with for other initial conditions
+        call hardcode_initial_conditions     
+     else
+        !! NOT SUPPORTED
+        write(6,*) "Requested flow type not supported, aborting."
+        stop
+     end if
 
-     !! Load an existing 1D flame file
-!     call load_flame_file(0.15d0)
+     !! Density stratification (for, e.g. Rayleigh-Taylor flow)
+     if(flag_strat.eq.1) then
+        call add_density_stratification
+     end if     
 
-     !! Make the initial conditions for a Rayleigh-Taylor instability
-!     call make_RT_initial_conditions(-0.0d0,2.0d-4,two*T_ref)
-     
-     !! A messy routine to play with for other initial conditions
-!     call hardcode_initial_conditions     
-
-     !! END HARD-CODED-CHOICE =================================
+     !! END FLOW TYPE CHOICE =================================
 
      deallocate(Yspec_reactants,Yspec_products)
 #else    
@@ -95,12 +104,14 @@ contains
      call load_restart_file
 
      !! Un-comment this to (re-)ignite a restarting simulation
-!     call make_gaussian_hotspot(-2.0d0,zero,2.0d-4,2.5d3)   !-0.23d0 !0.045    
+!     call make_gaussian_hotspot  
 
 #endif
 
      !! Add some turbulence to the velocity field
-!     call make_turbulent_velocity_field(1.0d-3,5.0d0*u_char)
+     if(flag_turbulent.eq.1) then
+        call make_turbulent_velocity_field
+     end if        
      !! =======================================================================
      
      !! Convert from velocity to momentum and Y to roY
@@ -284,14 +295,13 @@ contains
      return
   end subroutine initialise_composition
 !! ------------------------------------------------------------------------------------------------ 
-  subroutine make_1d_flame(flame_location,flame_thickness,T_products)
+  subroutine make_1d_flame
      integer(ikind) :: i,ispec,j
-     real(rkind),intent(in) :: flame_location,flame_thickness,T_products
-     real(rkind) :: fl_thck
+     real(rkind) :: fl_thck_nd,ptbn
      real(rkind) :: c,Rmix_local,x,y,z,ro_inflow
 
      !! Scale thickness because position vectors are scaled...
-     fl_thck = flame_thickness/L_char 
+     fl_thck_nd = fl_thck/L_char 
 
      !! Inflow mixture gas constant
      Rmix_local = zero
@@ -304,16 +314,19 @@ contains
      ro_inflow = p_ref/(Rmix_local*T_ref)
     
      !! Loop over all nodes and impose values
-     !$omp parallel do private(x,y,z,c,Rmix_local,ispec)
+     !$omp parallel do private(x,y,z,c,Rmix_local,ispec,ptbn)
      do i=1,npfb
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
+        
+        !! Make a perturbation
+        call make_perturbation(y/(ymax-ymin),ptbn)
+        x = x+ptbn        
                 
         !! Error function based progress variable
-        z=0.01*sin(two*pi*y/(ymax-ymin))
-        c = half*(one + erf((x-flame_location)/fl_thck))
+        c = half*(one + erf((x-fl_pos_x)/fl_thck_nd))
         
         !! Temperature profile
-        T(i) = T(i) + (T_products - T(i))*c
+        T(i) = T(i) + (T_hot - T(i))*c
         
         !! Composition
         do ispec = 1,nspec
@@ -354,101 +367,47 @@ contains
      return
   end subroutine make_1d_flame
 !! ------------------------------------------------------------------------------------------------  
-  subroutine make_RT_initial_conditions(flame_location,flame_thickness,T_products)
+  subroutine add_density_stratification
      integer(ikind) :: i,ispec,j
-     real(rkind),intent(in) :: flame_location,flame_thickness,T_products
-     real(rkind) :: fl_thck
-     real(rkind) :: c,Rmix_local,x,y,z,ro_ref_hot,ro_ref_cold,ro_ref_local
-     real(rkind) :: T_y0,dcdy,p_local
-
-     !! Scale thickness because position vectors are scaled...
-     fl_thck = flame_thickness/L_char 
-
-     !! Inflow mixture gas constant
-     Rmix_local = zero
-     do ispec=1,nspec
-        Rmix_local = Rmix_local + Yspec_reactants(ispec)*one_over_molar_mass(ispec)
-     end do
-     Rmix_local = Rmix_local*Rgas_universal     
-
-     !! Inflow density
-     ro_ref_cold = p_ref/(Rmix_local*T_ref)
-     ro_ref_hot = p_ref/(Rmix_local*T_products)
+     real(rkind) :: c,Rmix_local,x,y,z
          
      !! Loop over all nodes and impose values
-     !$omp parallel do private(x,y,z,c,Rmix_local,ispec,dcdy,ro_ref_local)
+     !$omp parallel do private(x,y,z,c,Rmix_local,ispec)
      do i=1,npfb
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
                 
-        !! Error function based progress variable
-        c = half*(one + erf((flame_location-x)/fl_thck))        
-
-        !! Temperature profile
-         
-        !! Composition
-        do ispec = 1,nspec
-!           Yspec(i,ispec) = (one-c)*Yspec_reactants(ispec) + c*Yspec_products(ispec)
-        end do
+        !! Add a perturbation
+        call make_perturbation(y/(ymax-ymin),c)
+        x=x+c
         
         !! Local mixture gas constant
         Rmix_local = zero
         do ispec=1,nspec
            Rmix_local = Rmix_local + Yspec(i,ispec)*one_over_molar_mass(ispec)
         end do
-        Rmix_local = Rmix_local*Rgas_universal
-        
-        
-        if(x.lt.zero) then !! Cold region
-           T(i) = T_ref
-           ro_ref_local = ro_ref_cold
-        else               !! Hot region
-           T(i) = T_products
-           ro_ref_local = ro_ref_hot
-        end if
+        Rmix_local = Rmix_local*Rgas_universal              
         
         !! Density
-!        ro(i) = ro_ref_local*exp(grav(2)*x/(Rmix_local*T(i)))
-        ro(i) = p_ref/(Rmix_local*T(i))        
+        ro(i) = ro(i)*exp(grav(1)*(x-fl_pos_x)/(Rmix_local*T(i)))
         
-        !! Local pressure
-        p(i) = ro(i)*Rmix_local*T(i)        
-        
-        !! Adjust the velocity
-        u(i) = u(i)!*ro_ref_cold/ro(i)        
-        v(i) = zero
-        w(i) = zero
                         
      end do
      !$omp end parallel do
-     
-     !! Special apply values on boundaries
-     if(nb.ne.0)then
-        do j=1,nb
-           i=boundary_list(j)
-           if(node_type(i).eq.0) then !! wall initial conditions
-              u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
-           end if                 
-           T_bound(j) = T(i)
-        end do
-     end if
- 
-  
-  
+         
      return
-  end subroutine make_RT_initial_conditions   
+  end subroutine add_density_stratification   
 !! ------------------------------------------------------------------------------------------------ 
-  subroutine make_gaussian_hotspot(f_loc_x,f_loc_y,flame_thickness,T_hot)
+  subroutine make_gaussian_hotspot
      !! Add a Gaussian hotspot to the flow. The composition and velocity are unchanged.
      !! Temperature follows a prescribed Gaussian, whilst density is modified to ensure pressure
      !! is unchanged.
      integer(ikind) :: i,ispec,j
-     real(rkind),intent(in) :: f_loc_x,f_loc_y,flame_thickness,T_hot
-     real(rkind) :: fl_thck,pR_local
+     real(rkind) :: pR_local
      real(rkind) :: c,u_reactants,Rmix_local,x,y,z
+     real(rkind) :: fl_thck_nd
 
      !! Scale thickness because position vectors are scaled...
-     fl_thck = flame_thickness/L_char 
-
+     fl_thck_nd = fl_thck/L_char 
    
      !! Loop over all nodes and impose values
      !$omp parallel do private(x,y,z,c,pR_local)
@@ -459,8 +418,8 @@ contains
         pR_local = ro(i)*T(i) 
                
         !! Gaussian progress variable
-        c = exp(-((x-f_loc_x)/fl_thck)**two - ((y-f_loc_y)/fl_thck)**two) !! 2D
-!        c = exp(-((x-f_loc_x)/fl_thck)**two)                               !! 1D 
+        c = exp(-((x-fl_pos_x)/fl_thck_nd)**two - ((y-fl_pos_y)/fl_thck_nd)**two) !! 2D
+!        c = exp(-((x-fl_pos_x)/fl_thck_nd)**two)                               !! 1D 
                 
         !! Adjust temperature profile
         T(i) = T(i)*(one-c) + T_hot*c
@@ -555,13 +514,12 @@ contains
      return
   end subroutine make_baseflow  
 !! ------------------------------------------------------------------------------------------------  
-  subroutine load_flame_file(flame_loc)
+  subroutine load_flame_file
      !! Load data for a one-dimensional flame generated with the oned branch on this code.
      use thermodynamics
-     real(rkind),intent(in) :: flame_loc !! Location of the flame
      integer(ikind) :: i,ispec,j,nflamein
      real(rkind) :: cell_pos,flamein_x0,flamein_xN
-     real(rkind) :: c,x,y,z
+     real(rkind) :: c,x,y,z,ptbn
      real(rkind) :: roR,roP,uR,uP,SL
      real(rkind),dimension(:,:),allocatable :: flamein_data
      real(rkind) :: dx_flamein
@@ -590,10 +548,16 @@ contains
      SL = (uP-uR)*roP/(roR-roP)   !! (eqn 1)     
        
      !! Loop through all particles. Find the "cell" the particle resides in. Copy data.     
-     !$omp parallel do private(j,x,y,z,c,ispec,cell_pos)
+     !$omp parallel do private(j,x,y,z,c,ispec,cell_pos,ptbn)
      do i=1,npfb
+        x=rp(i,1)
+        
+        !! Make perturbation
+        call make_perturbation(y/(ymax-ymin),ptbn)
+        x=x+ptbn     
+     
         !! Dimensional coordinate of particle relative to desired flame position
-        x = (rp(i,1)-flame_loc)*L_char 
+        x = (x-fl_pos_x)*L_char 
         
         !! Nearest index in flame-in data (to left of x) and position within "cell"
         if(x.le.flamein_x0) then
@@ -843,5 +807,33 @@ contains
   
      return
   end subroutine load_restart_file
+!! ------------------------------------------------------------------------------------------------  
+  subroutine initialise_perturbation
+     !! Create the mode amplitudes and phases for a peturbed interface
+     integer(ikind) :: i
+
+     mode_amp = zero
+     mode_phase = zero
+     do i=1,n_modes
+        mode_amp(i) = rand()*fl_thck*ptbn_size
+        mode_phase(i) = two*pi*rand()
+     end do
+     return
+  end subroutine initialise_perturbation
+!! ------------------------------------------------------------------------------------------------
+  subroutine make_perturbation(y,c)
+     !! Return a scalar which adjusts a flame position according to the perturbation
+     real(rkind),intent(in) :: y !! y is in [0,1] or [-1/2,1/2]
+     real(rkind),intent(out) :: c
+     integer(ikind) :: i
+     
+     c=zero
+     do i=1,n_modes
+        c = c + mode_amp(i)*sin(two*pi*dble(i)*y + mode_phase(i))
+     end do
+  
+     return
+  end subroutine make_perturbation
+!! ------------------------------------------------------------------------------------------------  
 !! ------------------------------------------------------------------------------------------------
 end module setup_flow

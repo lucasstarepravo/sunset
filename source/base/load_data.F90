@@ -155,8 +155,27 @@ contains
      !! Read in base flow type
      read(12,*)
      read(12,*) flag_base_flow_profile
-!     read(12,*)  
+     read(12,*)  
 
+     !! Read in initial condition type
+     read(12,*)
+     read(12,*) flag_flow_type
+     read(12,*)
+     
+     !! Read in initial flame position, size and temperature
+     read(12,*)
+     read(12,*) fl_pos_x,fl_pos_y,fl_thck,T_hot
+     read(12,*)
+     
+     !! Read in turbulence flags/params
+     read(12,*)
+     read(12,*) flag_turbulent,turb_lengthscale,turb_intensity
+     read(12,*)
+     
+     !! Read in density stratification flag
+     read(12,*)
+     read(12,*) flag_strat
+!     read(12,*)
      
      close(12)
      
