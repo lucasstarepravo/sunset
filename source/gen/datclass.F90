@@ -187,7 +187,7 @@ case(6) !! Hong Im flameholder setup
 
 
      dxmin = dx0/2.0d0
-     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=2.0d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!! 
+     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=3.0d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!! 
 !! ------------------------------------------------------------------------------------------------
 case(7) !! Porous with in-out
 
