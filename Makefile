@@ -9,7 +9,6 @@
 # thermo     Isothermal (0) or thermal (1) flow                                        (default: 1)
 # restart    Start from initial conditions (0) or restart file (1)                     (default: 0)
 # pgrad      Drive the flow with a pressure gradient and P.I.D control                 (default: 0)
-# tdtp       Temperature dependent transport properties (1) or constant (0)            (default: 0)
 # flout      Output the flame structure (1) or don't (0)                               (default: 0)
 # allout     If 3D, output the entire domain (1) or just a slice (0)                   (default: 1)
 # -------------------------------------------------------------------------------------------------
@@ -18,11 +17,11 @@
 # For isothermal flows:
 # make thermo=0 dim3=X mpi=X pgrad=X
 #
-# For standard combustion problems, react=1 will overwrite any thermo and tdtp flags:
+# For standard combustion problems, react=1 will overwrite any thermo flags:
 # make react=1 dim3=X mpi=X flout=X      <---------- standard combustion make
 #
 # For thermal flows with real gas properties:
-# make thermo=1 dim3=X mpi=X pgrad=X tdtp=1
+# make thermo=1 dim3=X mpi=X pgrad=X 
 #
 
 #
@@ -39,23 +38,16 @@ endif
 CFLAGS := -Wall -O3 -g -m64
 FFLAGS := -fopenmp -fbounds-check -ffpe-trap=zero -O3 -Wall -g -J./obj -I./obj -m64
 
-# Isothermal or not. tdtp can only happen if not(isoT). isoT can only happen if not(react)
+# Isothermal or not. isoT can only happen if not(react)
 ifeq ($(thermo), 0)
 ifneq ($(react), 1)
 FFLAGS += -DisoT
 endif
-else
-ifeq ($(tdtp),1)
-FFLAGS += -Dtdtp
-endif
 endif
 
-# Reacting? set react if so, also force tdtp
+# Reacting? set react if so
 ifeq ($(react), 1)
 FFLAGS += -Dreact
-ifneq ($(tdtp),1)
-FFLAGS += -Dtdtp
-endif
 endif
 
 # Restart from dump file.

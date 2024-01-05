@@ -516,7 +516,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
                       
          
      !! Evaluate the viscosity gradient (different methods depending on whether mixture averaged)
-#ifdef tdtp     
+#ifndef isoT
      allocate(gradvisc(npfb,dims))
      if(flag_mix_av.eq.1) then
         call calc_gradient(visc,gradvisc)         
@@ -551,7 +551,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
 #endif        
         
         !! Viscous forces due to non-uniform viscosity
-#ifdef tdtp
+#ifndef isoT
         f_visc_u = f_visc_u + gradvisc(i,1)*(fourthirds*gradu(i,1) - twothirds*(gradv(i,2)+gradw(i,3))) &
                             + gradvisc(i,2)*(gradu(i,2)+gradv(i,1)) &
                             + gradvisc(i,3)*(gradu(i,3)+gradw(i,1))
@@ -654,7 +654,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
               f_visc_v = visc(i)*(lapv(i))
               f_visc_w = visc(i)*(lapw(i))
 #endif              
-#ifdef tdtp
+#ifndef isoT
               !! non-uniform viscosity terms. 
 !              gradvisc(:) = r_temp_dependence*visc(i)*gradT(i,:)/T(i)
               f_visc_u = f_visc_u + gradvisc(i,1)*(fourthirds*gradu(i,1) - twothirds*(gradv(i,2)+gradw(i,3))) &
@@ -708,7 +708,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
      !! Deallocate any stores no longer required
      deallocate(lapu,lapv,lapw)
      deallocate(graddivvel) 
-#ifdef tdtp
+#ifndef isoT
      deallocate(gradvisc)
 #endif
 

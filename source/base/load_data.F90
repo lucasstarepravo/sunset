@@ -130,9 +130,6 @@ contains
      read(12,*)
      read(12,*) r_temp_dependence
      read(12,*)     
-#ifndef tdtp
-     r_temp_dependence = zero  !! zero it if not required
-#endif 
      
      !! Read in inflow boundary type
      read(12,*)

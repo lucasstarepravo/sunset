@@ -17,9 +17,8 @@ module transport
   !!                          conductivity are dependent on temperature, and if mixture-averaged
   !!                          transport is turned on, also on composition.
   !!
-  !! N.B. Currently hard-coded with visc, lambda and D given by 4 polynomial coefficients - need 
-  !! to check the reference for these. Took them from Senga+.
-
+  !! N.B. Currently hard-coded with visc, lambda and D given by 4 polynomial coefficients - reference
+  !! for these is given in paper and documentation
   use kind_parameters
   use common_parameter
   use common_vars
@@ -32,23 +31,19 @@ contains
   subroutine evaluate_transport_properties
      use mirror_boundaries
      !! Uses temperature, cp and density to evaluate thermal conductivity, viscosity and 
-     !! molecular diffusivity. For isothermal flows, or if not(tdtp), use reference values.
+     !! molecular diffusivity. For isothermal flows, use reference values.
      integer(ikind) :: ispec,i
      real(rkind) :: tmp
      segment_tstart=omp_get_wtime()             
        
 #ifndef isoT     
      if(flag_mix_av.eq.0) then
-        !! Constant Lewis numbers, with option for temp dependence
+        !! Constant Lewis numbers
         !$omp parallel do private(ispec,tmp)        
         do i=1,npfb
      
            !! Viscosity
-#ifdef tdtp
            visc(i) = visc_ref*(T(i)/T_ref)**r_temp_dependence
-#else
-           visc(i) = visc_ref
-#endif        
      
            !! Thermal conductivity
            lambda_th(i) = cp(i)*visc(i)/Pr
@@ -85,6 +80,7 @@ contains
      
      end if
 #else
+     !! Isothermal options
      visc(:) = visc_ref
      roMdiff(:,:) = visc_ref/Pr/one !! reference diffusivity with Le=one
 #endif     

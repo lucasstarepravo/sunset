@@ -45,7 +45,7 @@ contains
      cput = ts_end-ts_start
      call global_reduce_sum(cput)
      if(iproc.eq.0) then 
-        write(191,*) itime,cput/(dble(nprocs)+one)
+        write(191,*) itime,cput/(dble(nprocs))
         flush(191)
      end if
 #else
