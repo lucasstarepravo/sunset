@@ -21,7 +21,7 @@ module setup_flow
   real(rkind),dimension(:),allocatable :: Yspec_reactants,Yspec_products
   integer(ikind), parameter :: n_modes=8
   real(rkind),dimension(n_modes) :: mode_amp,mode_phase
-  real(rkind), parameter :: ptbn_size = zero!half*half   !! perturbation size in multiples of fl_thck
+  real(rkind), parameter :: ptbn_size = zero!half   !! perturbation size in multiples of fl_thck
   
 contains
 !! ------------------------------------------------------------------------------------------------
@@ -74,13 +74,10 @@ contains
      
      !! FLOW TYPE CHOICE =====================================       
      if(flag_flow_type.eq.1) then        
-        !! Make a 1D flame: pass X-position,flame_thickness and T_hot
         call make_1d_flame
      else if(flag_flow_type.eq.2) then    
-        !! Make a gaussian hotspot: pass X,Y-positions, hotspot size and T_hot
         call make_gaussian_hotspot   
      else if(flag_flow_type.eq.3) then
-        !! Load an existing 1D flame file
         call load_flame_file
      else if(flag_flow_type.eq.4) then
         !! A messy routine to play with for other initial conditions
@@ -550,7 +547,7 @@ contains
      !! Loop through all particles. Find the "cell" the particle resides in. Copy data.     
      !$omp parallel do private(j,x,y,z,c,ispec,cell_pos,ptbn)
      do i=1,npfb
-        x=rp(i,1)
+        x=rp(i,1);y=rp(i,2);z=rp(i,3)
         
         !! Make perturbation
         call make_perturbation(y/(ymax-ymin),ptbn)
@@ -640,7 +637,6 @@ contains
               T_bound(j) = T(i)
            end if                 
            if(node_type(i).eq.1) then !! inflow initial conditions
-              u(i)=u_char
               T_bound(j) = T(i) !! Inflow temperature is T_cold
            end if
            if(node_type(i).eq.2) then !! outflow initial conditions
@@ -815,7 +811,7 @@ contains
      mode_amp = zero
      mode_phase = zero
      do i=1,n_modes
-        mode_amp(i) = rand()*fl_thck*ptbn_size
+        mode_amp(i) = rand()*fl_thck*ptbn_size/L_char
         mode_phase(i) = two*pi*rand()
      end do
      return

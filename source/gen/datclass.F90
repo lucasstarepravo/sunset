@@ -128,9 +128,9 @@ case(4) !! Rayleigh-Taylor geometry
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.015d0!0.0125d0  ! channel width
+     yl=1.0d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/750.0       !15
+     dx0=xl/200.0       !15
      xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
      
      nb_patches = 4
@@ -149,7 +149,7 @@ case(5) !! Inflow/outflow tube for simple flames
 !     end do
 
      dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx0*1.0d0;dx_wallio=dx_in  !! dx for solids and in/outs..
+     dx_wall=dxmin;dx_in=2.0d0*dx0;dx_out=dx0*2.0d0;dx_wallio=dx_in  !! dx for solids and in/outs..
 
      
 !! ------------------------------------------------------------------------------------------------
@@ -177,6 +177,7 @@ case(6) !! Hong Im flameholder setup
         read(191,*) blob_coeffs(1,i)
      end do
      close(191)
+     blob_coeffs(1,:)=0.0d0;blob_coeffs(1,1)=1.0d0
      blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi
 !     blob_coeffs(2,:) = blob_coeffs(1,:);blob_rotation(2)=-0.0d0*pi
 !     blob_coeffs(3,:) = blob_coeffs(1,:);blob_rotation(3)=-0.0d0*pi    
@@ -186,7 +187,7 @@ case(6) !! Hong Im flameholder setup
 !     blob_centre(3,:)=(/ -0.275d0*xl, 0.5d0*yl/);     
 
 
-     dxmin = dx0/2.0d0
+     dxmin = dx0/1.0d0
      dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=2.0d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!! 
 !! ------------------------------------------------------------------------------------------------
 case(7) !! Porous with in-out
