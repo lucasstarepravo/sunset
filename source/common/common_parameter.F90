@@ -39,7 +39,8 @@ module common_parameter
   integer(ikind) ,parameter :: dims = 3
   !! hovs values need changing depending on desired order
   !!  4: 2.1 & 2.1
-  !!  6,8: 2.7 & 2.4
+  !!  6: 2.4 & 2.4
+  !!  8: 2.7 & 2.4
   !!  10:  3.1 & 2.4
   real(rkind), parameter :: hovs = 2.7d0   !! stencil scale over discretisation scale (h/s)
   real(rkind), parameter :: hovs_bound = 2.4d0 !! as above, reduced near bounds for stability

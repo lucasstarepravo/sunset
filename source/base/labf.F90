@@ -19,6 +19,7 @@ module labf
   use mpi
   use mpi_transfers
 #endif      
+  use svdlib
   implicit none 
   
   private
@@ -85,7 +86,7 @@ contains
 
      !! No parallelism for individual linear system solving (have to set this on CSF/HPC-pool, but not on
      !! local workstation.... ???
-     call openblas_set_num_threads(1)
+!     call openblas_set_num_threads(1)
 
 
      !$OMP PARALLEL DO PRIVATE(i,nsize,amatx,k,j,rij,rad,qq,x,y,xx,yy, &
@@ -167,11 +168,13 @@ contains
     
         !! Solve system for ddy coefficients
         i1=0;i2=0         
-        call dgesv(nsize,1,amatx,nsize,i1,bvecx,nsize,i2)   
+!        call dgesv(nsize,1,amatx,nsize,i1,bvecx,nsize,i2)          
+        call svd_solve(amatx,nsize,bvecx)               
         
         !! Solve system for ddy coefficients
         i1=0;i2=0;nsize=nsizeG    
-        call dgesv(nsize,1,amaty,nsize,i1,bvecy,nsize,i2)    
+!        call dgesv(nsize,1,amaty,nsize,i1,bvecy,nsize,i2)           
+        call svd_solve(amaty,nsize,bvecy)                       
  
         !! Build RHS for d2/dx2,d2/dxdy,d2/dy2
         bvecxx(:)=zero;bvecxx(3)=one/hh/hh
@@ -180,15 +183,18 @@ contains
  
         !! Solve system for d2/dx2 coefficients
         i1=0;i2=0;nsize=nsizeG
-        call dgesv(nsize,1,amatxx,nsize,i1,bvecxx,nsize,i2)
+!        call dgesv(nsize,1,amatxx,nsize,i1,bvecxx,nsize,i2)
+        call svd_solve(amatxx,nsize,bvecxx)               
         
         !! Solve system for 2nd cross deriv coefficients (d2/dxdy)
         i1=0;i2=0;nsize=nsizeG
-        call dgesv(nsize,1,amatxy,nsize,i1,bvecxy,nsize,i2)
+!        call dgesv(nsize,1,amatxy,nsize,i1,bvecxy,nsize,i2)
+        call svd_solve(amatxy,nsize,bvecxy)               
 
         !! Solve system for d2/dy2 coefficients
         i1=0;i2=0;nsize=nsizeG
-        call dgesv(nsize,1,amatyy,nsize,i1,bvecyy,nsize,i2)
+!        call dgesv(nsize,1,amatyy,nsize,i1,bvecyy,nsize,i2)
+        call svd_solve(amatyy,nsize,bvecyy)               
 
         !! Solve system for Hyperviscosity (regular viscosity if ORDER<4)
 #if ORDER<=3
@@ -242,8 +248,8 @@ contains
               end if
         end if 
 #endif    
-
-        call dgesv(nsize,1,amathyp,nsize,i1,bvechyp,nsize,i2)
+!        call dgesv(nsize,1,amathyp,nsize,i1,bvechyp,nsize,i2)
+        call svd_solve(amathyp,nsize,bvechyp)               
 
         !! Another loop of neighbours to calculate interparticle weights
         do k=1,ij_count(i)
@@ -277,9 +283,7 @@ contains
            
         end do             
         
-        write(2,*) "" !! Temporary fix for a weird openblas/lapack/openmp bug 
-        !! The bug may be due to a race condition or something, but not really sure
-        !! What's the best way to fix this??   
+
      end do
      !$OMP END PARALLEL DO
      deallocate(amatx,amaty,amatxx,amatxy,amatyy,amathyp)
@@ -625,16 +629,18 @@ contains
 
         !! Solve system for transverse deriv   
         bvect(:)=zero;bvect(1)=one;i1=0;i2=0;nsize=nsizeG
-        call dgesv(nsize,1,amatt,nsize,i1,bvect,nsize,i2)  
+!        call dgesv(nsize,1,amatt,nsize,i1,bvect,nsize,i2)   
+        call svd_solve(amatt,nsize,bvect)
 
         !! Solve system for transverse 2nd deriv   
         bvectt(:)=zero;bvectt(2)=one;i1=0;i2=0;nsize=nsizeG
-        call dgesv(nsize,1,amattt,nsize,i1,bvectt,nsize,i2)      
+!        call dgesv(nsize,1,amattt,nsize,i1,bvectt,nsize,i2)     
+        call svd_solve(amattt,nsize,bvectt)
 
         !! Solve system for transverse hyperviscous filter   
         bvecthyp(:)=zero;bvecthyp(6)=one;i1=0;i2=0;nsize=nsizeG
-        call dgesv(nsize,1,amatthyp,nsize,i1,bvecthyp,nsize,i2)                  
-
+!        call dgesv(nsize,1,amatthyp,nsize,i1,bvecthyp,nsize,i2)                  
+        call svd_solve(amatthyp,nsize,bvecthyp)
 
         !! Next neighbour loop to calculate weights
         do k=1,ij_count(i)
@@ -717,7 +723,8 @@ contains
 
            !! Solve system for transverse deriv   
            bvect(:)=zero;bvect(1)=one;i1=0;i2=0;nsize=nsizeG
-           call dgesv(nsize,1,amatt,nsize,i1,bvect,nsize,i2)                         
+!           call dgesv(nsize,1,amatt,nsize,i1,bvect,nsize,i2)             
+           call svd_solve(amatt,nsize,bvect)                                
 
            do k=1,ij_count(i)
               j=ij_link(k,i)                   
@@ -935,7 +942,7 @@ contains
 
      !! No parallelism for individual linear system solving (have to set this on CSF/HPC-pool, but not on
      !! local workstation.... ???
-     call openblas_set_num_threads(1)
+!     call openblas_set_num_threads(1)
 
 
      !$OMP PARALLEL DO PRIVATE(i,nsize,k,j,rij,rad,qq,x,y,xx,yy, &
@@ -1016,13 +1023,16 @@ contains
 
 
         i1=0;i2=0;nsize=nsizeG+1
-        call dgesv(nsize,1,amati2,nsize,i1,bveci2,nsize,i2)
+!        call dgesv(nsize,1,amati2,nsize,i1,bveci2,nsize,i2)        
+        call svd_solve(amati2,nsize,bveci2)        
  
         i1=0;i2=0;nsize=nsizeG+1
-        call dgesv(nsize,1,amati3,nsize,i1,bveci3,nsize,i2)  
+!        call dgesv(nsize,1,amati3,nsize,i1,bveci3,nsize,i2)  
+        call svd_solve(amati3,nsize,bveci3)        
 
         i1=0;i2=0;nsize=nsizeG+1
-        call dgesv(nsize,1,amati4,nsize,i1,bveci4,nsize,i2)
+!        call dgesv(nsize,1,amati4,nsize,i1,bveci4,nsize,i2)
+        call svd_solve(amati4,nsize,bveci4)        
 
         !! Another loop of neighbours to calculate interparticle weights for interpolation i0 to i3 and i4
         do k=1,ij_count(i)  !! Note, we're looping over neighbours of i0
@@ -1083,9 +1093,6 @@ contains
          
         end do                   
         
-        write(2,*) "" !! Temporary fix for a weird openblas/lapack/openmp bug 
-        !! The bug may be due to a race condition or something, but not really sure
-        !! What's the best way to fix this??   
      end do
      !$OMP END PARALLEL DO
      deallocate(gvec,xvec)   
@@ -1182,7 +1189,7 @@ contains
      bvecL=zero;bvecX=zero;bvecY=zero;gvec=zero;xvec=zero
 
      !! No parallelism for individual linear system solving...
-     call openblas_set_num_threads(1)
+!     call openblas_set_num_threads(1)
      
      !! Temporary neighbour lists...
      allocate(full_j_link_i(nplink));full_j_link_i=0
@@ -1193,9 +1200,9 @@ contains
      !! N.B. Need to modify this to work for 4th, 10th and 12th order
 !     res_tol = 5.0d-3*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)     
 #if ORDER==6
-     res_tol = 5.0d-5*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 6th order
+     res_tol = 5.0d-3*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 6th order
 #elif ORDER==8
-     res_tol = 1.0d-4*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 8th order    
+     res_tol = 2.0d-2*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 8th order    
 #elif ORDER==10     
      res_tol = 1.0d-4*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 10th order --> needs tweaking 1.0d-4
 #elif ORDER==12
@@ -1206,10 +1213,10 @@ contains
 
    
      sumcheck = zero
-     !$OMP PARALLEL DO PRIVATE(nsize,amat,k,j,rij,rad,qq,x,y,xx,yy, &
-     !$OMP ff1,gvec,xvec,i1,i2,bvecL,bvecX,bvecY,hh,full_j_count_i,full_j_link_i, &
-     !$OMP hchecksum,reduce_h,ii,mmat,hchecksumL,hchecksumX,hchecksumY) &
-     !$omp reduction(+:sumcheck)
+!     !$OMP PARALLEL DO PRIVATE(nsize,amat,k,j,rij,rad,qq,x,y,xx,yy, &
+!     !$OMP ff1,gvec,xvec,i1,i2,bvecL,bvecX,bvecY,hh,full_j_count_i,full_j_link_i, &
+!     !$OMP hchecksum,reduce_h,ii,mmat,hchecksumL,hchecksumX,hchecksumY) &
+!     !$omp reduction(+:sumcheck)
      do i=1,npfb_layer
         ii=0
         reduce_h=.true.
@@ -1257,7 +1264,7 @@ contains
               gvec(1:nsizeG) = abfs(rad,xx,yy,ff1)
               
               !! Populate the monomials array
-              xvec(1:nsizeG) = monomials(x,y)
+              xvec(1:nsizeG) = monomials(x/hh,y/hh)
 
               !! Build the LHS - it is the same for all three diff operators (ddx,ddy,Lap)
               do i1=1,nsize
@@ -1267,30 +1274,33 @@ contains
            mmat = amat
 
            !! Solve system for Laplacian
-           bvecL(:)=zero;bvecL(3)=one;bvecL(5)=one;i1=0;i2=0
-           call dgesv(nsize,1,amat,nsize,i1,bvecL,nsize,i2)  
+           bvecL(:)=zero;bvecL(3)=one/hh/hh;bvecL(5)=one/hh/hh;i1=0;i2=0
+!           call dgesv(nsize,1,amat,nsize,i1,bvecL,nsize,i2)  
+           call svd_solve(amat,nsize,bvecL)       
 
            !! Solve system for d/dx           
            amat=mmat
-           bvecX(:)=zero;bvecX(1)=one;i1=0;i2=0;nsize=nsizeG           
-           call dgesv(nsize,1,amat,nsize,i1,bvecX,nsize,i2)  
+           bvecX(:)=zero;bvecX(1)=one/hh;i1=0;i2=0;nsize=nsizeG           
+!           call dgesv(nsize,1,amat,nsize,i1,bvecX,nsize,i2)  
+           call svd_solve(amat,nsize,bvecX)       
 
            !! Solve system for d/dy
            amat=mmat
-           bvecY(:)=zero;bvecY(2)=one;i1=0;i2=0;nsize=nsizeG           
-           call dgesv(nsize,1,amat,nsize,i1,bvecY,nsize,i2)  
-                  
-
+           bvecY(:)=zero;bvecY(2)=one/hh;i1=0;i2=0;nsize=nsizeG           
+!           call dgesv(nsize,1,amat,nsize,i1,bvecY,nsize,i2)                    
+           call svd_solve(amat,nsize,bvecY)       
+           
            !! First (main) check for h-reduction: the residual of the linear system solution (Laplacian)
            !! Multiply the solution vector by the LHS, and calculate the residual
-           xvec=zero;xvec(3)=-one;xvec(5)=-one !! Initialise with -C^{L} (LABFM paper notation)
+           xvec=zero;xvec(3)=-one/hh/hh;xvec(5)=-one/hh/hh !! Initialise with -C^{L} (LABFM paper notation)
            hchecksum = zero
            do i1=1,nsizeG
               do i2=1,nsizeG
                  xvec(i1) = xvec(i1) + mmat(i1,i2)*bvecL(i2)
               end do
-              hchecksum = hchecksum + xvec(i1)**2
+              hchecksum = hchecksum + xvec(i1)**two
            end do
+           hchecksum = hchecksum*hh*hh
            hchecksum = sqrt(hchecksum/dble(nsizeG))
            
            !! Second check for h-reduction: amplification of wavenumbers below Nyquist
@@ -1338,16 +1348,16 @@ contains
 
                  !! Modify hchecksum to break out of h-reduction loop if required
                  if(hchecksumL.gt.amp_tol.or.hchecksumL.lt.zero) then
-!write(6,*) i,i1,"stopping because of L",ii,hchecksum,res_tol/hh 
+write(6,*) i,i1,"stopping because of L",ii,hchecksum,res_tol/hh 
                     hchecksum = two*res_tol/hh              
                  end if
                  if(abs(hchecksumX).gt.amp_tol) then
                     hchecksum = two*res_tol/hh
-!write(6,*) i,i1,"stopping because of X",ii                 
+write(6,*) i,i1,"stopping because of X",ii                 
                  end if
                  if(abs(hchecksumY).gt.amp_tol) then
                     hchecksum = two*res_tol/hh
-!write(6,*) i,i1,"stopping because of Y",ii
+write(6,*) i,i1,"stopping because of Y",ii
                  end if
                  if(isnan(hchecksum)) then
                     hchecksum = two*res_tol/hh
@@ -1360,7 +1370,7 @@ write(6,*) i,i1,"stopping because of NaN",ii
            !! Limit is half original h
            if(ii.gt.log(0.6)/log(reduction_factor)) then
               hchecksum = two*res_tol/hh !! Limit total reduction to XX%.
-!write(6,*) i,i1,"stopping because of max reduction limit",ii
+write(6,*) i,i1,"stopping because of max reduction limit",ii
            end if
 
 
@@ -1374,7 +1384,7 @@ write(6,*) i,i1,"stopping because of NaN",ii
 !#endif    
            if(hchecksum.ge.res_tol/hh)then   !! breakout of do-while
               reduce_h=.false.
-!write(6,*) i,i1,"stopping because of residual",ii,hchecksum,res_tol/hh 
+!write(6,*) i,"stopping due to residual",ii,hh,hchecksum,res_tol/hh 
            else  !! continue reducing h, copy tmp neighbour lists to main neighbour lists, and set h(i)
               h(i) = hh
               ii = ii + 1         !! Counter for number of times reduced
@@ -1387,14 +1397,11 @@ write(6,*) i,i1,"stopping because of NaN",ii
               end do        
            end if
                 
-           write(2,*) "" !! Temporary fix for a weird openblas/lapack/openmp bug 
-           !! The bug may be due to a race condition or something, but not really sure
-           !! What's the best way to fix this??
         end do
         !! Temporary: store size in neighbourcountreal(i)
         neighbourcountreal(i) = dble(ij_count(i))
      end do
-     !$OMP END PARALLEL DO    
+!     !$OMP END PARALLEL DO    
      deallocate(amat,mmat,bvecL,bvecX,bvecY,gvec,xvec)      
           
 #ifdef dim3
