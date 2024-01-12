@@ -83,11 +83,6 @@ contains
      allocate(bvecx(nsizeG),bvecy(nsizeG),bvecxx(nsizeG),bvecxy(nsizeG),bvecyy(nsizeG),bvechyp(nsizeG))
      allocate(gvec(nsizeG),xvec(nsizeG));gvec=zero;xvec=zero
 
-     !! No parallelism for individual linear system solving (have to set this on CSF/HPC-pool, but not on
-     !! local workstation.... ???
-!     call openblas_set_num_threads(1)
-
-
      !$OMP PARALLEL DO PRIVATE(i,nsize,amatx,k,j,rij,rad,qq,x,y,xx,yy, &
      !$OMP ff1,gvec,xvec,i1,i2,amatxx,amaty,amatxy,amatyy,bvecx,bvecy,bvecxx,bvecxy,hh, &
      !$OMP amathyp,bvechyp,bvecyy)
@@ -167,12 +162,10 @@ contains
     
         !! Solve system for ddy coefficients
         i1=0;i2=0         
-!        call dgesv(nsize,1,amatx,nsize,i1,bvecx,nsize,i2)          
         call svd_solve(amatx,nsize,bvecx)               
         
         !! Solve system for ddy coefficients
         i1=0;i2=0;nsize=nsizeG    
-!        call dgesv(nsize,1,amaty,nsize,i1,bvecy,nsize,i2)           
         call svd_solve(amaty,nsize,bvecy)                       
  
         !! Build RHS for d2/dx2,d2/dxdy,d2/dy2
@@ -182,17 +175,14 @@ contains
  
         !! Solve system for d2/dx2 coefficients
         i1=0;i2=0;nsize=nsizeG
-!        call dgesv(nsize,1,amatxx,nsize,i1,bvecxx,nsize,i2)
         call svd_solve(amatxx,nsize,bvecxx)               
         
         !! Solve system for 2nd cross deriv coefficients (d2/dxdy)
         i1=0;i2=0;nsize=nsizeG
-!        call dgesv(nsize,1,amatxy,nsize,i1,bvecxy,nsize,i2)
         call svd_solve(amatxy,nsize,bvecxy)               
 
         !! Solve system for d2/dy2 coefficients
         i1=0;i2=0;nsize=nsizeG
-!        call dgesv(nsize,1,amatyy,nsize,i1,bvecyy,nsize,i2)
         call svd_solve(amatyy,nsize,bvecyy)               
 
         !! Solve system for Hyperviscosity (regular viscosity if order<4)
@@ -244,10 +234,9 @@ contains
               bvechyp(:)=zero;bvechyp(10)=-one;bvechyp(12)=-two;bvechyp(14)=-one
               bvechyp(:)=bvechyp(:)/hh/hh/hh/hh        
               i1=0;i2=0;nsize=nsizeG 
-              end if
+           end if
         end if 
 #endif    
-!        call dgesv(nsize,1,amathyp,nsize,i1,bvechyp,nsize,i2)
         call svd_solve(amathyp,nsize,bvechyp)               
 
         !! Another loop of neighbours to calculate interparticle weights
@@ -628,17 +617,14 @@ contains
 
         !! Solve system for transverse deriv   
         bvect(:)=zero;bvect(1)=one;i1=0;i2=0;nsize=nsizeG
-!        call dgesv(nsize,1,amatt,nsize,i1,bvect,nsize,i2)   
         call svd_solve(amatt,nsize,bvect)
 
         !! Solve system for transverse 2nd deriv   
         bvectt(:)=zero;bvectt(2)=one;i1=0;i2=0;nsize=nsizeG
-!        call dgesv(nsize,1,amattt,nsize,i1,bvectt,nsize,i2)     
         call svd_solve(amattt,nsize,bvectt)
 
-        !! Solve system for transverse hyperviscous filter   
+        !! Solve system for transverse hyperviscous filter (4th derivatives)
         bvecthyp(:)=zero;bvecthyp(6)=one;i1=0;i2=0;nsize=nsizeG
-!        call dgesv(nsize,1,amatthyp,nsize,i1,bvecthyp,nsize,i2)                  
         call svd_solve(amatthyp,nsize,bvecthyp)
 
         !! Next neighbour loop to calculate weights
@@ -722,7 +708,6 @@ contains
 
            !! Solve system for transverse deriv   
            bvect(:)=zero;bvect(1)=one;i1=0;i2=0;nsize=nsizeG
-!           call dgesv(nsize,1,amatt,nsize,i1,bvect,nsize,i2)             
            call svd_solve(amatt,nsize,bvect)                                
 
            do k=1,ij_count(i)
@@ -939,11 +924,6 @@ contains
      !! Right hand sides, vectors of monomials and ABFs
      allocate(gvec(nsizeG),xvec(nsizeG));gvec=zero;xvec=zero
 
-     !! No parallelism for individual linear system solving (have to set this on CSF/HPC-pool, but not on
-     !! local workstation.... ???
-!     call openblas_set_num_threads(1)
-
-
      !$OMP PARALLEL DO PRIVATE(i,nsize,k,j,rij,rad,qq,x,y,xx,yy, &
      !$OMP ff1,gvec,xvec,i1,i2,hh,amati2,amati3,amati4 &
      !$OMP ,bveci2,bveci3,bveci4,xveci,gveci)
@@ -1022,15 +1002,12 @@ contains
 
 
         i1=0;i2=0;nsize=nsizeG+1
-!        call dgesv(nsize,1,amati2,nsize,i1,bveci2,nsize,i2)        
         call svd_solve(amati2,nsize,bveci2)        
  
         i1=0;i2=0;nsize=nsizeG+1
-!        call dgesv(nsize,1,amati3,nsize,i1,bveci3,nsize,i2)  
         call svd_solve(amati3,nsize,bveci3)        
 
         i1=0;i2=0;nsize=nsizeG+1
-!        call dgesv(nsize,1,amati4,nsize,i1,bveci4,nsize,i2)
         call svd_solve(amati4,nsize,bveci4)        
 
         !! Another loop of neighbours to calculate interparticle weights for interpolation i0 to i3 and i4
@@ -1187,9 +1164,7 @@ contains
      allocate(bvecL(nsizeG),bvecX(nsizeG),bvecY(nsizeG),gvec(nsizeG),xvec(nsizeG))
      bvecL=zero;bvecX=zero;bvecY=zero;gvec=zero;xvec=zero
 
-     !! No parallelism for individual linear system solving...
-!     call openblas_set_num_threads(1)
-     
+    
      !! Temporary neighbour lists...
      allocate(full_j_link_i(nplink));full_j_link_i=0
      allocate(neighbourcountreal(npfb));neighbourcountreal=zero
@@ -1201,7 +1176,7 @@ contains
 #elif order==6
      res_tol = 5.0d-3*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 6th order
 #elif order==8
-     res_tol = 5.0d-2*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 8th order    
+     res_tol = 4.0d-2*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 8th order    
 #elif order==10     
      res_tol = 1.0d+0*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 10th order
 #elif order==12
@@ -1274,19 +1249,16 @@ contains
 
            !! Solve system for Laplacian
            bvecL(:)=zero;bvecL(3)=one/hh/hh;bvecL(5)=one/hh/hh;i1=0;i2=0
-!           call dgesv(nsize,1,amat,nsize,i1,bvecL,nsize,i2)  
            call svd_solve(amat,nsize,bvecL)       
 
            !! Solve system for d/dx           
            amat=mmat
            bvecX(:)=zero;bvecX(1)=one/hh;i1=0;i2=0;nsize=nsizeG           
-!           call dgesv(nsize,1,amat,nsize,i1,bvecX,nsize,i2)  
            call svd_solve(amat,nsize,bvecX)       
 
            !! Solve system for d/dy
            amat=mmat
            bvecY(:)=zero;bvecY(2)=one/hh;i1=0;i2=0;nsize=nsizeG           
-!           call dgesv(nsize,1,amat,nsize,i1,bvecY,nsize,i2)                    
            call svd_solve(amat,nsize,bvecY)       
            
            !! First (main) check for h-reduction: the residual of the linear system solution (Laplacian)
