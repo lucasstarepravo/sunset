@@ -11,6 +11,7 @@
 # pgrad      Drive the flow with a pressure gradient and P.I.D control                 (default: 0)
 # flout      Output the flame structure (1) or don't (0)                               (default: 0)
 # allout     If 3D, output the entire domain (1) or just a slice (0)                   (default: 1)
+# morder     m (order) value = 4,6,8,10                                                (default: 8)
 # -------------------------------------------------------------------------------------------------
 #
 # EXAMPLE USAGE:
@@ -37,6 +38,21 @@ endif
 # Set compiler flags based on make options
 CFLAGS := -Wall -O3 -g -m64
 FFLAGS := -fopenmp -fbounds-check -ffpe-trap=zero -O3 -Wall -g -J./obj -I./obj -m64
+
+# Order of the numerical scheme (even, from 4 to 10, default 8)
+ifeq ($(morder),4)
+FFLAGS += -Dorder=$(morder)
+else
+ifeq ($(morder),6)
+FFLAGS += -Dorder=$(morder)
+else
+ifeq ($(morder),10)
+FFLAGS += -Dorder=$(morder)
+else
+FFLAGS += -Dorder=8
+endif
+endif
+endif
 
 # Isothermal or not. isoT can only happen if not(react)
 ifeq ($(thermo), 0)

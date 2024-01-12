@@ -245,6 +245,7 @@ contains
      c = sqrt(csq)
 #else  
      c = dsqrt(cp_local*Rgm_local*T_local/(cp_local-Rgm_local))
+
 #endif      
   end function evaluate_sound_speed_at_node
 !! ------------------------------------------------------------------------------------------------  

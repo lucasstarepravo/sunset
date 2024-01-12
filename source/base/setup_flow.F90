@@ -669,26 +669,10 @@ contains
         x = rp(i,1);y=rp(i,2);z=rp(i,3)
 
         !! TG 3D Re1600 as in Cant 2022, Sandam 2017 etc (ish)
-        u(i) = u_char!-cos(x)*sin(y)*cos(z)!*oosqrt2
-        v(i) = zero!sin(x)*cos(y)*cos(z)    !!c c
+        u(i) = half*sqrt(three)*sin(x)*cos(y)*cos(z)!*oosqrt2
+        v(i) =-half*sqrt(three)*cos(x)*sin(y)*cos(z)    !!c c
         w(i) = zero!u(i);u(i)=zero
-                
-        
-!        tmp = Rgas_universal*one_over_molar_mass(1)*T_ref  !! RT0        
-!        tmp = rho_char*U_char*U_char/tmp   !! roUU/RT0
-!        tmp = -tmp*(one/16.0d0)*(cos(two*x)+cos(two*y))*(two+cos(two*z))        
-!        T(i) = T_ref
-
-        ro(i) = rho_char! + tmp
-
-!        tmp = one - half*(one + erf(5.0d0*x))
-        Yspec(i,:) = one
-
-!        u(i) = zero
-!        v(i) = zero
- !       T(i) = T_ref
- !       tmp = exp(-y*y/0.01d0)
- !       ro(i) = one + 0.1d0*tmp
+                       
         
 #ifndef isoT
         !! Local mixture gas constant
@@ -696,15 +680,15 @@ contains
         do ispec=1,nspec
            Rmix_local = Rmix_local + Yspec(i,ispec)*one_over_molar_mass(ispec)
         end do
-        Rmix_local = Rmix_local*Rgas_universal       
-        
-        !! Density
-        p(i) = ro(i)*Rmix_local*T(i)
+        Rmix_local = Rmix_local*Rgas_universal               
+        p(i) = p_ref + (ro(i)*U_char*U_char/16.0d0)*(cos(two*x)+cos(two*y))*(two+cos(two*z))      
+        T(i) = T_ref
+        ro(i) = p(i)/(Rmix_local*T(i))
 #else
         p(i) = ro(i)*csq
 #endif        
         
-                   
+     !1.4028035124466285              
      end do
      !$OMP END PARALLEL DO
      

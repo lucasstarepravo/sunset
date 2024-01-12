@@ -30,7 +30,6 @@ module labf
 !! Choice of ABF type:: 1=original, 2=Hermite polynomials, 3=Legendre polynomials
 !! ABFs 2 and 3 are multiplied by an RBF (Wab(qq) set in sphtools).
 #define ABF 2
-#define ORDER 8
 !#define WALLNODES3
 
 contains
@@ -47,25 +46,25 @@ contains
 
 
      !! Set desired order::
-#if ORDER==2
+#if order==2
      k=2
-#elif ORDER==3
+#elif order==3
      k=3
-#elif ORDER==4
+#elif order==4
      k=4
-#elif ORDER==5
+#elif order==5
      k=5
-#elif ORDER==6
+#elif order==6
      k=6
-#elif ORDER==7
+#elif order==7
      k=7
-#elif ORDER==8
+#elif order==8
      k=8
-#elif ORDER==9
+#elif order==9
      k=9
-#elif ORDER==10
+#elif order==10
      k=10
-#elif ORDER==12
+#elif order==12
      k=12     
 #endif
      nsizeG=(k*k+3*k)/2   !!  5,9,14,20,27,35,44... for k=2,3,4,5,6,7,8...
@@ -130,7 +129,7 @@ contains
         end do   
 
         !! for rows 1,2,3 & 4, drop to 6th order
-#if ORDER>=7
+#if order>=7
         if(node_type(i).eq.998.or.node_type(i).lt.0)then 
            do i1=1,nsizeG
               amatx(i1,28:nsizeG)=zero        
@@ -147,7 +146,7 @@ contains
         amathyp = amatx
 
         !! for rows 1 & 2, drop gradients to 4th order
-#if ORDER>=5              
+#if order>=5              
         if(node_type(i).eq.-1.or.node_type(i).eq.-2) then 
             do i1=1,nsizeG
               amatx(i1,15:nsizeG)=zero        
@@ -196,23 +195,23 @@ contains
 !        call dgesv(nsize,1,amatyy,nsize,i1,bvecyy,nsize,i2)
         call svd_solve(amatyy,nsize,bvecyy)               
 
-        !! Solve system for Hyperviscosity (regular viscosity if ORDER<4)
-#if ORDER<=3
+        !! Solve system for Hyperviscosity (regular viscosity if order<4)
+#if order<=3
         bvechyp(:)=zero;bvechyp(3)=one;bvechyp(5)=one;i1=0;i2=0;nsize=nsizeG 
         bvechyp(:)=bvechyp(:)/hh/hh
-#elif ORDER<=5
+#elif order<=5
         bvechyp(:)=zero;bvechyp(10)=-one;bvechyp(12)=-two;bvechyp(14)=-one
         bvechyp(:)=bvechyp(:)/hh/hh/hh/hh        
         i1=0;i2=0;nsize=nsizeG 
-#elif ORDER<=7
+#elif order<=7
         bvechyp(:)=zero;bvechyp(21)=one;bvechyp(23)=3.0d0;bvechyp(25)=3.0d0;bvechyp(27)=one
         bvechyp(:)=bvechyp(:)/hh/hh/hh/hh/hh/hh
         i1=0;i2=0;nsize=nsizeG 
-#elif ORDER<=9
+#elif order<=9
         bvechyp(:)=zero;bvechyp(36)=-one;bvechyp(38)=-4.0d0;bvechyp(40)=-6.0d0;bvechyp(42)=-4.0d0;bvechyp(44)=-one
         bvechyp(:)=bvechyp(:)/hh/hh/hh/hh/hh/hh/hh/hh
         i1=0;i2=0;nsize=nsizeG    
-#elif ORDER<=11      
+#elif order<=11      
         bvechyp(:)=zero;bvechyp(55)=one;bvechyp(57)=5.0d0;bvechyp(59)=10.0d0;bvechyp(61)=10.0d0
         bvechyp(63)=5.0d0;bvechyp(65)=one
         bvechyp(:)=bvechyp(:)/hh/hh/hh/hh/hh/hh/hh/hh/hh/hh
@@ -225,14 +224,14 @@ contains
 #endif
 
 
-#if ORDER>=7
+#if order>=7
         if(node_type(i).eq.998.or.node_type(i).lt.0)then !! for rows 3 & 4, drop to 6th order
            bvechyp(:)=zero;bvechyp(21)=one;bvechyp(23)=3.0d0;bvechyp(25)=3.0d0;bvechyp(27)=one
            bvechyp(:)=bvechyp(:)/hh/hh/hh/hh/hh/hh        
            i1=0;i2=0;nsize=nsizeG 
         end if 
 #endif    
-#if ORDER>=5
+#if order>=5
         if(node_type(i).eq.-1)then !! for rows 1, drop to 4th order
            if(node_type(fd_parent(i)).eq.2.or.node_type(fd_parent(i)).eq.1) then
               do i1=1,nsizeG
@@ -906,25 +905,25 @@ contains
 
 
      !! Set desired order::
-#if ORDER==2
+#if order==2
      k=2
-#elif ORDER==3
+#elif order==3
      k=3
-#elif ORDER==4
+#elif order==4
      k=4
-#elif ORDER==5
+#elif order==5
      k=5
-#elif ORDER==6
+#elif order==6
      k=6
-#elif ORDER==7
+#elif order==7
      k=7
-#elif ORDER==8
+#elif order==8
      k=8
-#elif ORDER==9
+#elif order==9
      k=9
-#elif ORDER==10
+#elif order==10
      k=10
-#elif ORDER==12
+#elif order==12
      k=12     
 #endif
      nsizeG=(k*k+3*k)/2   !!  5,9,14,20,27,35,44... for k=2,3,4,5,6,7,8...
@@ -988,7 +987,7 @@ contains
         end do   
                   
         !! Drop to 4th order
-#if ORDER>=5              
+#if order>=5              
         do i1=1,nsizeG+1   !! 2nd gen interpolation
            amati2(i1,16:nsizeG+1)=zero        
         end do
@@ -1155,27 +1154,27 @@ contains
      real(rkind) :: grad_s_mag,hfactor,radmax
      real(rkind),dimension(:),allocatable :: neighbourcountreal
  
-#if ORDER==2
+#if order==2
      k=2
-#elif ORDER==3
+#elif order==3
      k=3
-#elif ORDER==4
+#elif order==4
      k=4
-#elif ORDER==5
+#elif order==5
      k=5
-#elif ORDER==6
+#elif order==6
      k=6
-#elif ORDER==7
+#elif order==7
      k=7
-#elif ORDER==8
+#elif order==8
      k=8
-#elif ORDER==9
+#elif order==9
      k=9
-#elif ORDER==10
+#elif order==10
      k=10
-#elif ORDER==11
+#elif order==11
      k=11     
-#elif ORDER==12
+#elif order==12
      k=12
 #endif
      nsizeG=(k*k+3*k)/2   !!  5,9,14,20,27,35,44... for k=2,3,4,5,6,7,8...
@@ -1197,15 +1196,15 @@ contains
 
      !! Set parameters of h-reduction
      reduction_factor = 0.98 
-     !! N.B. Need to modify this to work for 4th, 10th and 12th order
-!     res_tol = 5.0d-3*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)     
-#if ORDER==6
+#if order==4
+     res_tol = 1.0d-3*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 6th order
+#elif order==6
      res_tol = 5.0d-3*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 6th order
-#elif ORDER==8
-     res_tol = 2.0d-2*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 8th order    
-#elif ORDER==10     
-     res_tol = 1.0d-4*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 10th order --> needs tweaking 1.0d-4
-#elif ORDER==12
+#elif order==8
+     res_tol = 5.0d-2*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 8th order    
+#elif order==10     
+     res_tol = 1.0d+0*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 10th order
+#elif order==12
      res_tol = 1.0d-8*dble(nsizeG**4)*epsilon(hchecksum)/dble(k)   !! For 12th order --> set so no reduction    
 #endif     
      nk = 32   !! How many wavenumbers between 1 and Nyquist to check... ! 16
@@ -1376,10 +1375,10 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
 
 !hchecksum = 2.0*res_tol/hh
            !! Check the h-reduction criteria
-#if ORDER==12
+#if order==12
            hchecksum = two*res_tol/hh
 #endif       
-!#if ORDER==4
+!#if order==4
 !           hchecksum = two*res_tol/hh
 !#endif    
            if(hchecksum.ge.res_tol/hh)then   !! breakout of do-while
@@ -1569,32 +1568,32 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
 !! ------------------------------------------------------------------------------------------------
   function monomials(x,y) result(cxvec)
      real(rkind),intent(in) :: x,y
-#if ORDER==2
+#if order==2
      real(rkind),dimension(5) :: cxvec
-#elif ORDER==3
+#elif order==3
      real(rkind),dimension(9) :: cxvec
-#elif ORDER==4
+#elif order==4
      real(rkind),dimension(14) :: cxvec
-#elif ORDER==5
+#elif order==5
      real(rkind),dimension(20) :: cxvec
-#elif ORDER==6
+#elif order==6
      real(rkind),dimension(27) :: cxvec
-#elif ORDER==7
+#elif order==7
      real(rkind),dimension(35) :: cxvec
-#elif ORDER==8
+#elif order==8
      real(rkind),dimension(44) :: cxvec
-#elif ORDER==9
+#elif order==9
      real(rkind),dimension(54) :: cxvec
-#elif ORDER==10
+#elif order==10
      real(rkind),dimension(65) :: cxvec
-#elif ORDER==11
+#elif order==11
      real(rkind),dimension(77) :: cxvec
-#elif ORDER==12     
+#elif order==12     
      real(rkind),dimension(90) :: cxvec
 #endif     
      real(rkind) :: x2,y2,x3,y3,x4,y4,x5,y5,x6,y6,x7,y7,x8,y8,x9,y9,x10,y10,x11,y11,x12,y12
  
-#if ORDER>=2
+#if order>=2
      x2=x*x;y2=y*y
      cxvec(1) = x
      cxvec(2)=y
@@ -1602,14 +1601,14 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      cxvec(4)=x*y
      cxvec(5)=half*y2
 #endif 
-#if ORDER>=3
+#if order>=3
      x3=x2*x;y3=y2*y 
      cxvec(6) = (one/6.0)*x3
      cxvec(7) = half*x2*y
      cxvec(8) = half*x*y2
      cxvec(9) = (one/6.0)*y3
 #endif
-#if ORDER>=4
+#if order>=4
      x4=x3*x;y4=y3*y
      cxvec(10) = (one/24.0)*x4
      cxvec(11)=(one/6.0)*x3*y
@@ -1617,7 +1616,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      cxvec(13)=(one/6.0)*x*y3
      cxvec(14)=(one/24.0)*y4
 #endif
-#if ORDER>=5
+#if order>=5
      x5=x4*x;y5=y4*y         
      cxvec(15) = (one/120.0)*x5
      cxvec(16)=(one/24.0)*x4*y
@@ -1626,7 +1625,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      cxvec(19)=(one/24.0)*x*y4
      cxvec(20)=(one/120.0)*y5
 #endif
-#if ORDER>=6
+#if order>=6
      x6=x5*x;y6=y5*y         
      cxvec(21)= (one/720.0)*x6
      cxvec(22)=(one/120.0)*x5*y
@@ -1636,7 +1635,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      cxvec(26)=(one/120.0)*x*y5
      cxvec(27)=(one/720.0)*y6
 #endif
-#if ORDER>=7
+#if order>=7
      x7=x6*x;y7=y6*y         
      cxvec(28) = (one/5040.0)*x7
      cxvec(29)=(one/720.0)*x6*y
@@ -1647,7 +1646,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      cxvec(34)=(one/720.0)*x*y6
      cxvec(35)=(one/5040.0)*y7
 #endif
-#if ORDER>=8
+#if order>=8
      x8=x7*x;y8=y7*y         
      cxvec(36) = (one/40320.0)*x8
      cxvec(37)=(one/5040.0)*x7*y
@@ -1659,7 +1658,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      cxvec(43)=(one/5040.0)*x*y7
      cxvec(44) = (one/40320.0)*y8
 #endif
-#if ORDER>=9
+#if order>=9
      x9=x8*x;y9=y8*y
      cxvec(45) = (one/362880.0)*x9
      cxvec(46)=(one/40320.0)*x8*y
@@ -1672,7 +1671,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      cxvec(53)=(one/40320.0)*x*y8
      cxvec(54) = (one/362880.0)*y9
 #endif
-#if ORDER>=10
+#if order>=10
      x10=x9*x;y10=y9*y
      cxvec(55)=(one/3628800.0)*x10
      cxvec(56)=(one/362880.0)*x9*y
@@ -1686,7 +1685,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      cxvec(64)=(one/362880.0)*x*y9
      cxvec(65)=(one/3628800.0)*y10
 #endif
-#if ORDER>=11
+#if order>=11
      x11=x10*x;y11=y10*y
      cxvec(66)=(one/39916800.0)*x11
      cxvec(67)=(one/3628800.0)*x10*y
@@ -1701,7 +1700,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      cxvec(76)=(one/3628800.0)*x*y10
      cxvec(77)=(one/39916800.0)*y11     
 #endif
-#if ORDER>=12
+#if order>=12
      x12=x11*x;y12=y11*y
      cxvec(78)=(one/479001600.0)*x12
      cxvec(79)=(one/3991680.0)*x11*y
@@ -1726,27 +1725,27 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
   function abfs(dummy,x,y,ff1) result(ggvec)         !! TEN
      real(rkind),intent(in) :: x,y,ff1,dummy
      real(rkind) :: xx,yy
-#if ORDER==2
+#if order==2
      real(rkind),dimension(5) :: ggvec
-#elif ORDER==3
+#elif order==3
      real(rkind),dimension(9) :: ggvec
-#elif ORDER==4
+#elif order==4
      real(rkind),dimension(14) :: ggvec
-#elif ORDER==5
+#elif order==5
      real(rkind),dimension(20) :: ggvec
-#elif ORDER==6
+#elif order==6
      real(rkind),dimension(27) :: ggvec
-#elif ORDER==7
+#elif order==7
      real(rkind),dimension(35) :: ggvec
-#elif ORDER==8
+#elif order==8
      real(rkind),dimension(44) :: ggvec
-#elif ORDER==9
+#elif order==9
      real(rkind),dimension(54) :: ggvec
-#elif ORDER==10
+#elif order==10
      real(rkind),dimension(65) :: ggvec
-#elif ORDER==11
+#elif order==11
      real(rkind),dimension(77) :: ggvec
-#elif ORDER==12
+#elif order==12
      real(rkind),dimension(90) :: ggvec
 #endif
      real(rkind) :: rad3,rad2,r15,r13,r11,r9,r7,r5
@@ -1754,7 +1753,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
 
      !! Scale xx and yy (Probablists to physicists)
      
-#if ORDER>=2
+#if order>=2
      x2=x*x;y2=y*y 
      rad2 = max(rad*rad,epsilon(rad));rad3=max(rad*rad*rad,epsilon(rad))
      ggvec(1) = ff1*x/max(rad,epsilon(rad)) 
@@ -1763,7 +1762,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(4) = -x*y*ff1/rad3
      ggvec(5) = x2*ff1/rad3
 #endif
-#if ORDER>=3
+#if order>=3
      x3=x2*x;y3=y2*y
      r5 = rad3*rad2
      ggvec(6) = -3.0*y2*x*ff1/r5                 
@@ -1771,7 +1770,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(8) = (2.0*x*y2 - x3)*ff1/r5
      ggvec(9) = -3.0*x2*y*ff1/r5
 #endif
-#if ORDER>=4
+#if order>=4
      x4=x3*x;y4=y3*y
      r7 = r5*rad2
      ggvec(10) = (12.0*x2*y2-3.0*y4)*ff1/r7                
@@ -1780,7 +1779,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(13) = (9.0*x3*y-6.0*x*y3)*ff1/r7
      ggvec(14) = (12.0*x2*y2-3.0*x4)*ff1/r7
 #endif
-#if ORDER>=5
+#if order>=5
      x5=x4*x;y5=y4*y
      r9 = r7*rad2
      ggvec(15) = (45.0*x*y4 - 60.0*x3*y2)*ff1/r9                    
@@ -1790,7 +1789,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(19) = (9.0*x5 - 72.0*x3*y2 + 24.0*x*y4)*ff1/r9
      ggvec(20) = (45.0*x4*y - 60.0*x2*y3)*ff1/r9
 #endif
-#if ORDER>=6
+#if order>=6
      x6=x5*x;y6=y5*y
      r11 = r9*rad2
      ggvec(21) = (360.0*x4*y2 - 540.0*x2*y4 + 45.0*y6)*ff1/r11                  
@@ -1801,7 +1800,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(26) = (600.0*x3*y3 - 225.0*x5*y - 120.0*x*y5)*ff1/r11
      ggvec(27) = (360.0*x2*y4 - 540.0*x4*y2 + 45.0*x6)*ff1/r11
 #endif
-#if ORDER>=7
+#if order>=7
      x7=x6*x;y7=y6*y
      r13 = r11*rad2
      ggvec(28) = (6300.0*x3*y4 - 2520.0*x5*y2 - 1575.0*x*y6)*ff1/r13               
@@ -1813,7 +1812,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(34) = (720.0*x*y6 - 225.0*x7 + 4050.0*x5*y2 - 5400.0*x3*y4)*ff1/r13
      ggvec(35) = (6300.0*x4*y3 - 2520.0*x2*y5 - 1575.0*x6*y)*ff1/r13
 #endif
-#if ORDER>=8
+#if order>=8
      x8=x7*x;y8=y7*y
      r15 = r13*rad2
      ggvec(36) = (20160.0*x6*y2 - 75600.0*x4*y4+37800.0*x2*y6-1575.0*y8)*ff1/r15        
@@ -1840,53 +1839,53 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
   function abfs(dummy,x,y,ff1) result(ggvec)         !! TEN
      real(rkind),intent(in) :: x,y,ff1,dummy
      real(rkind) :: xx,yy
-#if ORDER==2
+#if order==2
      real(rkind),dimension(5) :: ggvec
-#elif ORDER==3
+#elif order==3
      real(rkind),dimension(9) :: ggvec
-#elif ORDER==4
+#elif order==4
      real(rkind),dimension(14) :: ggvec
-#elif ORDER==5
+#elif order==5
      real(rkind),dimension(20) :: ggvec
-#elif ORDER==6
+#elif order==6
      real(rkind),dimension(27) :: ggvec
-#elif ORDER==7
+#elif order==7
      real(rkind),dimension(35) :: ggvec
-#elif ORDER==8
+#elif order==8
      real(rkind),dimension(44) :: ggvec
-#elif ORDER==9
+#elif order==9
      real(rkind),dimension(54) :: ggvec
-#elif ORDER==10
+#elif order==10
      real(rkind),dimension(65) :: ggvec
-#elif ORDER==11
+#elif order==11
      real(rkind),dimension(77) :: ggvec
-#elif ORDER==12
+#elif order==12
      real(rkind),dimension(90) :: ggvec
 #endif
      !! Scale xx and yy (Probablists to physicists)
      xx = oosqrt2*x;yy=oosqrt2*y
      
-#if ORDER>=2
+#if order>=2
      ggvec(1) = ff1*Hermite1(xx)*oosqrt2
      ggvec(2) = ff1*Hermite1(yy)*oosqrt2
      ggvec(3) = ff1*Hermite2(xx)*half
      ggvec(4) = ff1*Hermite1(xx)*Hermite1(yy)*half
      ggvec(5) = ff1*Hermite2(yy)*half
 #endif
-#if ORDER>=3
+#if order>=3
      ggvec(6) = ff1*Hermite3(xx)*oosqrt2*half
      ggvec(7) = ff1*Hermite2(xx)*Hermite1(yy)*oosqrt2*half
      ggvec(8) = ff1*Hermite1(xx)*Hermite2(yy)*oosqrt2*half
      ggvec(9) = ff1*Hermite3(yy)*oosqrt2*half
 #endif
-#if ORDER>=4
+#if order>=4
      ggvec(10) = ff1*Hermite4(xx)*0.25d0
      ggvec(11) = ff1*Hermite3(xx)*Hermite1(yy)*0.25d0
      ggvec(12) = ff1*Hermite2(xx)*Hermite2(yy)*0.25d0
      ggvec(13) = ff1*Hermite1(xx)*Hermite3(yy)*0.25d0
      ggvec(14) = ff1*Hermite4(yy)*0.25d0
 #endif
-#if ORDER>=5
+#if order>=5
      ggvec(15) = ff1*Hermite5(xx)*oosqrt2*0.25d0
      ggvec(16) = ff1*Hermite4(xx)*Hermite1(yy)*oosqrt2*0.25d0
      ggvec(17) = ff1*Hermite3(xx)*Hermite2(yy)*oosqrt2*0.25d0
@@ -1894,7 +1893,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(19) = ff1*Hermite1(xx)*Hermite4(yy)*oosqrt2*0.25d0
      ggvec(20) = ff1*Hermite5(yy)*oosqrt2*0.25d0
 #endif
-#if ORDER>=6
+#if order>=6
      ggvec(21) = ff1*Hermite6(xx)*0.125d0
      ggvec(22) = ff1*Hermite5(xx)*Hermite1(yy)*0.125d0
      ggvec(23) = ff1*Hermite4(xx)*Hermite2(yy)*0.125d0
@@ -1903,7 +1902,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(26) = ff1*Hermite1(xx)*Hermite5(yy)*0.125d0
      ggvec(27) = ff1*Hermite6(yy)*0.125d0
 #endif
-#if ORDER>=7
+#if order>=7
      ggvec(28) = ff1*Hermite7(xx)*oosqrt2*0.125d0
      ggvec(29) = ff1*Hermite6(xx)*Hermite1(yy)*oosqrt2*0.125d0
      ggvec(30) = ff1*Hermite5(xx)*Hermite2(yy)*oosqrt2*0.125d0
@@ -1913,7 +1912,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(34) = ff1*Hermite1(xx)*Hermite6(yy)*oosqrt2*0.125d0
      ggvec(35) = ff1*Hermite7(yy)*oosqrt2*0.125d0
 #endif
-#if ORDER>=8
+#if order>=8
      ggvec(36) = ff1*Hermite8(xx)*0.0625d0
      ggvec(37) = ff1*Hermite7(xx)*Hermite1(yy)*0.0625d0
      ggvec(38) = ff1*Hermite6(xx)*Hermite2(yy)*0.0625d0
@@ -1924,7 +1923,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(43) = ff1*Hermite1(xx)*Hermite7(yy)*0.0625d0
      ggvec(44) = ff1*Hermite8(yy)*0.0625d0
 #endif
-#if ORDER>=9
+#if order>=9
      ggvec(45) = ff1*Hermite9(xx)*oosqrt2*0.0625d0
      ggvec(46) = ff1*Hermite8(xx)*Hermite1(yy)*oosqrt2*0.0625d0
      ggvec(47) = ff1*Hermite7(xx)*Hermite2(yy)*oosqrt2*0.0625d0
@@ -1936,7 +1935,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(53) = ff1*Hermite1(xx)*Hermite8(yy)*oosqrt2*0.0625d0
      ggvec(54)= ff1*Hermite9(yy)*oosqrt2*0.0625d0
 #endif
-#if ORDER>=10
+#if order>=10
      ggvec(55) = ff1*Hermite10(xx)*0.03125d0
      ggvec(56) = ff1*Hermite9(xx)*Hermite1(yy)*0.03125d0
      ggvec(57) = ff1*Hermite8(xx)*Hermite2(yy)*0.03125d0
@@ -1949,7 +1948,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(64)= ff1*Hermite1(xx)*Hermite9(yy)*0.03125d0
      ggvec(65)= ff1*Hermite10(yy)*0.03125d0
 #endif
-#if ORDER>=11
+#if order>=11
      ggvec(66) = ff1*Hermite11(xx)*0.03125d0*oosqrt2
      ggvec(67) = ff1*Hermite10(xx)*Hermite1(yy)*0.03125d0*oosqrt2
      ggvec(68) = ff1*Hermite9(xx)*Hermite2(yy)*0.03125d0*oosqrt2
@@ -1963,7 +1962,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(76) = ff1*Hermite1(xx)*Hermite10(yy)*0.03125d0*oosqrt2
      ggvec(76) = ff1*Hermite11(yy)*0.03125d0*oosqrt2
 #endif
-#if ORDER>=12
+#if order>=12
      ggvec(78) = ff1*Hermite12(xx)*0.015625d0
      ggvec(79) = ff1*Hermite11(xx)*Hermite1(yy)*0.015625d0
      ggvec(80) = ff1*Hermite10(xx)*Hermite2(yy)*0.015625d0
@@ -1988,51 +1987,51 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
 !! ------------------------------------------------------------------------------------------------
   function abfs(dummy,x,y,ff1) result(ggvec)         !! TEN
      real(rkind),intent(in) :: x,y,ff1,dummy
-#if ORDER==2
+#if order==2
      real(rkind),dimension(5) :: ggvec
-#elif ORDER==3
+#elif order==3
      real(rkind),dimension(9) :: ggvec
-#elif ORDER==4
+#elif order==4
      real(rkind),dimension(14) :: ggvec
-#elif ORDER==5
+#elif order==5
      real(rkind),dimension(20) :: ggvec
-#elif ORDER==6
+#elif order==6
      real(rkind),dimension(27) :: ggvec
-#elif ORDER==7
+#elif order==7
      real(rkind),dimension(35) :: ggvec
-#elif ORDER==8
+#elif order==8
      real(rkind),dimension(44) :: ggvec
-#elif ORDER==9
+#elif order==9
      real(rkind),dimension(54) :: ggvec
-#elif ORDER==10
+#elif order==10
      real(rkind),dimension(65) :: ggvec
-#elif ORDER==11
+#elif order==11
      real(rkind),dimension(77) :: ggvec
-#elif ORDER==12
+#elif order==12
      real(rkind),dimension(90) :: ggvec
 #endif
      
-#if ORDER>=2
+#if order>=2
      ggvec(1) = ff1*Legendre1(x)
      ggvec(2) = ff1*Legendre1(y)
      ggvec(3) = ff1*Legendre2(x)
      ggvec(4) = ff1*Legendre1(x)*Legendre1(y)
      ggvec(5) = ff1*Legendre2(y)
 #endif
-#if ORDER>=3
+#if order>=3
      ggvec(6) = ff1*Legendre3(x)
      ggvec(7) = ff1*Legendre2(x)*Legendre1(y)
      ggvec(8) = ff1*Legendre1(x)*Legendre2(y)
      ggvec(9) = ff1*Legendre3(y)
 #endif
-#if ORDER>=4
+#if order>=4
      ggvec(10) = ff1*Legendre4(x)
      ggvec(11) = ff1*Legendre3(x)*Legendre1(y)
      ggvec(12) = ff1*Legendre2(x)*Legendre2(y)
      ggvec(13) = ff1*Legendre1(x)*Legendre3(y)
      ggvec(14) = ff1*Legendre4(y)
 #endif
-#if ORDER>=5
+#if order>=5
      ggvec(15) = ff1*Legendre5(x)
      ggvec(16) = ff1*Legendre4(x)*Legendre1(y)
      ggvec(17) = ff1*Legendre3(x)*Legendre2(y)
@@ -2040,7 +2039,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(19) = ff1*Legendre1(x)*Legendre4(y)
      ggvec(20) = ff1*Legendre5(y)
 #endif
-#if ORDER>=6
+#if order>=6
      ggvec(21) = ff1*Legendre6(x)
      ggvec(22) = ff1*Legendre5(x)*Legendre1(y)
      ggvec(23) = ff1*Legendre4(x)*Legendre2(y)
@@ -2049,7 +2048,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(26) = ff1*Legendre1(x)*Legendre5(y)
      ggvec(27) = ff1*Legendre6(y)
 #endif
-#if ORDER>=7
+#if order>=7
      ggvec(28) = ff1*Legendre7(x)
      ggvec(29) = ff1*Legendre6(x)*Legendre1(y)
      ggvec(30) = ff1*Legendre5(x)*Legendre2(y)
@@ -2059,7 +2058,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(34) = ff1*Legendre1(x)*Legendre6(y)
      ggvec(35) = ff1*Legendre7(y)
 #endif
-#if ORDER>=8
+#if order>=8
      ggvec(36) = ff1*Legendre8(x)
      ggvec(37) = ff1*Legendre7(x)*Legendre1(y)
      ggvec(38) = ff1*Legendre6(x)*Legendre2(y)
@@ -2070,7 +2069,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(43) = ff1*Legendre1(x)*Legendre7(y)
      ggvec(44) = ff1*Legendre8(y)
 #endif
-#if ORDER>=9
+#if order>=9
      ggvec(45) = ff1*Legendre9(x)
      ggvec(46) = ff1*Legendre8(x)*Legendre1(y)
      ggvec(47) = ff1*Legendre7(x)*Legendre2(y)
@@ -2082,7 +2081,7 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
      ggvec(53) = ff1*Legendre1(x)*Legendre8(y)
      ggvec(54)= ff1*Legendre9(y)
 #endif
-#if ORDER>=10
+#if order>=10
      ggvec(55) = ff1*Legendre10(x)
      ggvec(56) = ff1*Legendre9(x)*Legendre1(y)
      ggvec(57) = ff1*Legendre8(x)*Legendre2(y)

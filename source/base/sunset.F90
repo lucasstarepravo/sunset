@@ -112,7 +112,7 @@ program sunset
 
      !! Call routines to evaluate global statistics and adjust forcing terms if desired
      call statistics_control(m_out)
-     
+    
   end do
   !! END MAIN TIME LOOP -----------------------------------------------
   
