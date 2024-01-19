@@ -62,6 +62,9 @@ contains
      !! Time, volume integrated kinetic energy
      open(unit=201,file='data_out/statistics/ke.out')
      
+     !! Time, mean pressure, mean outflow pressure, mean inflow pressure
+     open(unit=202,file='data_out/statistics/p.out')
+     
      return     
   end subroutine open_stats_files
 !! ------------------------------------------------------------------------------------------------
@@ -89,6 +92,9 @@ contains
 
         !! Check conservation of mass and energy
         call mass_and_energy_check
+        
+        !! Check pressure
+        call pressure_check
      
         !! Error evaluation for Taylor Green vortices?
 !        call error_TG
@@ -385,6 +391,81 @@ contains
 
      return
   end subroutine mass_and_energy_check 
+!! ------------------------------------------------------------------------------------------------  
+  subroutine pressure_check
+     !! This subroutine calculates the mean pressure in the domain, and on the inflow/outflows
+     integer(ikind) :: i,j
+     real(rkind) :: tot_vol,tot_p,tot_pout,tot_pin,dVi,tot_volout,tot_volin
+   
+   
+     tot_vol = zero;tot_p = zero
+     !$omp parallel do private(dVi) reduction(+:tot_vol,tot_p)
+     do i=1,npfb
+        dVi = vol(i)
+#ifdef dim3
+        dVi = dVi*dz
+#endif        
+        tot_vol = tot_vol + dVi
+        tot_p = tot_p + p(i)*dVi
+     end do
+     !$omp end parallel do
+     tot_p = tot_p - p_ref*tot_vol !! Remove p_ref
+
+     !! Reduce across processors     
+#ifdef mp
+     call global_reduce_sum(tot_p)
+     call global_reduce_sum(tot_vol)     
+#endif     
+     !! Mean pressure
+     tot_p = tot_p/tot_vol
+
+     tot_volout = zero;tot_volin=zero
+     tot_pout=zero;tot_pin=zero
+     if(nb.ne.0)then
+        !$omp parallel do private(i,dVi) reduction(+:tot_volin,tot_volout,tot_pin,tot_pout)
+        do j=1,nb
+           i=boundary_list(j)        
+           dVi = s(i)
+        
+           if(node_type(i).eq.1) then  !! Inflow
+              tot_volin = tot_volin + dVi
+              tot_pin = tot_pin + p(i)*dVi
+           else if(node_type(i).eq.2) then !! Outflow
+              tot_volout = tot_volout + dVi
+              tot_pout = tot_pout + p(i)*dVi
+           end if
+        
+        end do
+        !$omp end parallel do
+        tot_pin = tot_pin - p_ref*tot_volin !! Remove p_ref
+        tot_pout = tot_pout - p_ref*tot_volout !! Remove p_ref
+     end if
+
+     !! Reduce across processors     
+#ifdef mp
+     call global_reduce_sum(tot_pin)
+     call global_reduce_sum(tot_volin)     
+     call global_reduce_sum(tot_pout)
+     call global_reduce_sum(tot_volout)          
+#endif     
+     !! Mean pressures
+     tot_pout = tot_pout/tot_volout
+     tot_pin = tot_pin/tot_volin    
+     
+        
+#ifdef mp
+     if(iproc.eq.0)then
+        write(202,*) time/Time_char,tot_p,tot_pin,tot_pout
+        flush(202)
+     end if
+#else
+     write(202,*) time/Time_char,tot_p,tot_pin,tot_pout
+     flush(202)
+#endif
+
+
+     return
+  end subroutine pressure_check  
 !! ------------------------------------------------------------------------------------------------   
   subroutine species_check
      !! This subroutine calculates total mass of each species in the domain

@@ -166,8 +166,8 @@ case(6) !! Hong Im flameholder setup
      allocate(b_type(nb_patches))
      b_type(:) = (/ 3, 2, 3, 1/)  
      b_node(1,:) = (/ -0.50d0*xl, -0.5d0*yl /)
-     b_node(2,:) = (/ 0.5d0*xl, -0.5d0*yl /)
-     b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
+     b_node(2,:) = (/ 2.5d0*xl, -0.5d0*yl /)
+     b_node(3,:) = (/ 2.5d0*xl, 0.5d0*yl /)
      b_node(4,:) = (/ -0.50d0*xl, 0.5d0*yl /)
      nb_blobs=1
      open(unit=191,file="blob_fcoefs.in")
@@ -187,8 +187,8 @@ case(6) !! Hong Im flameholder setup
 !     blob_centre(3,:)=(/ -0.275d0*xl, 0.5d0*yl/);     
 
 
-     dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=4.0d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!! 
+     dxmin = dx0/2.0d0
+     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!! 
 !! ------------------------------------------------------------------------------------------------
 case(7) !! Porous with in-out
 
