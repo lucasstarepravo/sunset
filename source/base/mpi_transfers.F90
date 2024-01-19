@@ -75,6 +75,7 @@ contains
      !! If using mpi, this calls routines to transfer all properties between halos. If not using
      !! mpi, it does nothing
      integer(ikind) :: ispec
+     real(rkind) :: tsum
           
      segment_tstart = omp_get_wtime()
 #ifdef mp
@@ -88,30 +89,31 @@ contains
 
 #ifdef mp 
        
+     call halo_exchange_cons_vars       
      
      !! u-momentum
-     call halo_exchange(rou)
+!     call halo_exchange(rou)
     
      !! v-momentum
-     call halo_exchange(rov)
+!     call halo_exchange(rov)
 
      !! w-momentum
 #ifdef dim3
-     call halo_exchange(row)
+!     call halo_exchange(row)
 #endif     
 
      !! density
-     call halo_exchange(ro)
+!     call halo_exchange(ro)
 
 #ifndef isoT
      !! Energy
-     call halo_exchange(roE)
+!     call halo_exchange(roE)
 #endif
    
      !! Species
-     do ispec=1,nspec 
-        call halo_exchange(Yspec(:,ispec))
-     end do
+!     do ispec=1,nspec 
+!        call halo_exchange(Yspec(:,ispec))
+!     end do
 
 
 #endif     
@@ -119,6 +121,14 @@ contains
      !! Profiling
      segment_tend = omp_get_wtime()
      segment_time_local(1) = segment_time_local(1) + segment_tend - segment_tstart
+     
+     tsum = segment_tend - segment_tstart
+     call global_reduce_sum(tsum)
+     if(iproc.eq.0) then
+        write(304,*) tsum
+        flush(304)
+     end if
+     
      return
   end subroutine halo_exchanges_all
 !! ------------------------------------------------------------------------------------------------
@@ -650,6 +660,324 @@ contains
      
      return
   end subroutine halo_exchange
+!! ------------------------------------------------------------------------------------------------  
+  subroutine halo_exchange_cons_vars    
+     !! This routine does halo exchanges for phi= rou,rov,ro,roE,roYspec
+     real(rkind),dimension(:),allocatable :: halo_phi,inhalo_phi
+     integer(ikind) :: i,j,k,tag,ii,ispec,jj,nvars,jj1,jj2
+     logical :: xodd,yodd,zodd
+
+     !! Number of variables to exchange
+     nvars = 4 + nspec
+#ifdef dim3
+     nvars = nvars + 1
+#endif     
+
+
+     xodd = .true.     
+     if(mod(iprocX,2).eq.0) then
+        xodd = .false.
+     end if
+     yodd = .true.     
+     if(mod(iprocY,2).eq.0) then
+        yodd = .false.
+     end if
+     zodd = .true.     
+     if(mod(iprocZ,2).eq.0) then
+        zodd = .false.
+     end if     
+     
+     !! Up and down first
+     do k=1,2
+        if(yodd) then !! ODD Y: SEND FIRST, RECEIVE SECOND        
+           if(iproc_S_UD(k).ge.0)then !! Send neighbour exists
+              !! Put data in an array for sending
+              allocate(halo_phi(nvars*nhalo_UD(k)))
+              do i=1,nhalo_UD(k)
+                 j=halo_lists_UD(i,k)
+                 ii = nvars*(i-1) 
+                 do ispec=1,nspec
+                     halo_phi((ispec-1)*nhalo_UD(k)+i) = Yspec(j,ispec)                   
+                 end do
+                 halo_phi((nspec+0)*nhalo_UD(k)+i) = ro(j)
+                 halo_phi((nspec+1)*nhalo_UD(k)+i) = roE(j)
+                 halo_phi((nspec+2)*nhalo_UD(k)+i) = rou(j)
+                 halo_phi((nspec+3)*nhalo_UD(k)+i) = rov(j)
+#ifdef dim3
+                 halo_phi((nspec+4)*nhalo_UD(k)+i) = row(j)
+#endif                 
+              end do
+              
+              !! Send the data
+              tag = iproc + 100*k
+              call MPI_SEND(halo_phi,nvars*nhalo_UD(k),MPI_DOUBLE_PRECISION,iproc_S_UD(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_phi)
+           end if
+           if(iproc_R_UD(k).ge.0) then !! Receive neighbour exists
+              allocate(inhalo_phi(nvars*inhalo_UD(k)))
+              tag = iproc_R_UD(k) + 100*k
+              call MPI_RECV(inhalo_phi,nvars*inhalo_UD(k),MPI_DOUBLE_PRECISION &
+                           ,iproc_R_UD(k),tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
+              !! Pass back into the correct arrays
+              jj1=nrecstart(k)
+              jj2=nrecstart(k)+inhalo_UD(k)-1
+              do ispec=1,nspec
+                 Yspec(jj1:jj2,ispec) = inhalo_phi((ispec-1)*inhalo_UD(k)+1:ispec*inhalo_UD(k))
+              end do
+              ro(jj1:jj2) = inhalo_phi((nspec+0)*inhalo_UD(k)+1:(nspec+1)*inhalo_UD(k))
+              roE(jj1:jj2) = inhalo_phi((nspec+1)*inhalo_UD(k)+1:(nspec+2)*inhalo_UD(k))
+              rou(jj1:jj2) = inhalo_phi((nspec+2)*inhalo_UD(k)+1:(nspec+3)*inhalo_UD(k))
+              rov(jj1:jj2) = inhalo_phi((nspec+3)*inhalo_UD(k)+1:(nspec+4)*inhalo_UD(k))
+#ifdef dim3
+              row(jj1:jj2) = inhalo_phi((nspec+4)*inhalo_UD(k)+1:(nspec+5)*inhalo_UD(k))
+#endif                                                        
+              deallocate(inhalo_phi)                                     
+           end if
+        else !! EVEN Y: RECEIVE FIRST, SEND SECOND
+           if(iproc_R_UD(k).ge.0) then !! Receive neighbour exists
+              allocate(inhalo_phi(nvars*inhalo_UD(k)))
+              tag = iproc_R_UD(k) + 100*k
+              call MPI_RECV(inhalo_phi,nvars*inhalo_UD(k),MPI_DOUBLE_PRECISION &
+                           ,iproc_R_UD(k),tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
+              !! Pass back into the correct arrays
+              jj1=nrecstart(k)
+              jj2=nrecstart(k)+inhalo_UD(k)-1
+              do ispec=1,nspec
+                 Yspec(jj1:jj2,ispec) = inhalo_phi((ispec-1)*inhalo_UD(k)+1:ispec*inhalo_UD(k))
+              end do
+              ro(jj1:jj2) = inhalo_phi((nspec+0)*inhalo_UD(k)+1:(nspec+1)*inhalo_UD(k))
+              roE(jj1:jj2) = inhalo_phi((nspec+1)*inhalo_UD(k)+1:(nspec+2)*inhalo_UD(k))
+              rou(jj1:jj2) = inhalo_phi((nspec+2)*inhalo_UD(k)+1:(nspec+3)*inhalo_UD(k))
+              rov(jj1:jj2) = inhalo_phi((nspec+3)*inhalo_UD(k)+1:(nspec+4)*inhalo_UD(k))
+#ifdef dim3
+              row(jj1:jj2) = inhalo_phi((nspec+4)*inhalo_UD(k)+1:(nspec+5)*inhalo_UD(k))
+#endif                                                        
+              deallocate(inhalo_phi)                                     
+           end if
+           if(iproc_S_UD(k).ge.0)then !! Send neighbour exists
+              !! Put data in an array for sending
+              allocate(halo_phi(nvars*nhalo_UD(k)))
+              do i=1,nhalo_UD(k)
+                 j=halo_lists_UD(i,k)
+                 ii = nvars*(i-1) 
+                 do ispec=1,nspec
+                     halo_phi((ispec-1)*nhalo_UD(k)+i) = Yspec(j,ispec)                   
+                 end do
+                 halo_phi((nspec+0)*nhalo_UD(k)+i) = ro(j)
+                 halo_phi((nspec+1)*nhalo_UD(k)+i) = roE(j)
+                 halo_phi((nspec+2)*nhalo_UD(k)+i) = rou(j)
+                 halo_phi((nspec+3)*nhalo_UD(k)+i) = rov(j)
+#ifdef dim3
+                 halo_phi((nspec+4)*nhalo_UD(k)+i) = row(j)
+#endif                 
+              end do
+              
+              !! Send the data
+              tag = iproc + 100*k
+              call MPI_SEND(halo_phi,nvars*nhalo_UD(k),MPI_DOUBLE_PRECISION,iproc_S_UD(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_phi)
+           end if
+        end if
+     end do
+    
+     !! All left and right
+     do k=1,2*nprocsY
+        if(xodd) then !! ODD X: SEND FIRST, RECEIVE SECOND
+           if(iproc_S_LR(k).ge.0)then !! Send neighbour exists
+              !! Put data in an array for sending
+              allocate(halo_phi(nvars*nhalo_LR(k)))
+              do i=1,nhalo_LR(k)
+                 j=halo_lists_LR(i,k)
+                 ii = nvars*(i-1) 
+                 do ispec=1,nspec
+!                    halo_phi(ii+ispec) = Yspec(j,ispec)
+                    halo_phi((ispec-1)*nhalo_LR(k)+i) = Yspec(j,ispec)
+                 end do
+                 halo_phi((nspec+0)*nhalo_LR(k)+i) = ro(j)
+                 halo_phi((nspec+1)*nhalo_LR(k)+i) = roE(j)
+                 halo_phi((nspec+2)*nhalo_LR(k)+i) = rou(j)
+                 halo_phi((nspec+3)*nhalo_LR(k)+i) = rov(j)
+#ifdef dim3
+                 halo_phi((nspec+4)*nhalo_LR(k)+i) = row(j)
+#endif                 
+              end do
+              
+              !! Send the data
+              tag = iproc + 100*k
+              call MPI_SEND(halo_phi,nvars*nhalo_LR(k),MPI_DOUBLE_PRECISION,iproc_S_LR(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_phi)
+           end if
+           if(iproc_R_LR(k).ge.0) then !! Receive neighbour exists
+              allocate(inhalo_phi(nvars*inhalo_LR(k)))
+              tag = iproc_R_LR(k) + 100*k
+              call MPI_RECV(inhalo_phi,nvars*inhalo_LR(k),MPI_DOUBLE_PRECISION &
+                            ,iproc_R_LR(k),tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
+              !! Pass back into the correct arrays
+              jj1=nrecstart(2+k)
+              jj2=nrecstart(2+k)+inhalo_LR(k)-1
+              do ispec=1,nspec
+                 Yspec(jj1:jj2,ispec) = inhalo_phi((ispec-1)*inhalo_LR(k)+1:ispec*inhalo_LR(k))
+              end do
+              ro(jj1:jj2) = inhalo_phi((nspec+0)*inhalo_LR(k)+1:(nspec+1)*inhalo_LR(k))
+              roE(jj1:jj2) = inhalo_phi((nspec+1)*inhalo_LR(k)+1:(nspec+2)*inhalo_LR(k))
+              rou(jj1:jj2) = inhalo_phi((nspec+2)*inhalo_LR(k)+1:(nspec+3)*inhalo_LR(k))
+              rov(jj1:jj2) = inhalo_phi((nspec+3)*inhalo_LR(k)+1:(nspec+4)*inhalo_LR(k))
+#ifdef dim3
+              row(jj1:jj2) = inhalo_phi((nspec+4)*inhalo_LR(k)+1:(nspec+5)*inhalo_LR(k))
+#endif                                                        
+              deallocate(inhalo_phi)                             
+           end if                   
+        else !! EVEN X: RECEIVE FIRST, SEND SECOND
+           if(iproc_R_LR(k).ge.0) then !! Receive neighbour exists
+              allocate(inhalo_phi(nvars*inhalo_LR(k)))
+              tag = iproc_R_LR(k) + 100*k
+              call MPI_RECV(inhalo_phi,nvars*inhalo_LR(k),MPI_DOUBLE_PRECISION &
+                            ,iproc_R_LR(k),tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
+              !! Pass back into the correct arrays
+              jj1=nrecstart(2+k)
+              jj2=nrecstart(2+k)+inhalo_LR(k)-1
+              do ispec=1,nspec
+                 Yspec(jj1:jj2,ispec) = inhalo_phi((ispec-1)*inhalo_LR(k)+1:ispec*inhalo_LR(k))
+              end do
+              ro(jj1:jj2) = inhalo_phi((nspec+0)*inhalo_LR(k)+1:(nspec+1)*inhalo_LR(k))
+              roE(jj1:jj2) = inhalo_phi((nspec+1)*inhalo_LR(k)+1:(nspec+2)*inhalo_LR(k))
+              rou(jj1:jj2) = inhalo_phi((nspec+2)*inhalo_LR(k)+1:(nspec+3)*inhalo_LR(k))
+              rov(jj1:jj2) = inhalo_phi((nspec+3)*inhalo_LR(k)+1:(nspec+4)*inhalo_LR(k))
+#ifdef dim3
+              row(jj1:jj2) = inhalo_phi((nspec+4)*inhalo_LR(k)+1:(nspec+5)*inhalo_LR(k))
+#endif                                                        
+              deallocate(inhalo_phi)                             
+           end if 
+           if(iproc_S_LR(k).ge.0)then !! Send neighbour exists
+              !! Put data in an array for sending
+              allocate(halo_phi(nvars*nhalo_LR(k)))
+              do i=1,nhalo_LR(k)
+                 j=halo_lists_LR(i,k)
+                 ii = nvars*(i-1) 
+                 do ispec=1,nspec
+!                    halo_phi(ii+ispec) = Yspec(j,ispec)
+                    halo_phi((ispec-1)*nhalo_LR(k)+i) = Yspec(j,ispec)
+                 end do
+                 halo_phi((nspec+0)*nhalo_LR(k)+i) = ro(j)
+                 halo_phi((nspec+1)*nhalo_LR(k)+i) = roE(j)
+                 halo_phi((nspec+2)*nhalo_LR(k)+i) = rou(j)
+                 halo_phi((nspec+3)*nhalo_LR(k)+i) = rov(j)
+#ifdef dim3
+                 halo_phi((nspec+4)*nhalo_LR(k)+i) = row(j)
+#endif                 
+              end do
+              
+              !! Send the data
+              tag = iproc + 100*k
+              call MPI_SEND(halo_phi,nvars*nhalo_LR(k),MPI_DOUBLE_PRECISION,iproc_S_LR(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_phi)
+           end if
+        end if
+     end do        
+     
+     
+     !! Finally forward and back
+     do k=1,2
+        if(zodd) then !! ODD Z: SEND FIRST, RECEIVE SECOND
+           if(iproc_S_FB(k).ge.0)then !! Send neighbour exists
+              !! Put data in an array for sending
+              allocate(halo_phi(nvars*nhalo_FB(k)))
+              do i=1,nhalo_FB(k)
+                 j=halo_lists_FB(i,k)
+                 ii = nvars*(i-1)
+                 do ispec=1,nspec
+                    halo_phi((ispec-1)*nhalo_FB(k)+i) = Yspec(j,ispec)
+                 end do                 
+                 halo_phi((nspec+0)*nhalo_FB(k)+i) = ro(j)
+                 halo_phi((nspec+1)*nhalo_FB(k)+i) = roE(j)
+                 halo_phi((nspec+2)*nhalo_FB(k)+i) = rou(j)
+                 halo_phi((nspec+3)*nhalo_FB(k)+i) = rov(j)
+#ifdef dim3
+                 halo_phi((nspec+4)*nhalo_FB(k)+i) = row(j)
+#endif                 
+              end do
+              
+              !! Send the data
+              tag = iproc + 100*k
+              call MPI_SEND(halo_phi,nvars*nhalo_FB(k),MPI_DOUBLE_PRECISION,iproc_S_FB(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_phi)
+           end if  
+           if(iproc_R_FB(k).ge.0) then !! Receive neighbour exists
+              allocate(inhalo_phi(nvars*inhalo_FB(k)))           
+              tag = iproc_R_FB(k) + 100*k
+              call MPI_RECV(inhalo_phi,nvars*inhalo_FB(k),MPI_DOUBLE_PRECISION &
+                            ,iproc_R_FB(k),tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
+              !! Pass back into the correct arrays
+              jj1=nrecstart(2+2*nprocsY+k)
+              jj2=nrecstart(2+2*nprocsY+k)+inhalo_FB(k)-1
+              do ispec=1,nspec
+                 Yspec(jj1:jj2,ispec) = inhalo_phi((ispec-1)*inhalo_FB(k)+1:ispec*inhalo_FB(k))
+              end do
+              ro(jj1:jj2) = inhalo_phi((nspec+0)*inhalo_FB(k)+1:(nspec+1)*inhalo_FB(k))
+              roE(jj1:jj2) = inhalo_phi((nspec+1)*inhalo_FB(k)+1:(nspec+2)*inhalo_FB(k))
+              rou(jj1:jj2) = inhalo_phi((nspec+2)*inhalo_FB(k)+1:(nspec+3)*inhalo_FB(k))
+              rov(jj1:jj2) = inhalo_phi((nspec+3)*inhalo_FB(k)+1:(nspec+4)*inhalo_FB(k))
+#ifdef dim3
+              row(jj1:jj2) = inhalo_phi((nspec+4)*inhalo_FB(k)+1:(nspec+5)*inhalo_FB(k))
+#endif                                                        
+              deallocate(inhalo_phi)                                                                
+           end if
+        else !! EVEN Z: RECEIVE FIRST, SEND SECOND
+           if(iproc_R_FB(k).ge.0) then !! Receive neighbour exists
+              allocate(inhalo_phi(nvars*inhalo_FB(k)))           
+              tag = iproc_R_FB(k) + 100*k
+              call MPI_RECV(inhalo_phi,nvars*inhalo_FB(k),MPI_DOUBLE_PRECISION &
+                            ,iproc_R_FB(k),tag,MPI_COMM_WORLD,MPI_STATUS_IGNORE,ierror)
+              !! Pass back into the correct arrays
+              jj1=nrecstart(2+2*nprocsY+k)
+              jj2=nrecstart(2+2*nprocsY+k)+inhalo_FB(k)-1
+              do ispec=1,nspec
+                 Yspec(jj1:jj2,ispec) = inhalo_phi((ispec-1)*inhalo_FB(k)+1:ispec*inhalo_FB(k))
+              end do
+              ro(jj1:jj2) = inhalo_phi((nspec+0)*inhalo_FB(k)+1:(nspec+1)*inhalo_FB(k))
+              roE(jj1:jj2) = inhalo_phi((nspec+1)*inhalo_FB(k)+1:(nspec+2)*inhalo_FB(k))
+              rou(jj1:jj2) = inhalo_phi((nspec+2)*inhalo_FB(k)+1:(nspec+3)*inhalo_FB(k))
+              rov(jj1:jj2) = inhalo_phi((nspec+3)*inhalo_FB(k)+1:(nspec+4)*inhalo_FB(k))
+#ifdef dim3
+              row(jj1:jj2) = inhalo_phi((nspec+4)*inhalo_FB(k)+1:(nspec+5)*inhalo_FB(k))
+#endif                                                        
+              deallocate(inhalo_phi)                                                                
+           end if
+
+           if(iproc_S_FB(k).ge.0)then !! Send neighbour exists
+              !! Put data in an array for sending
+              allocate(halo_phi(nvars*nhalo_FB(k)))
+              do i=1,nhalo_FB(k)
+                 j=halo_lists_FB(i,k)
+                 ii = nvars*(i-1)
+                 do ispec=1,nspec
+                    halo_phi((ispec-1)*nhalo_FB(k)+i) = Yspec(j,ispec)
+                 end do                 
+                 halo_phi((nspec+0)*nhalo_FB(k)+i) = ro(j)
+                 halo_phi((nspec+1)*nhalo_FB(k)+i) = roE(j)
+                 halo_phi((nspec+2)*nhalo_FB(k)+i) = rou(j)
+                 halo_phi((nspec+3)*nhalo_FB(k)+i) = rov(j)
+#ifdef dim3
+                 halo_phi((nspec+4)*nhalo_FB(k)+i) = row(j)
+#endif                 
+              end do
+              
+              !! Send the data
+              tag = iproc + 100*k
+              call MPI_SEND(halo_phi,nvars*nhalo_FB(k),MPI_DOUBLE_PRECISION,iproc_S_FB(k), &
+                            tag,MPI_COMM_WORLD,ierror)
+              deallocate(halo_phi)
+           end if
+        end if
+     end do                                 
+     
+     return
+  end subroutine halo_exchange_cons_vars  
 !! ------------------------------------------------------------------------------------------------  
   subroutine halo_exchange_int(phi) 
      !! This routine does halo exchanges for integers (only used at startup)   
