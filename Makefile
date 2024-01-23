@@ -5,7 +5,7 @@
 # -------------------------------------------------------------------------------------------------
 # mpi        Shared only (0) or distributed-shared (1) acceleration                    (default: 1)          
 # dim3       Two (0) or three (1) dimensional simulation                               (default: 0)
-# react      Reacting (1) or inert (0) flow                                            (default: 0)
+# react      Reacting (1) or inert (0) flow                                            (default: 1)
 # thermo     Isothermal (0) or thermal (1) flow                                        (default: 1)
 # restart    Start from initial conditions (0) or restart file (1)                     (default: 0)
 # pgrad      Drive the flow with a pressure gradient and P.I.D control                 (default: 0)
@@ -15,6 +15,10 @@
 # -------------------------------------------------------------------------------------------------
 #
 # EXAMPLE USAGE:
+#
+# Default make for reacting 2D flows:
+# make
+
 # For isothermal flows:
 # make thermo=0 dim3=X mpi=X pgrad=X
 #
@@ -56,13 +60,13 @@ endif
 
 # Isothermal or not. isoT can only happen if not(react)
 ifeq ($(thermo), 0)
-ifneq ($(react), 1)
+ifeq ($(react), 0)
 FFLAGS += -DisoT
 endif
 endif
 
 # Reacting? set react if so
-ifeq ($(react), 1)
+ifneq ($(react), 0)
 FFLAGS += -Dreact
 endif
 
