@@ -52,6 +52,7 @@ contains
   subroutine calc_all_rhs
      use statistics
      integer(ikind) :: i
+real(rkind) :: sumex,sumey,sumdx,sumdy
      !! Control routine for calculating right hand sides. Does thermodynamic evaluations, finds
      !! gradients, and then calls property-specific RHS routines
           
@@ -68,6 +69,30 @@ contains
 
      !! Initialise right hand sides to zero
      rhs_ro=zero;rhs_rou=zero;rhs_rov=zero;rhs_row=zero;rhs_roE=zero;rhs_Yspec=zero
+     
+     
+!!==================================
+
+!    do i=1,np
+!       ro(i) = cos(pi*rp(i,1))*sin(pi*rp(i,2))
+!       u(i) = -pi*sin(pi*rp(i,1))*sin(pi*rp(i,2))/L_char
+!       v(i) = pi*cos(pi*rp(i,1))*cos(pi*rp(i,2))/L_char
+!    end do
+!    allocate(gradro(npfb,dims));gradro=zero
+!    call calc_gradient(ro,gradro)
+!    do i=1,npfb
+!       if(node_type(i).lt.0) then
+!          write(6,*) node_type(i),u(i),gradro(i,1),v(i),gradro(i,2)
+!       end if       
+!    end do
+!    stop
+
+
+
+!!=================================     
+     
+     
+     
      
      !! Calculate derivatives of primary variables
      allocate(gradro(npfb,dims));gradro=zero  

@@ -122,12 +122,12 @@ contains
      segment_tend = omp_get_wtime()
      segment_time_local(1) = segment_time_local(1) + segment_tend - segment_tstart
      
-     tsum = segment_tend - segment_tstart
-     call global_reduce_sum(tsum)
-     if(iproc.eq.0) then
-        write(304,*) tsum
-        flush(304)
-     end if
+!     tsum = segment_tend - segment_tstart
+!     call global_reduce_sum(tsum)
+!     if(iproc.eq.0) then
+!        write(304,*) tsum
+!        flush(304)
+!     end if
      
      return
   end subroutine halo_exchanges_all

@@ -7,10 +7,10 @@
 10.0d0
 
 !! Start and end time (in multiples of L_char/Uchar)
-0.0d0 1.0d1
+0.0d0 10.0d0
 
 !! Output period (in multiples of L_char/U_char), stats output period
-1.0d-1 1.0d-4
+1.0d-4 1.0d-4
 
 !! Gravity vector (grav)
 0.0d0 0.0d0 0.0d0
@@ -43,19 +43,19 @@
 1
 
 !! Inflow velocity control parameters (profile, temporal control?, Ustart,Uend,ramp-time <- all dimensionless)
-1 0.2d0 0.5d0 0.5d0
+1 0.2d0 1.0d0 1.0d0
 
 !! WALLS: adiabatic(0) or isothermal (1)
 0
 
 !! Initial base flow (0=zero, 1=uniform, 2=parabolic)
-1
+2
 
-!! Flow type (1=flame,2=gaussian hotspot,3=flame file,4=hard-coded)
+!! Flow type (1=flame,2=gaussian hotspot,3=flame file)
 3
 
 !! Flame position (x,y), dimensional thickness, and T_hot
--0.27d0 0.0d0 4.0d-4 2.366d3
+-0.27d0 0.0d0 4.0d-4 1.3d3
 
 !! Turbulent initial velocity field (0=no, 1=yes), dimensional length scale and dimensionless intensity
 0 2.0d-4 5.0d0

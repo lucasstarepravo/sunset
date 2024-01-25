@@ -263,6 +263,30 @@ contains
         Yspec_products(9) = Yin_N2      
      end if
      
+     !! 4 species H2 single step
+     !! Assuming lean conditions, so some O2 remains in products
+     if(nspec.eq.4) then
+        o2n2_ratio = one*molar_mass(2)/(3.76d0*molar_mass(4))
+        h2o2_stoichiometric = two*molar_mass(1)/(one*molar_mass(2))
+        h2o2_ratio = h2o2_stoichiometric*phi_in
+
+        Yin_O2 = one/(one + h2o2_ratio + one/o2n2_ratio)
+        Yin_H2 = Yin_O2*h2o2_ratio
+        Yin_N2 = one - Yin_H2 - Yin_O2            
+        Yout_O2 = Yin_O2*(one-phi_in)
+        Yout_H2O = one - Yin_N2 - Yout_O2   
+
+        Yspec_reactants(1) = Yin_H2
+        Yspec_reactants(2) = Yin_O2
+        Yspec_reactants(3) = zero
+        Yspec_reactants(4) = Yin_N2
+        
+        Yspec_products(1) = zero
+        Yspec_products(2) = Yout_O2
+        Yspec_products(3) = Yout_H2O
+        Yspec_products(4) = Yin_N2      
+     end if     
+     
      !! 15 species CH4 chemistry
      if(nspec.eq.16) then
         o2n2_ratio = one*molar_mass(2)/(3.76d0*molar_mass(16))

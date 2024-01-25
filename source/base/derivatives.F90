@@ -39,7 +39,11 @@ contains
           gradtmp(1:2) = gradtmp(1:2) + phi(j)*ij_w_grad(:,k,i)                      
           
        end do
+!if(node_type(i).eq.-1) then
+!       gradphi(i,1:2) = gradtmp(1:2) - phi(i+1)*ij_w_grad_sum(:,i)                           
+!else       
        gradphi(i,1:2) = gradtmp(1:2) - phi(i)*ij_w_grad_sum(:,i)                           
+!endif       
     end do
     !$OMP END PARALLEL DO
      
