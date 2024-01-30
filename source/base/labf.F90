@@ -30,7 +30,6 @@ module labf
 !! Choice of ABF type:: 1=original, 2=Hermite polynomials, 3=Legendre polynomials
 !! ABFs 2 and 3 are multiplied by an RBF (Wab(qq) set in sphtools).
 #define ABF 2
-#define WALLNODES3
 
 contains
   subroutine calc_labf_weights
@@ -467,7 +466,7 @@ contains
         ij_w_grad(:,:,i) = zero;ij_wb_grad2(:,:,jj) = zero;ij_w_hyp(:,i)=zero
         
         !! Build new FD operators
-#ifdef WALLNODES3        
+#ifdef wn3        
         if(node_type(i).eq.1.or.node_type(i).eq.2) then !! inflow/outflows, 5 point stencils
 #else        
         if(.true.)then
@@ -535,7 +534,7 @@ contains
         i=boundary_list(jj)+1
         dx = s(i)     
         ij_w_grad(:,:,i) = zero   
-#ifdef WALLNODES3        
+#ifdef wn3        
         if(node_type(fd_parent(i)).eq.1.or.node_type(fd_parent(i)).eq.2) then !! inflow/outflow boundaries
 #else        
         if(.true.)then
@@ -802,205 +801,10 @@ contains
         end if
      end do
 
-!!=================================================================================================
-!! Experimental section to use one-sided LABFM with m=6 for first row nodes
-     call calc_row1_derivs
-!!=================================================================================================
-
      write(6,*) "finished boundary weights"
      return
   end subroutine calc_boundary_weights  
 !! ------------------------------------------------------------------------------------------------  
-  subroutine calc_row1_derivs
-     integer(ikind) :: i,j,k,ii
-     real(rkind) :: rad,qq,x,y,xx,yy,xs,ys
-     real(rkind),dimension(dims) :: rij
-
-     !! Linear system to find ABF coefficients
-     real(rkind),dimension(:,:),allocatable :: amatx,amaty,amatxx,amatxy,amatyy,amathyp
-     real(rkind),dimension(:),allocatable :: bvecx,bvecy,bvecxx,bvecxy,bvecyy,bvechyp,gvec,xvec
-     integer(ikind) :: i1,i2,nsize,nsizeG
-     real(rkind) :: ff1,hh,testing
-
-
-     !! Set desired order::
-#if order==2
-     k=2
-#elif order==3
-     k=3
-#elif order==4
-     k=4
-#elif order==5
-     k=5
-#elif order==6
-     k=6
-#elif order==7
-     k=7
-#elif order==8
-     k=8
-#elif order==9
-     k=9
-#elif order==10
-     k=10
-#elif order==12
-     k=12     
-#endif
-     
-     nsizeG=(k*k+3*k)/2   !!  5,9,14,20,27,35,44... for k=2,3,4,5,6,7,8...
-     nsize_large = nsizeG
-     
-     !! Left hand sides and arrays for interparticle weights 
-     allocate(amathyp(nsizeG,nsizeG),amatyy(nsizeG,nsizeG))
-     allocate(amatx(nsizeG,nsizeG),amaty(nsizeG,nsizeG),amatxx(nsizeG,nsizeG),amatxy(nsizeG,nsizeG))
-     amatx=zero;amaty=zero;amatxx=zero;amatxy=zero;amatyy=zero
-      
-     !! Right hand sides, vectors of monomials and ABFs
-     allocate(bvecx(nsizeG),bvecy(nsizeG),bvecxx(nsizeG),bvecxy(nsizeG),bvecyy(nsizeG),bvechyp(nsizeG))
-     allocate(gvec(nsizeG),xvec(nsizeG));gvec=zero;xvec=zero
-
-     !$OMP PARALLEL DO PRIVATE(i,nsize,amatx,k,j,rij,rad,qq,x,y,xx,yy, &
-     !$OMP ff1,gvec,xvec,i1,i2,amatxx,amaty,amatxy,amatyy,bvecx,bvecy,bvecxx,bvecxy,hh, &
-     !$OMP amathyp,bvechyp,bvecyy,xs,ys)
-     do ii=1,nb
-        i=boundary_list(ii)+1
-        
-        xs = -s(i)*rnorm(i,1)
-        ys = -s(i)*rnorm(i,2)
-        
-        nsize = nsizeG
-        amatx=zero
-        hh=h(i)
-        do k=1,ij_count(i)
-           j = ij_link(k,i) 
-           rij(:) = rp(i,:) - rp(j,:) + s(i)*rnorm(i,:) !! ri2 - rj
-           x = -rij(1);y = -rij(2)
-           
-           rad = sqrt(x*x + y*y)/hh;qq=rad
-   
-           ff1 = Wab(qq)
-           xx=x/hh;yy=y/hh    !! Hermite   
-  
-
-           !! Populate the ABF array                      
-           gvec(1:nsizeG) = abfs(rad,xx,yy,ff1)
-           gvec(15:44) = zero
-           
-           !! Populate the monomials array
-           
-           rij(:) = rp(i,:) - rp(j,:)
-           x = -rij(1);y = -rij(2)          
-           xvec(1:nsizeG) = monomials(x/hh,y/hh)
-           xvec(15:44) = zero
-
-           !! Build the LHS - it is the same for all three operators
-           do i1=1,nsize
-              amaty(i1,:) = xvec(i1)*gvec(:)   !! Contribution to LHS for this interaction
-              if(i1.ge.15) amaty(i1,i1)=one
-           end do           
-           amatx(:,:) = amatx(:,:) + amaty(:,:)   
-        end do   
-       
-     
-        !! Copy remaining LHSs
-        amaty = amatx;amatxx=amatx;amatxy=amatx;amatyy=amatx 
-     
-        !! Build RHS for ddx and ddy
-        bvecx = zero;bvecx(1) = one/hh
-!        bvecx(3) = xs/hh/hh
-!        bvecx(4) = ys/hh/hh
-!        bvecx(5) = 0.0d0
-!        bvecx(6) = 0.5d0*xs*xs/hh/hh/hh
-!        bvecx(7) = xs*ys/hh/hh/hh
-!        bvecx(8) = 0.5d0*ys*ys/hh/hh/hh
-!        bvecx(9) = 0.0d0
-!        bvecx(10) = xs*xs*xs/6.0d0/hh/hh/hh/hh
-!        bvecx(11) = xs*xs*ys/2.0d0/hh/hh/hh/hh
-!        bvecx(12) = xs*ys*ys/2.0d0/hh/hh/hh/hh
-!        bvecx(13) = ys*ys*ys/6.0d0/hh/hh/hh/hh
-!        bvecx(14) = 0.0d0
-!        bvecx(15) = xs*xs*xs*xs/24.0d0/hh/hh/hh/hh/hh
-!        bvecx(16) = xs*xs*xs*ys/6.0d0/hh/hh/hh/hh/hh
-!        bvecx(17) = xs*xs*ys*ys/4.0d0/hh/hh/hh/hh/hh
-!        bvecx(18) = xs*ys*ys*ys/6.0d0/hh/hh/hh/hh/hh
-!        bvecx(19) = ys*ys*ys*ys/24.0d0/hh/hh/hh/hh/hh
-!        bvecx(20) = 0.0d0
-!        bvecx(21) = xs*xs*xs*xs*xs/120.0d0/hh/hh/hh/hh/hh/hh
-!        bvecx(22) = xs*xs*xs*xs*ys/24.0d0/hh/hh/hh/hh/hh/hh
-!        bvecx(23) = xs*xs*xs*ys*ys/12.0d0/hh/hh/hh/hh/hh/hh
-!        bvecx(24) = xs*xs*ys*ys*ys/12.0d0/hh/hh/hh/hh/hh/hh
-!        bvecx(25) = xs*ys*ys*ys*ys/24.0d0/hh/hh/hh/hh/hh/hh
-!        bvecx(26) = ys*ys*ys*ys*ys/120.0d0/hh/hh/hh/hh/hh/hh
-!        bvecx(27) = 0.0d0
-                       
-        bvecy = zero;bvecy(2) = one/hh  
-!        bvecy(3) = 0.0d0
-!        bvecy(4) = xs/hh/hh
-!        bvecy(5) = ys/hh/hh
-!        bvecy(6) = 0.0d0
-!        bvecy(7) = 0.5d0*xs*xs/hh/hh/hh
-!        bvecy(8) = xs*ys/hh/hh/hh
-!        bvecy(9) = 0.5d0*ys*ys/hh/hh/hh       
-!        bvecy(10) = 0.0d0
-!        bvecy(11) = xs*xs*xs/6.0d0/hh/hh/hh/hh
-!        bvecy(12) = xs*xs*ys/2.0d0/hh/hh/hh/hh
-!        bvecy(13) = xs*ys*ys/2.0d0/hh/hh/hh/hh
-!        bvecy(14) = ys*ys*ys/6.0d0/hh/hh/hh/hh
-!        bvecy(15) = 0.0d0
-!        bvecy(16) = xs*xs*xs*xs/24.0d0/hh/hh/hh/hh/hh
-!        bvecy(17) = xs*xs*xs*ys/6.0d0/hh/hh/hh/hh/hh
-!        bvecy(18) = xs*xs*ys*ys/4.0d0/hh/hh/hh/hh/hh
-!        bvecy(19) = xs*ys*ys*ys/6.0d0/hh/hh/hh/hh/hh
-!        bvecy(20) = ys*ys*ys*ys/24.0d0/hh/hh/hh/hh/hh
-!        bvecy(21) = 0.0d0
-!        bvecy(22) = xs*xs*xs*xs*xs/120.0d0/hh/hh/hh/hh/hh/hh
-!        bvecy(23) = xs*xs*xs*xs*ys/24.0d0/hh/hh/hh/hh/hh/hh
-!        bvecy(24) = xs*xs*xs*ys*ys/12.0d0/hh/hh/hh/hh/hh/hh
-!        bvecy(25) = xs*xs*ys*ys*ys/12.0d0/hh/hh/hh/hh/hh/hh
-!        bvecy(26) = xs*ys*ys*ys*ys/24.0d0/hh/hh/hh/hh/hh/hh
-!        bvecy(27) = ys*ys*ys*ys*ys/120.0d0/hh/hh/hh/hh/hh/hh
-        
-    
-        !! Solve system for ddy coefficients
-        i1=0;i2=0         
-        call svd_solve(amatx,nsize,bvecx)               
-        
-        !! Solve system for ddy coefficients
-        i1=0;i2=0;nsize=nsizeG    
-        call svd_solve(amaty,nsize,bvecy)                       
-           
-            
-
-        !! Another loop of neighbours to calculate interparticle weights
-        do k=1,ij_count(i)
-           j = ij_link(k,i) 
-           rij(:) = rp(i,:) - rp(j,:) + s(i)*rnorm(i,:) !! ri2-rj
-           x=-rij(1);y=-rij(2)
-
-           rad = sqrt(x*x + y*y)/hh;qq=rad
-  
-           ff1 = Wab(qq)
-           xx=x/hh;yy=y/hh    !! Hermite   
-      
-           !! Populate the ABF array        
-           gvec(1:nsizeG) = abfs(rad,xx,yy,ff1)
-           gvec(15:44) = zero
-
-
-           !! Weights for gradients
-           ij_w_grad(1,k,i) = dot_product(bvecx,gvec)
-           ij_w_grad(2,k,i) = dot_product(bvecy,gvec)
-           
-        end do             
-        
-
-     end do
-     !$OMP END PARALLEL DO
-     deallocate(amatx,amaty,amatxx,amatxy,amatyy,amathyp)
-     deallocate(bvecx,bvecy,bvecxx,bvecxy,bvecyy,bvechyp,gvec,xvec)   
-         
-     return
-  end subroutine calc_row1_derivs
-!! ------------------------------------------------------------------------------------------------
   subroutine calc_interp
      !! Temporary routine to calculate interpolants for boundary derivatives
      integer(ikind) :: i,j,k,ii,iii,k2,j2
@@ -1021,7 +825,7 @@ contains
      !! Allocation
      allocate(linktmp0(nplink),linktmp1(nplink));linktmp0=0;linktmp1=0
 
-#ifdef WALLNODES3
+#ifdef wn3
      !! Add neighbours of i2 to neighbour list of i0 and i1 for walls only
      do ii=1,nb
         i=boundary_list(ii)

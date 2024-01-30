@@ -26,7 +26,7 @@ This document details the governing equations and numerical methods used in the 
 
 \section{Introduction}
 
-This document describes the \textbf{S}calable \textbf{U}nstructured \textbf{N}ode-\textbf{SET} code (aka. SUNSET code). The code is designed for direct numerical simulations of compressible turbulent reacting flows in non-trivial geometries. It builds on the work in~\cite{king_2020,king_2022}, using the Local Anisotropic Basis Function Method (LABFM) for spatial discretisation, combined with high-order finite differences in the third dimension, and a third-order Runge-Kutta time integration. This guide should be read in conjunction with the preprint~\cite{king_2023}.
+This document describes the \textbf{S}calable \textbf{U}nstructured \textbf{N}ode-\textbf{SET} code (aka. SUNSET code). The code is designed for direct numerical simulations of compressible turbulent reacting flows in non-trivial geometries. It builds on the work in~\cite{king_2020,king_2022}, using the Local Anisotropic Basis Function Method (LABFM) for spatial discretisation, combined with high-order finite differences in the third dimension, and a third-order Runge-Kutta time integration. This guide should be read in conjunction with the preprint~\cite{king_2024}.
 
 \subsection{Key features at a glance:}
 \begin{itemize}
@@ -43,7 +43,7 @@ This document describes the \textbf{S}calable \textbf{U}nstructured \textbf{N}od
 
 \subsection{A comment on notation}
 
-Subscripts $i$, $j$, and $k$ are vector indices for Einstein notation, and for these indices, repetition implies summation. Subscripts $\alpha$ and $\beta$ indicate chemical species. Subscripts $a$ and $b$ indicate collocation point indices. Subscripts $l$ and $L$ are used for polynomial coefficient indices. Subscript $m$ is for chemical reaction number (regular-size $m$ is polynomial order). Note that this is consistent with~\cite{king_2023}, but not~\cite{king_2020,king_2022}, in which we used $i$ and $j$ to indicate collocation point indices.
+Subscripts $i$, $j$, and $k$ are vector indices for Einstein notation, and for these indices, repetition implies summation. Subscripts $\alpha$ and $\beta$ indicate chemical species. Subscripts $a$ and $b$ indicate collocation point indices. Subscripts $l$ and $L$ are used for polynomial coefficient indices. Subscript $m$ is for chemical reaction number (regular-size $m$ is polynomial order). Note that this is consistent with~\cite{king_2024}, but not~\cite{king_2020,king_2022}, in which we used $i$ and $j$ to indicate collocation point indices.
 
 \section{The Governing Equations}\label{ge}
 
@@ -170,7 +170,7 @@ $k_{0,m}$ is the Arrhenius rate of the reaction, and $k_{\infty,m}$ is a second 
 
 \section{The Numerical Methods}\label{ni}
 
-The spatial discretisation is based on the Local Anisotropic Basis Function Method (LABFM) in the first two dimensions, and high-order finite differences in the third dimension. LABFM has been detailed and extensively analysed in~\cite{king_2020,king_2022}, and the present implementation is described in~\cite{king_2023} and we refer the reader to these works for a complete description.
+The spatial discretisation is based on the Local Anisotropic Basis Function Method (LABFM) in the first two dimensions, and high-order finite differences in the third dimension. LABFM has been detailed and extensively analysed in~\cite{king_2020,king_2022}, and the present implementation is described in~\cite{king_2024} and we refer the reader to these works for a complete description.
 
 To summarise, the domain is discretised in the $x_{1}-x_{2}$ plane with an unstructured point cloud of $N_{12}$ nodes. The discretisation in the third dimension is uniform: there are $N_{3}$ copies of each node in the $x_{1}-x_{2}$ plane, equispaced along the $x_{3}$ axis. Hence, there are a total of $N=N_{12}N_{3}$ nodes in the domain. Each node $a\in\left[1,N\right]$ has position $x_{a,i}$, a distribution lengthscale $s_{a}$, and a computational stencil lengthscale $h_{a}$. $s_{a}$ is the average node spacing around node $a$, and is analagous to the grid spacing in a finite difference scheme. The spacing in $x_{3}$ is denoted $s_{3}$, and is uniform throughout the domain, whilst $s_{a}$ can vary as a function of $x_{1}$ and $x_{2}$. Each node holds the conservative variables $\rho_{a}$, $\rho{u}_{i,a}$, $\rho{E}_{a}$ and $\rho{Y}_{\alpha,a}$. The governing equations are solved on the set of $N$ nodes. 
 
@@ -200,16 +200,16 @@ For the mixture averaged model, gradients of $\mu$, $\lambda$ and $\rho{D}_{\alp
 
 \subsection{Temporal integration and filtering}
 
-The governing equations are integrated in time using a four-step third-order, low-storage explicit Runge-Kutta scheme, with embedded second order error estimation, denoted RK3(2)4[2R+]C in the classification system of~\citet{kennedy_2000}. The value of the time step is set adaptively using a PID controller to keep time-integration errors below a specified threshold, set to $10^{-4}$ as a default. The solution is de-aliased after each time-step by high-order spatial filtering using the filters described in~\cite{king_2022} combined with a finite difference filter following~\cite{kennedy_1994}. Details of the filtering procedure can be found in~\cite{king_2023}.
+The governing equations are integrated in time using a four-step third-order, low-storage explicit Runge-Kutta scheme, with embedded second order error estimation, denoted RK3(2)4[2R+]C in the classification system of~\citet{kennedy_2000}. The value of the time step is set adaptively using a PID controller to keep time-integration errors below a specified threshold, set to $10^{-4}$ as a default. The solution is de-aliased after each time-step by high-order spatial filtering using the filters described in~\cite{king_2022} combined with a finite difference filter following~\cite{kennedy_1994}. Details of the filtering procedure can be found in~\cite{king_2024}.
 
 
 \subsection{Boundaries}
 
-For full details of the implementation of boundaries we refer the reader to~\cite{king_2022,king_2023}. To summarise, the node distribution is locally structured at the boundaries, in the vicinity of which derivative operators are constructed from combinations of LABFM and asymmetric finite differences. Numerical boundary conditions are imposed through the Navier-Stokes Characteristic Boundary Condition formalism, details of which can be found in~\cite{poinsot_2005,sutherland_2003,yoo_2007}. For walls and hard inflows, we follow the procedures described in~\cite{poinsot_2005}. For non-reflecting outflows we follow the approach of~\cite{sutherland_2003}. For non-reflecting inflows we use the \emph{improved} formulation of~\cite{yoo_2007}.
+For full details of the implementation of boundaries we refer the reader to~\cite{king_2022,king_2024}. To summarise, the node distribution is locally structured at the boundaries, in the vicinity of which derivative operators are constructed from combinations of LABFM and asymmetric finite differences. Numerical boundary conditions are imposed through the Navier-Stokes Characteristic Boundary Condition formalism, details of which can be found in~\cite{poinsot_2005,sutherland_2003,yoo_2007}. For walls and hard inflows, we follow the procedures described in~\cite{poinsot_2005}. For non-reflecting outflows we follow the approach of~\cite{sutherland_2003}. For non-reflecting inflows we use the \emph{improved} formulation of~\cite{yoo_2007}.
 
 \subsection{Parallelisation}
 
-The code is accelerated with MPI and OpenMP, and uses a static non-uniform block-structured three-dimensional domain decomposition. The distributed parallelism with MPI scales extremely well ($>96\%$ from $4$ to $1024$ MPI ranks). The shared parallelism is limited by memory access competition, and scales poorly for more than $4$ OpenMP threads per MPI rank. In general, we use $1$, $2$ or $4$ threads per MPI rank.
+The code is accelerated with MPI and OpenMP, and uses a static non-uniform block-structured three-dimensional domain decomposition. The distributed parallelism with MPI scales extremely well ($>96\%$ from $4$ to $1024$ MPI ranks). The shared parallelism is limited by memory access competition, and scales very poorly - improvements are in the pipeline here. For now, we use $1$ thread, and the code is hard-coded to use only $1$ thread by default.
 
 In the $x_{1}$ and $x_{3}$ directions, periodic boundary conditions are imposed through the MPI structure, whilst in the $x_{2}$ direction they are imposed locally on each MPI rank. Communications are blocking, and due to the cyclical structure for any domain periodicity, \textbf{an even number of MPI ranks is required in each direction}.
 
@@ -221,7 +221,7 @@ There are currently four branches of the code, which are becoming increasingly d
 \item \verb|main| - the main branch which solves the equations above in dimensional form for multistep chemistry.
 \item \verb|nondim| - this branch solves for single-step chemistry in entirely non-dimensional form.
 \item \verb|oned| - this is a one-dimensional version which is suitable for quickly simulating laminar flames to generate input files for the main branch.
-\item \verb|ev| - solves the isothermal Navier-Stokes equations for a single species, along with a constitutive equation for viscoelastic flows. This branch is unrelated to combustion.
+\item \verb|ev| - solves the isothermal Navier-Stokes equations for a single species, along with a constitutive equation for viscoelastic flows. This branch is unrelated to combustion. Details of the equations and formulations for this branch can be found in~\cite{king_2023}.
 \end{enumerate}
 
 Check github regularly for the most up to date versions. Please do not directly modify any of the above branches (especially main). Create a new branch to work on, and we will merge developments into \verb|main| later.
@@ -314,11 +314,8 @@ This is partially controlled by \verb|control.in|, for example in the specificat
 \item Copy the control files from the appropriate sub-directory with \verb|runfiles| and modify as required.
 \item Modify \verb|source/base/setup_flow.F90| to specify the required initial conditions.
 \item Compile sunset code using (e.g.) \verb|make react=1|
-\item Ensure the OpenMP environment variable is correctly specified (e.g. \verb|export OMP_NUM_THREADS=1|).
 \item Run the code on the correct number of processors using (e.g.) \verb|mpirun -n 24 ./sunset|
 \end{itemize}
-
-Note that if you forget to specify \verb|OMP_NUM_THREADS|, it will automatically allocate the maximum number of threads on the system to each MPI rank, and you end up trying to run with more parallelism that the system has (e.g. $24$ MPI ranks each with $48$ threads for a system with $24$ physical cores plus hyperthreading). If this happens, the code will run extremely slowly.
 
 \subsection{Running from a restart file}
 
@@ -361,7 +358,7 @@ If after running \verb|gen2D| you run \verb|ishift| and get a segmentation fault
 \end{figure}
 
 
-\bibliographystyle{elsarticle-num-names}
+%\bibliographystyle{elsarticle-num-names}
 \bibliography{jrckbib}
 
 \end{document}

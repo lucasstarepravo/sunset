@@ -37,6 +37,7 @@ program datgen
   real(rkind),dimension(5) :: pdp_x_new,pdp_y_new
   real(rkind) :: thup,thdown,th_increment
   integer(ikind) :: npdps_new,inew,block_left,block_right,block_new,block_delete,block_end
+  double precision, parameter :: r3o2 = 0.5d0*sqrt(3.0d0)
 
   
   
@@ -128,9 +129,9 @@ case(4) !! Rayleigh-Taylor geometry
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.04d0!0.0125d0  ! channel width
+     yl=0.02d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/500.0       !15
+     dx0=xl/1000.0       !15
      xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
      
      nb_patches = 4
@@ -234,23 +235,24 @@ case(7) !! Porous with in-out
      dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=1.0d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...
 
 !! ------------------------------------------------------------------------------------------------
-case(8) !! Array of circles
+case(8) !! Arrays of cylinders for lean H2 flame dynamics tests
 
-     xl=1.0d0 ! channel length
-     h0=xl/40.0d0   !cylinder radius
-     yl=xl/10.0d0!/10.0d0!(4.0d0/3.0d0)  ! channel width
-     dx0=xl/(40.0d0*25.0d0)!25.0       !15
-     xbcond_L=0;xbcond_U=0;ybcond_L=3;ybcond_U=3
+     D_cyl = 1.0d0;h0 = 0.5d0*D_cyl  !! Cylinder diameter (unity)
+     S_cyl = 1.5d0*D_cyl             !! Cylinder spacing (multiples of D_cyl)
+     xl = 40.0d0*D_cyl              !! Channel length
+     yl = 2.0d0*S_cyl                      !! Channel width 
+     dx0 = D_cyl/50                  !! Baseline resolution
+     xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
      allocate(b_type(nb_patches))
      b_type(:) = (/ 3, 2, 3, 1/)  
-     b_node(1,:) = (/ -0.50d0*xl, -0.5d0*yl /)
-     b_node(2,:) = (/ 0.5d0*xl, -0.5d0*yl /)
-     b_node(3,:) = (/ 0.5d0*xl, 0.5d0*yl /)
-     b_node(4,:) = (/ -0.50d0*xl, 0.5d0*yl /)
-     nb_blobs=1
+     b_node(1,:) = (/ -5.0d0*D_cyl, -0.5d0*yl /)
+     b_node(2,:) = (/ -5.0d0*D_cyl + xl, -0.5d0*yl /)
+     b_node(3,:) = (/ -5.0d0*D_cyl + xl, 0.5d0*yl /)
+     b_node(4,:) = (/ -5.0d0*D_cyl, 0.5d0*yl /)
+     nb_blobs=8
      open(unit=191,file="blob_fcoefs.in")
      read(191,*) n_blob_coefs
      allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs))
@@ -260,16 +262,28 @@ case(8) !! Array of circles
      close(191)
      blob_coeffs(1,:)=0.0d0;blob_coeffs(1,1)=1.0d0
      blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi
-!     blob_coeffs(2,:) = blob_coeffs(1,:);blob_rotation(2)=-0.0d0*pi
-!     blob_coeffs(3,:) = blob_coeffs(1,:);blob_rotation(3)=-0.0d0*pi    
+ 
+     blob_centre(1,:)=(/ 0.0d0, 0.0d0/)  !! Row 1
+     blob_centre(2,:)=(/ 0.0d0,-S_cyl/)
+     blob_centre(3,:)=(/ 0.0d0, S_cyl/)
+     
+     blob_centre(4,:)=(/ r3o2*S_cyl,0.5d0*S_cyl/)   !! Row 2  
+     blob_centre(5,:)=(/ r3o2*S_cyl,-0.5d0*S_cyl/)     
 
-     blob_centre(1,:)=(/ -0.275d0*xl, 0.0d0*yl/);
-!     blob_centre(2,:)=(/ -0.275d0*xl,-0.5d0*yl/);
-!     blob_centre(3,:)=(/ -0.275d0*xl, 0.5d0*yl/);     
+     blob_centre(6,:)=(/ 2.0d0*r3o2*S_cyl,0.0d0/)  !! Row 3   
+     blob_centre(7,:)=(/ 2.0d0*r3o2*S_cyl, S_cyl/)     
+     blob_centre(8,:)=(/ 2.0d0*r3o2*S_cyl, -S_cyl/)               
+
+     !! Multiple blobs, copy coefficients and orientations from blob 1
+     if(nb_blobs.gt.1)then
+        do i=2,nb_blobs
+           blob_coeffs(i,:) = blob_coeffs(1,:);blob_rotation(i)=blob_rotation(1)        
+        end do
+     end if
 
 
-     dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=2.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
+     dxmin = dx0/2.0d0
+     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
      
 !! ------------------------------------------------------------------------------------------------     
 end select
@@ -325,7 +339,7 @@ end select
               end if
            end if
            i=i+1
-           if(dist2bound.le.3.25*dxp(i-1)) keepgoing = .false. !! Too close to solid bound, leave it.  !!NEWBC
+           if(dist2bound.le.4.25*dxp(i-1)) keepgoing = .false. !! Too close to solid bound, leave it.  !!NEWBC
         end do     
 
         if(dist2io.le.4.25) keepgoing = .false. !! Too close to io bound, leave it.  !!NEWBC              
@@ -689,25 +703,25 @@ end subroutine quicksort
         endif      
         
      else if(itest.eq.8) then   
-        xhat = x - blob_centre(1,1)
-        yhat = y - blob_centre(1,2)
-        !! Stretch high-res region downstream of flameholder        
-        if((x-blob_centre(1,1)).gt.0.0d0) then
+        xhat = x - blob_centre(nb_blobs,1)
+        yhat = y 
+        !! Stretch high-res region downstream of flameholder(s). Note blob nb_blobs is furthest downstream...
+        if((x-blob_centre(nb_blobs,1)).gt.0.0d0) then
      
-           r_mag = ((xb_max - x)/(xb_max - blob_centre(1,1)))**1.0d0  !! Scale between blob and outlet (0=outlet)
-           temp = exp(-(10.0d0*yhat)**4.0d0) !! Blob-side spreading function
-           tmp2 = exp(-(6.0d0*yhat)**4.0d0) !! Outflow-side spreading function
+           r_mag = ((xb_max - x)/(xb_max - blob_centre(nb_blobs,1)))**1.0d0  !! Scale between blob and outlet (0=outlet)
+           temp = exp(-(0.5d0*yhat)**4.0d0) !! Blob-side spreading function
+           tmp2 = exp(-(yhat/3.0d0)**4.0d0) !! Outflow-side spreading function
            temp = r_mag*temp + (1.0d0-r_mag)*tmp2 !! Linear variation between blob-side and outflow-side
            
            dxio = dx_out + (dx_in - dx_out)*(1.0d0-temp)
-!           dxio = dx_out*r_mag + (4.0d0/3.0d0)*dx_out*(1.0d0-r_mag)
-           dxio = dxio*(r_mag + (4.0d0/3.0d0)*(1.0d0-r_mag))
+           dxio = dx_out*r_mag + (5.0d0/3.0d0)*dx_out*(1.0d0-r_mag)
+!           dxio = dxio*(r_mag + (5.0d0/3.0d0)*(1.0d0-r_mag))
 
         else
            tmp2 = ((blob_centre(1,1)-x)/(blob_centre(1,1)-xb_min))**2.0d0
            d2b_local = d2b_local*(1.5d0*tmp2 + 1.0d0*(1.0d0-tmp2))
            r_mag = sqrt(xhat**2.0d0 + yhat**2.0d0)
-           temp = exp(-(10.0d0*r_mag)**4.0d0)
+           temp = exp(-(0.5d0*r_mag)**4.0d0)
            dxio = dx_out + (dx_in - dx_out)*(1.0d0-temp)
         endif    
               

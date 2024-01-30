@@ -100,7 +100,7 @@ contains
            write(6,291) "Waiting          :",100.0d0*stg(10)/stg(11),'%,',stg(10)/dble(scr_freq*nprocs),"seconds/step"
            write(6,291) "Other            :",100.0d0*store1/stg(11),'%,',store1/dble(scr_freq*nprocs),"seconds/step"
            write(6,'(A)') "  "
-                                         
+                                        
         end if
  
         !! Load balancing diagnostics       

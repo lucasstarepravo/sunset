@@ -119,6 +119,8 @@ contains
   end subroutine statistics_control  
 !! ------------------------------------------------------------------------------------------------   
   subroutine check_load_balance  
+     !! N.B. This subroutine is out-of-date with the rest of the code, and needs updating if you
+     !! wish to use it.
      real(rkind),dimension(:),allocatable :: prof_tmp,prof_tmp_local,load_n_n
      integer(ikind),dimension(:),allocatable :: sum_n_n,sum_n_n_local
      integer(ikind) :: sum_sum_n_n

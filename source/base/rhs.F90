@@ -69,31 +69,7 @@ real(rkind) :: sumex,sumey,sumdx,sumdy
 
      !! Initialise right hand sides to zero
      rhs_ro=zero;rhs_rou=zero;rhs_rov=zero;rhs_row=zero;rhs_roE=zero;rhs_Yspec=zero
-     
-     
-!!==================================
-
-!    do i=1,np
-!       ro(i) = cos(pi*rp(i,1))*sin(pi*rp(i,2))
-!       u(i) = -pi*sin(pi*rp(i,1))*sin(pi*rp(i,2))/L_char
-!       v(i) = pi*cos(pi*rp(i,1))*cos(pi*rp(i,2))/L_char
-!    end do
-!    allocate(gradro(npfb,dims));gradro=zero
-!    call calc_gradient(ro,gradro)
-!    do i=1,npfb
-!       if(node_type(i).lt.0) then
-!          write(6,*) node_type(i),u(i),gradro(i,1),v(i),gradro(i,2)
-!       end if       
-!    end do
-!    stop
-
-
-
-!!=================================     
-     
-     
-     
-     
+             
      !! Calculate derivatives of primary variables
      allocate(gradro(npfb,dims));gradro=zero  
      allocate(gradu(npfb,dims),gradv(npfb,dims),gradw(npfb,dims));gradw=zero
@@ -217,9 +193,7 @@ real(rkind) :: sumex,sumey,sumdx,sumdy
      real(rkind),dimension(:),allocatable :: speciessum_divroVY,speciessum_hY
      real(rkind),dimension(:,:),allocatable :: gradroMdiff
      real(rkind),dimension(:,:),allocatable :: mxav_store1,mxav_store2
-     real(rkind),dimension(:),allocatable :: mxav_store3,mxav_store4
-     
-     
+     real(rkind),dimension(:),allocatable :: mxav_store3,mxav_store4     
 
      !! Allocate space for gradients and stores
      allocate(Y_thisspec(np));Y_thisspec = zero
@@ -304,8 +278,8 @@ real(rkind) :: sumex,sumey,sumdx,sumdy
            gradroMdiff(:,:) = zero
 #endif           
         end if
-             
-segment_tstart=omp_get_wtime()      
+
+segment_tstart=omp_get_wtime()    
       
         !$omp parallel do private(i,tmp_scal,tmpY,divroVY,roVY,enthalpy, &
         !$omp dcpdT,cpispec,tmpro,gradroDY,roDY)
@@ -316,8 +290,7 @@ segment_tstart=omp_get_wtime()
            !! Convective term: ro*u.gradY + Y(div.(ro*u))        
            tmp_scal = ro(i)*(u(i)*gradYspec(i,1,ispec) + &
                              v(i)*gradYspec(i,2,ispec) + &
-                             w(i)*gradYspec(i,3,ispec) ) - Y_thisspec(i)*rhs_ro(i)
-           
+                             w(i)*gradYspec(i,3,ispec) ) - Y_thisspec(i)*rhs_ro(i)             
          
            !! First part of molecular diffusion terms 
            roVY = roMdiff(i,ispec)*gradYspec(i,:,ispec)                     
@@ -463,6 +436,8 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
 
      end do
     
+     segment_tstart = omp_get_wtime()
+    
      !! Deallocate any stores no longer required    
      deallocate(lapYspec,Y_thisspec)
      deallocate(gradroMdiff)     
@@ -509,6 +484,10 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
 
      deallocate(speciessum_divroVY,speciessum_roVY,gradYspec)
      deallocate(speciessum_hY,speciessum_hgradY)
+
+!! Profiling
+segment_tend = omp_get_wtime()
+segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
           
 
      return
