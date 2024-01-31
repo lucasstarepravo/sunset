@@ -239,8 +239,8 @@ case(8) !! Arrays of cylinders for lean H2 flame dynamics tests
 
      D_cyl = 1.0d0;h0 = 0.5d0*D_cyl  !! Cylinder diameter (unity)
      S_cyl = 1.5d0*D_cyl             !! Cylinder spacing (multiples of D_cyl)
-     xl = 40.0d0*D_cyl              !! Channel length
-     yl = 2.0d0*S_cyl                      !! Channel width 
+     xl = 20.0d0*D_cyl              !! Channel length
+     yl = 1.0d0*S_cyl                      !! Channel width 
      dx0 = D_cyl/50                  !! Baseline resolution
      xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
      
@@ -252,7 +252,7 @@ case(8) !! Arrays of cylinders for lean H2 flame dynamics tests
      b_node(2,:) = (/ -5.0d0*D_cyl + xl, -0.5d0*yl /)
      b_node(3,:) = (/ -5.0d0*D_cyl + xl, 0.5d0*yl /)
      b_node(4,:) = (/ -5.0d0*D_cyl, 0.5d0*yl /)
-     nb_blobs=8
+     nb_blobs=1
      open(unit=191,file="blob_fcoefs.in")
      read(191,*) n_blob_coefs
      allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs))
@@ -264,15 +264,15 @@ case(8) !! Arrays of cylinders for lean H2 flame dynamics tests
      blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi
  
      blob_centre(1,:)=(/ 0.0d0, 0.0d0/)  !! Row 1
-     blob_centre(2,:)=(/ 0.0d0,-S_cyl/)
-     blob_centre(3,:)=(/ 0.0d0, S_cyl/)
+!     blob_centre(2,:)=(/ 0.0d0,-S_cyl/)
+!     blob_centre(3,:)=(/ 0.0d0, S_cyl/)
      
-     blob_centre(4,:)=(/ r3o2*S_cyl,0.5d0*S_cyl/)   !! Row 2  
-     blob_centre(5,:)=(/ r3o2*S_cyl,-0.5d0*S_cyl/)     
+!     blob_centre(4,:)=(/ r3o2*S_cyl,0.5d0*S_cyl/)   !! Row 2  
+!     blob_centre(5,:)=(/ r3o2*S_cyl,-0.5d0*S_cyl/)     
 
-     blob_centre(6,:)=(/ 2.0d0*r3o2*S_cyl,0.0d0/)  !! Row 3   
-     blob_centre(7,:)=(/ 2.0d0*r3o2*S_cyl, S_cyl/)     
-     blob_centre(8,:)=(/ 2.0d0*r3o2*S_cyl, -S_cyl/)               
+!     blob_centre(6,:)=(/ 2.0d0*r3o2*S_cyl,0.0d0/)  !! Row 3   
+!     blob_centre(7,:)=(/ 2.0d0*r3o2*S_cyl, S_cyl/)     
+!     blob_centre(8,:)=(/ 2.0d0*r3o2*S_cyl, -S_cyl/)               
 
      !! Multiple blobs, copy coefficients and orientations from blob 1
      if(nb_blobs.gt.1)then
@@ -714,8 +714,8 @@ end subroutine quicksort
            temp = r_mag*temp + (1.0d0-r_mag)*tmp2 !! Linear variation between blob-side and outflow-side
            
            dxio = dx_out + (dx_in - dx_out)*(1.0d0-temp)
-           dxio = dx_out*r_mag + (5.0d0/3.0d0)*dx_out*(1.0d0-r_mag)
-!           dxio = dxio*(r_mag + (5.0d0/3.0d0)*(1.0d0-r_mag))
+!           dxio = dx_out*r_mag + (5.0d0/3.0d0)*dx_out*(1.0d0-r_mag)
+           dxio = dxio*(r_mag**0.5d0 + (4.0d0/3.0d0)*(1.0d0-r_mag**0.5d0))
 
         else
            tmp2 = ((blob_centre(1,1)-x)/(blob_centre(1,1)-xb_min))**2.0d0

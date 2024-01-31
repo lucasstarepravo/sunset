@@ -41,9 +41,9 @@ contains
 #ifdef mp
      !$omp parallel  
      n_threads=omp_get_num_threads()
+     !$omp end parallel
      n_threads = 1
      call omp_set_num_threads(n_threads)  !! Hard-coded to single-threads if using MPI
-     !$omp end parallel
      write(6,*) "nprocs,iproc,n_threads:",nprocs,iproc,n_threads  
 #else  
      !$omp parallel
