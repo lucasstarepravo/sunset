@@ -65,6 +65,9 @@ contains
      !! Time, mean pressure, mean outflow pressure, mean inflow pressure
      open(unit=202,file='data_out/statistics/p.out')
      
+     ! Time, mean temperature, mean boundary temperature
+     open(unit=203,file='data_out/statistics/T.out')
+     
      return     
   end subroutine open_stats_files
 !! ------------------------------------------------------------------------------------------------
@@ -95,6 +98,9 @@ contains
         
         !! Check pressure
         call pressure_check
+        
+        !! Check temperature
+        call temperature_check
      
         !! Error evaluation for Taylor Green vortices?
 !        call error_TG
@@ -468,6 +474,76 @@ contains
 
      return
   end subroutine pressure_check  
+!! ------------------------------------------------------------------------------------------------  
+  subroutine temperature_check
+     !! This subroutine calculates the mean temperature in the domain, and the mean temperature on 
+     !! solid boundaries (i.e. on a bluff body)
+     integer(ikind) :: i,j
+     real(rkind) :: tot_vol,tot_t,tot_tb,dVi
+   
+     !! Global mean temperature
+     tot_vol = zero;tot_t = zero
+     !$omp parallel do private(dVi) reduction(+:tot_vol,tot_t)
+     do i=1,npfb
+        dVi = vol(i)
+#ifdef dim3
+        dVi = dVi*dz
+#endif        
+        tot_vol = tot_vol + dVi
+        tot_t = tot_t + T(i)*dVi
+     end do
+     !$omp end parallel do
+
+     !! Reduce across processors     
+#ifdef mp
+     call global_reduce_sum(tot_t)
+     call global_reduce_sum(tot_vol)     
+#endif     
+     !! Mean temperature
+     tot_t = tot_t/tot_vol     
+   
+     !! Mean on solid boundaries
+     tot_vol = zero
+     tot_tb=zero
+     if(nb.ne.0)then
+        !$omp parallel do private(i,dVi) reduction(+:tot_tb,tot_vol)
+        do j=1,nb
+           i=boundary_list(j)        
+           dVi = s(i)
+#ifdef dim3
+           dVi = dVi*dz
+#endif        
+           if(node_type(i).eq.0) then  !! Wall
+              tot_vol = tot_vol + dVi
+              tot_tb = tot_tb + T(i)*dVi
+           end if
+        
+        end do
+        !$omp end parallel do
+     end if
+
+     !! Reduce across processors     
+#ifdef mp
+     call global_reduce_sum(tot_tb)
+     call global_reduce_sum(tot_vol)     
+#endif     
+     !! Mean pressures
+     tot_tb = tot_tb/tot_vol
+     
+        
+#ifdef mp
+     if(iproc.eq.0)then
+        write(203,*) time/Time_char,tot_t,tot_tb
+        flush(203)
+     end if
+#else
+     write(203,*) time/Time_char,tot_t,tot_tb
+     flush(203)
+#endif
+
+
+     return
+  end subroutine temperature_check    
 !! ------------------------------------------------------------------------------------------------   
   subroutine species_check
      !! This subroutine calculates total mass of each species in the domain

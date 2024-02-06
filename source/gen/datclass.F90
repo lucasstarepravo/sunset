@@ -238,8 +238,8 @@ case(7) !! Porous with in-out
 case(8) !! Arrays of cylinders for lean H2 flame dynamics tests
 
      D_cyl = 1.0d0;h0 = 0.5d0*D_cyl  !! Cylinder diameter (unity)
-     S_cyl = 1.5d0*D_cyl             !! Cylinder spacing (multiples of D_cyl)
-     xl = 20.0d0*D_cyl              !! Channel length
+     S_cyl = 2.0d0*D_cyl             !! Cylinder spacing (multiples of D_cyl)
+     xl = 40.0d0*D_cyl              !! Channel length
      yl = 1.0d0*S_cyl                      !! Channel width 
      dx0 = D_cyl/50                  !! Baseline resolution
      xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
@@ -283,7 +283,7 @@ case(8) !! Arrays of cylinders for lean H2 flame dynamics tests
 
 
      dxmin = dx0/2.0d0
-     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
+     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=1.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
      
 !! ------------------------------------------------------------------------------------------------     
 end select
