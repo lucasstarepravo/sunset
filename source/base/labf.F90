@@ -41,7 +41,7 @@ contains
      real(rkind),dimension(:,:),allocatable :: amatx,amaty,amatxx,amatxy,amatyy,amathyp
      real(rkind),dimension(:),allocatable :: bvecx,bvecy,bvecxx,bvecxy,bvecyy,bvechyp,gvec,xvec
      integer(ikind) :: i1,i2,nsize,nsizeG
-     real(rkind) :: ff1,hh,testing
+     real(rkind) :: ff1,hh,testing,hyp_scal
 
 
      !! Set desired order::
@@ -84,7 +84,7 @@ contains
 
      !$OMP PARALLEL DO PRIVATE(i,nsize,amatx,k,j,rij,rad,qq,x,y,xx,yy, &
      !$OMP ff1,gvec,xvec,i1,i2,amatxx,amaty,amatxy,amatyy,bvecx,bvecy,bvecxx,bvecxy,hh, &
-     !$OMP amathyp,bvechyp,bvecyy)
+     !$OMP amathyp,bvechyp,bvecyy,hyp_scal)
      do ii=1,npfb-nb
         i=internal_list(ii) 
         nsize = nsizeG
@@ -139,7 +139,7 @@ contains
         !! Copy LHS for hyperviscosity
         amathyp = amatx
 
-        !! for rows 1 & 2, drop gradients to 4th order
+        !! for rows 1 & 2, drop gradients and laplacian to 4th order
 #if order>=5              
         if(node_type(i).eq.-1.or.node_type(i).eq.-2) then 
             do i1=1,nsizeG
@@ -156,8 +156,8 @@ contains
         amaty = amatx;amatxx=amatx;amatxy=amatx;amatyy=amatx 
      
         !! Build RHS for ddx and ddy
-        bvecx = zero;bvecx(1) = one/hh
-        bvecy = zero;bvecy(2) = one/hh  
+        bvecx = zero;bvecx(1) = one
+        bvecy = zero;bvecy(2) = one  
     
         !! Solve system for ddy coefficients
         i1=0;i2=0         
@@ -168,9 +168,9 @@ contains
         call svd_solve(amaty,nsize,bvecy)                       
  
         !! Build RHS for d2/dx2,d2/dxdy,d2/dy2
-        bvecxx(:)=zero;bvecxx(3)=one/hh/hh
-        bvecxy(:)=zero;bvecxy(4)=one/hh/hh
-        bvecyy(:)=zero;bvecyy(5)=one/hh/hh
+        bvecxx(:)=zero;bvecxx(3)=one
+        bvecxy(:)=zero;bvecxy(4)=one
+        bvecyy(:)=zero;bvecyy(5)=one
  
         !! Solve system for d2/dx2 coefficients
         i1=0;i2=0;nsize=nsizeG
@@ -187,28 +187,28 @@ contains
         !! Solve system for Hyperviscosity (regular viscosity if order<4)
 #if order<=3
         bvechyp(:)=zero;bvechyp(3)=one;bvechyp(5)=one;i1=0;i2=0;nsize=nsizeG 
-        bvechyp(:)=bvechyp(:)/hh/hh
+        hyp_scal = one/hh/hh
 #elif order<=5
         bvechyp(:)=zero;bvechyp(10)=-one;bvechyp(12)=-two;bvechyp(14)=-one
-        bvechyp(:)=bvechyp(:)/hh/hh/hh/hh        
+        hyp_scal = one/hh/hh/hh/hh        
         i1=0;i2=0;nsize=nsizeG 
 #elif order<=7
         bvechyp(:)=zero;bvechyp(21)=one;bvechyp(23)=3.0d0;bvechyp(25)=3.0d0;bvechyp(27)=one
-        bvechyp(:)=bvechyp(:)/hh/hh/hh/hh/hh/hh
+        hyp_scal = one/hh/hh/hh/hh/hh/hh        
         i1=0;i2=0;nsize=nsizeG 
 #elif order<=9
         bvechyp(:)=zero;bvechyp(36)=-one;bvechyp(38)=-4.0d0;bvechyp(40)=-6.0d0;bvechyp(42)=-4.0d0;bvechyp(44)=-one
-        bvechyp(:)=bvechyp(:)/hh/hh/hh/hh/hh/hh/hh/hh
+        hyp_scal = one/hh/hh/hh/hh/hh/hh/hh/hh        
         i1=0;i2=0;nsize=nsizeG    
 #elif order<=11      
         bvechyp(:)=zero;bvechyp(55)=one;bvechyp(57)=5.0d0;bvechyp(59)=10.0d0;bvechyp(61)=10.0d0
         bvechyp(63)=5.0d0;bvechyp(65)=one
-        bvechyp(:)=bvechyp(:)/hh/hh/hh/hh/hh/hh/hh/hh/hh/hh
+        hyp_scal = one/hh/hh/hh/hh/hh/hh/hh/hh/hh/hh        
         i1=0;i2=0;nsize=nsizeG                
 #else        
         bvechyp(:)=zero;bvechyp(78)=-one;bvechyp(80)=-6.0d0;bvechyp(82)=-15.0d0;bvechyp(84)=-20.0d0
         bvechyp(86)=-15.0d0;bvechyp(88)=-6.0d0;bvechyp(90)=-one
-        bvechyp(:)=bvechyp(:)/hh/hh/hh/hh/hh/hh/hh/hh/hh/hh/hh/hh
+        hyp_scal = one/hh/hh/hh/hh/hh/hh/hh/hh/hh/hh/hh/hh        
         i1=0;i2=0;nsize=nsizeG                
 #endif
 
@@ -216,13 +216,13 @@ contains
 #if order>=7
         if(node_type(i).eq.998.or.node_type(i).lt.0)then !! for rows 3 & 4, drop to 6th order
            bvechyp(:)=zero;bvechyp(21)=one;bvechyp(23)=3.0d0;bvechyp(25)=3.0d0;bvechyp(27)=one
-           bvechyp(:)=bvechyp(:)/hh/hh/hh/hh/hh/hh        
+           hyp_scal = one/hh/hh/hh/hh/hh/hh
            i1=0;i2=0;nsize=nsizeG 
         end if 
 #endif    
 #if order>=5
         if(node_type(i).eq.-1)then !! for rows 1, drop to 4th order
-           if(node_type(fd_parent(i)).eq.2.or.node_type(fd_parent(i)).eq.1) then
+!           if(node_type(fd_parent(i)).eq.2.or.node_type(fd_parent(i)).eq.1) then !! but only for in/out
               do i1=1,nsizeG
                  amathyp(i1,15:nsizeG)=zero        
               end do
@@ -231,9 +231,9 @@ contains
                  amathyp(i1,i1)=one
               end do
               bvechyp(:)=zero;bvechyp(10)=-one;bvechyp(12)=-two;bvechyp(14)=-one
-              bvechyp(:)=bvechyp(:)/hh/hh/hh/hh        
+              hyp_scal = one/hh/hh/hh/hh
               i1=0;i2=0;nsize=nsizeG 
-           end if
+!           end if
         end if 
 #endif    
         call svd_solve(amathyp,nsize,bvechyp)               
@@ -260,13 +260,11 @@ contains
            !! Populate the ABF array        
            gvec(1:nsizeG) = abfs(rad,xx,yy,ff1)
 
-
-
            !! Weights for gradients
-           ij_w_grad(1,k,i) = dot_product(bvecx,gvec)
-           ij_w_grad(2,k,i) = dot_product(bvecy,gvec)
-           ij_w_lap(k,i) = dot_product(bvecxx+bvecyy,gvec)
-           ij_w_hyp(k,i) = dot_product(bvechyp,gvec)
+           ij_w_grad(1,k,i) = dot_product(bvecx,gvec)/hh
+           ij_w_grad(2,k,i) = dot_product(bvecy,gvec)/hh
+           ij_w_lap(k,i) = dot_product(bvecxx+bvecyy,gvec)/hh/hh
+           ij_w_hyp(k,i) = dot_product(bvechyp,gvec)*hyp_scal
            
         end do             
         
@@ -1477,9 +1475,9 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
         if(node_type(i).lt.0) then
            if(node_type(fd_parent(i)).eq.0) then !! Walls only
               if(node_type(i).eq.-1) filter_coeff(i) = filter_coeff(i)*half*oosqrt2!*half*half
-              if(node_type(i).eq.-2) filter_coeff(i) = filter_coeff(i)*half!*oosqrt2
-              if(node_type(i).eq.-3) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half
-              if(node_type(i).eq.-4.or.node_type(i).eq.998) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half 
+!              if(node_type(i).eq.-2) filter_coeff(i) = filter_coeff(i)*half!*oosqrt2
+!              if(node_type(i).eq.-3) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half
+!              if(node_type(i).eq.-4.or.node_type(i).eq.998) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half 
            end if
         end if
 

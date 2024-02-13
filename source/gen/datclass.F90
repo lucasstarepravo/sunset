@@ -282,8 +282,8 @@ case(8) !! Arrays of cylinders for lean H2 flame dynamics tests
      end if
 
 
-     dxmin = dx0/2.0d0
-     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=1.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
+     dxmin = dx0/3.0d0
+     dx_wall=dxmin;dx_in=3.5d0*dx0;dx_out=1.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
      
 !! ------------------------------------------------------------------------------------------------     
 end select
