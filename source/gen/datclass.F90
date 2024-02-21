@@ -129,10 +129,10 @@ case(4) !! Rayleigh-Taylor geometry
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.02d0!0.0125d0  ! channel width
+     yl=0.2d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
-     dx0=xl/1000.0       !15
-     xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
+     dx0=xl/180.0       !15
+     xbcond_L=0;xbcond_U=0;ybcond_L=3;ybcond_U=3
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
@@ -149,7 +149,7 @@ case(5) !! Inflow/outflow tube for simple flames
 !        blob_coeffs(i,:)=h0*(/1.0d0,0.4d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=-pi/9.0d0
 !     end do
 
-     dxmin = dx0/1.0d0
+     dxmin = dx0/2.0d0
      dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx0*1.0d0;dx_wallio=dx_in  !! dx for solids and in/outs..
 
      
