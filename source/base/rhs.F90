@@ -783,7 +783,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
         !$omp parallel do private(i,tmp_visc,lapT_tmp,gradulocal,gradvlocal,gradwlocal,xn,yn,fla)
         do j=1,nb
            i=boundary_list(j)
-   
+              
            !! Viscous energy term: div.(tau u) (N.B. for walls, we need to rotate gradients)
            if(node_type(i).eq.0) then
               xn=rnorm(i,1);yn=rnorm(i,2)           

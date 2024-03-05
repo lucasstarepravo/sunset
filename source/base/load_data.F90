@@ -146,7 +146,7 @@ contains
      
      !! Read in wall boundary type
      read(12,*)
-     read(12,*) flag_wall_type
+     read(12,*) flag_wall_type, T_wall
      read(12,*)     
 
      !! Read in base flow type

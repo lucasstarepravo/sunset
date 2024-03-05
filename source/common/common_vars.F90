@@ -35,7 +35,8 @@ module common_vars
   integer(ikind) :: flag_flow_type
   integer(ikind) :: flag_strat,flag_turbulent
   real(rkind) :: turb_lengthscale,turb_intensity
-  real(rkind) :: fl_pos_x,fl_pos_y,fl_thck,T_hot  
+  real(rkind) :: fl_pos_x,fl_pos_y,fl_thck,T_hot,T_wall  
+  real(rkind),dimension(:),allocatable :: Yspec_reactants,Yspec_products  
   
   !! Evolved fluid quantities
   real(rkind), dimension(:), allocatable, target :: rou,rov,row,ro,roE

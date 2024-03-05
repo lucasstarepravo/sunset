@@ -68,6 +68,9 @@ contains
      ! Time, mean temperature, mean boundary temperature
      open(unit=203,file='data_out/statistics/T.out')
      
+     ! Time, furthest upstream flame location
+     open(unit=204,file='data_out/statistics/flpos.out')
+     
      return     
   end subroutine open_stats_files
 !! ------------------------------------------------------------------------------------------------
@@ -101,6 +104,9 @@ contains
         
         !! Check temperature
         call temperature_check
+        
+        !! Flame positions
+        call flame_position
      
         !! Error evaluation for Taylor Green vortices?
 !        call error_TG
@@ -544,6 +550,34 @@ contains
 
      return
   end subroutine temperature_check    
+!! ------------------------------------------------------------------------------------------------  
+  subroutine flame_position
+     !! This subroutine calculates left-most position at which Y(1)<0.5Y(1,inflow)
+     integer(ikind) :: i,j
+     real(rkind) :: leftmost_flame,c
+   
+     !! Global mean temperature
+     leftmost_flame=1.0d10
+     do i=1,npfb
+        c = one - Yspec(i,1)/(ro(i)*Yspec_reactants(1))
+        if(c.ge.half.and.rp(i,1).le.leftmost_flame)then
+           leftmost_flame = rp(i,1)
+        endif                     
+     end do
+
+#ifdef mp
+     call global_reduce_min(leftmost_flame)
+     if(iproc.eq.0)then
+        write(204,*) time/Time_char,leftmost_flame
+        flush(204)
+     end if
+#else
+     write(204,*) time/Time_char,leftmost_flame
+     flush(204)
+#endif
+
+     return
+  end subroutine flame_position 
 !! ------------------------------------------------------------------------------------------------   
   subroutine species_check
      !! This subroutine calculates total mass of each species in the domain

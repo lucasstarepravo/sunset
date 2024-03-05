@@ -175,7 +175,6 @@ contains
         nprocsout = nprocsX*nprocsY
 #endif
 
-
         !! Calculate the vorticity 
         allocate(gradu(npfb,dims),gradv(npfb,dims),gradw(npfb,dims));gradw=zero
         allocate(vort(npfb))
@@ -337,6 +336,10 @@ contains
 
      flush(20)
      close(20)
+     
+     !! Compress and bundle nodes files
+!     call MPI_BARRIER( MPI_COMM_WORLD, ierror)                            
+
 
      return
   end subroutine output_nodes

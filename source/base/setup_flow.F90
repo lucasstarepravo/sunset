@@ -18,7 +18,6 @@ module setup_flow
   use turbulence
   implicit none
   
-  real(rkind),dimension(:),allocatable :: Yspec_reactants,Yspec_products
   integer(ikind), parameter :: n_modes=8
   real(rkind),dimension(n_modes) :: mode_amp,mode_phase
   real(rkind), parameter :: ptbn_size = zero!half   !! perturbation size in multiples of fl_thck
@@ -59,12 +58,13 @@ contains
         allocate(u_inflow_local(nb));u_inflow_local = u_char   
         allocate(dudt_inflow_local(nb));dudt_inflow_local=zero            
      end if
-     
+
+     !! Evaluate mass fractions of reactants and products assuming complete combustion
+     call initialise_composition     
+
      !! =======================================================================
      !! Choose initial conditions
 #ifndef restart     
-     !! Evaluate mass fractions of reactants and products assuming complete combustion
-     call initialise_composition 
 
      !! Initialise the perturbation
      call initialise_perturbation            
@@ -95,7 +95,6 @@ contains
 
      !! END FLOW TYPE CHOICE =================================
 
-     deallocate(Yspec_reactants,Yspec_products)
 #else    
      !! RESTART OPTION. 
      call load_restart_file
@@ -374,10 +373,14 @@ contains
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! wall initial conditions
               u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
+              if(flag_wall_type.eq.1) then
+                 ro(i) = ro(i)*T(i)/T_wall
+                 T(i) = T_wall
+              end if
            end if                 
            T_bound(j) = T(i)
         end do
-     end if
+     end if   
  
   
   
@@ -452,16 +455,20 @@ contains
      end do
      !$omp end parallel do
      
-     !! Special impose values on boundaries
+     !! Special apply values on boundaries
      if(nb.ne.0)then
         do j=1,nb
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! wall initial conditions
               u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
+              if(flag_wall_type.eq.1) then
+                 ro(i) = ro(i)*T(i)/T_wall
+                 T(i) = T_wall
+              end if
            end if                 
            T_bound(j) = T(i)
         end do
-     end if
+     end if   
     
      return
   end subroutine make_gaussian_hotspot
@@ -517,16 +524,21 @@ contains
      end do
      !$omp end parallel do
      
-     !! Special impose values on boundaries
+     !! Special apply values on boundaries
      if(nb.ne.0)then
         do j=1,nb
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! wall initial conditions
               u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
+              if(flag_wall_type.eq.1) then
+                 ro(i) = ro(i)*T(i)/T_wall
+                 T(i) = T_wall
+              end if
            end if                 
            T_bound(j) = T(i)
         end do
-     end if
+     end if   
+    
     
      return
   end subroutine make_baseflow  
@@ -648,22 +660,20 @@ contains
      !! Re-evaluate temperature from energy.  
 !     call evaluate_temperature_and_pressure
      
-     !! Values on boundaries
+     !! Special apply values on boundaries
      if(nb.ne.0)then
         do j=1,nb
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! wall initial conditions
               u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
-              T_bound(j) = T(i)
+              if(flag_wall_type.eq.1) then
+                 ro(i) = ro(i)*T(i)/T_wall
+                 T(i) = T_wall
+              end if
            end if                 
-           if(node_type(i).eq.1) then !! inflow initial conditions
-              T_bound(j) = T(i) !! Inflow temperature is T_cold
-           end if
-           if(node_type(i).eq.2) then !! outflow initial conditions
-              T_bound(j) = T(i)  !! Outflow temperature is T_hot
-           end if
+           T_bound(j) = T(i)
         end do
-     end if   
+     end if    
   
      !! Return Yspec to primitive form
      !$omp parallel do private(ispec)
@@ -714,23 +724,18 @@ contains
      
     
      
-     !! Values on boundaries
+     !! Special apply values on boundaries
      if(nb.ne.0)then
         do j=1,nb
            i=boundary_list(j)
            if(node_type(i).eq.0) then !! wall initial conditions
-              u(i)=zero;v(i)=zero;w(i)=zero
-
-              tmp = T_ref*(one + 0.01*sin(two*pi*rp(i,3)/L_domain_z))
-              T_bound(j) = tmp !! Might want changing                
-              T(i) = T_bound(j)
+              u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
+              if(flag_wall_type.eq.1) then
+                 ro(i) = ro(i)*T(i)/T_wall
+                 T(i) = T_wall
+              end if
            end if                 
-           if(node_type(i).eq.1) then !! inflow initial conditions
-              u(i)=u_char
-           end if
-           if(node_type(i).eq.2) then !! outflow initial conditions
-              u(i)=u_char
-           end if
+           T_bound(j) = T(i)
         end do
      end if   
   
@@ -796,13 +801,20 @@ contains
      end do      
      close(14)
      
-     !! Re-specify the boundary temperatures
-     if(nb.ne.0) then
+     !! Special apply values on boundaries
+     if(nb.ne.0)then
         do j=1,nb
-           i=internal_list(j)
-           T_bound(j) = T_ref!T(i)
+           i=boundary_list(j)
+           if(node_type(i).eq.0) then !! wall initial conditions
+              u(i)=zero;v(i)=zero;w(i)=zero  !! Will impose an initial shock!!
+              if(flag_wall_type.eq.1) then
+                 ro(i) = ro(i)*T(i)/T_wall
+                 T(i) = T_wall
+              end if
+           end if                 
+           T_bound(j) = T(i)
         end do
-     end if
+     end if   
 
   
      return
