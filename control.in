@@ -1,7 +1,7 @@
 !! This is the control file for sunset code
 
 !! Characteristic length-scale (L_char)
-0.004d0
+0.001d0
 
 !! Characteristic velocity scale (U_char)
 1.0d1
@@ -10,7 +10,7 @@
 0.0d0 2.0d2
 
 !! Output period (in multiples of L_char/U_char), stats output period
-1.0d0 1.0d-3
+1.0d-2 1.0d-3
 
 !! Gravity vector (grav)
 0.0d0 0.0d0 0.0d0

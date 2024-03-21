@@ -191,49 +191,45 @@ case(6) !! Hong Im flameholder setup
      dxmin = dx0/2.0d0
      dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!! 
 !! ------------------------------------------------------------------------------------------------
-case(7) !! Porous with in-out
+case(7) !! Half-plane with bump
 
-     D_cyl = 1.0d0
-     S_cyl = D_cyl*1.25d0
-     yl = 2.0d0*S_cyl
-     xl = sqrt(3.0d0)*S_cyl
-     h0=D_cyl/2.0d0      !cylinder radius    
-     dx0=D_cyl/60.0       !75
-     xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
+     D_cyl = 1.0d0;h0 = 0.5d0*D_cyl  !! Cylinder diameter (unity)
+     S_cyl = 10.0d0*D_cyl             !! Cylinder spacing (multiples of D_cyl)
+     xl = 20.0d0*D_cyl              !! Channel length
+     yl = 1.0d0*S_cyl                      !! Channel width 
+     dx0 = D_cyl/50                  !! Baseline resolution
+     xbcond_L=0;xbcond_U=0;ybcond_L=2;ybcond_U=2
      
      nb_patches = 4
      allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
      allocate(b_type(nb_patches))
      b_type(:) = (/ 3, 2, 3, 1/)  
-     b_node(1,:) = (/-2.250d0*xl, -0.5d0*yl /)
-     b_node(2,:) = (/4.0d0*xl, -0.5d0*yl /)
-     b_node(3,:) = (/4.0d0*xl, 0.5d0*yl /)
-     b_node(4,:) = (/-2.25d0*xl, 0.5d0*yl /)
+     b_node(1,:) = (/ -5.0d0*D_cyl, 0.0d0 /)
+     b_node(2,:) = (/ -5.0d0*D_cyl + xl, 0.0d0 /)
+     b_node(3,:) = (/ -5.0d0*D_cyl + xl, yl /)
+     b_node(4,:) = (/ -5.0d0*D_cyl, yl /)
+     nb_blobs=1
      open(unit=191,file="blob_fcoefs.in")
-     read(191,*) n_blob_coefs    
-     nb_blobs = 7
+     read(191,*) n_blob_coefs
      allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs))
      do i=1,n_blob_coefs
-        read(191,*) blob_coeffs(1,i)      
-        blob_coeffs(:,i) = blob_coeffs(1,i)
+        read(191,*) blob_coeffs(1,i)
      end do
-     blob_centre(1,:) = (/0.0d0,0.0d0/)   !! Row 0
-     blob_centre(2,:) = (/0.0d0,-S_cyl/)
-     blob_centre(3,:) = (/0.0d0,S_cyl/)
-     blob_centre(4,:) = (/S_cyl*sqrt(3.0d0)/2.0d0,-0.5d0*S_cyl/) !! Row 1/2
-     blob_centre(5,:) = (/S_cyl*sqrt(3.0d0)/2.0d0,0.5d0*S_cyl/)
-     blob_centre(6,:) = (/-S_cyl*sqrt(3.0d0)/2.0d0,-0.5d0*S_cyl/) !! Row -1/2
-     blob_centre(7,:) = (/-S_cyl*sqrt(3.0d0)/2.0d0,0.5d0*S_cyl/)
-                               
-     do i=1,nb_blobs
-        blob_coeffs(i,:) = 0.0d0;blob_coeffs(i,1) = 1.0d0
-        blob_coeffs(i,:) = blob_coeffs(i,:)*h0
-        blob_rotation(i)=-0.0d0/9.0d0
-     end do
+     close(191)
+     blob_coeffs(1,:)=0.0d0;blob_coeffs(1,1)=1.0d0
+     blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi
+ 
+     blob_centre(1,:)=(/ 0.0d0, 0.0d0/) 
+
+     !! Multiple blobs, copy coefficients and orientations from blob 1
+     if(nb_blobs.gt.1)then
+        do i=2,nb_blobs
+           blob_coeffs(i,:) = blob_coeffs(1,:);blob_rotation(i)=blob_rotation(1)        
+        end do
+     end if
 
      dxmin = dx0/2.0d0
-     dx_wall=dxmin;dx_in=3.0d0*dx0;dx_out=1.0d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!! Ratio for scaling far field...
-
+     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
 !! ------------------------------------------------------------------------------------------------
 case(8) !! Arrays of cylinders for lean H2 flame dynamics tests
 
@@ -284,6 +280,48 @@ case(8) !! Arrays of cylinders for lean H2 flame dynamics tests
 
      dxmin = dx0/3.0d0
      dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
+
+case(9) !! Channel with wall bump
+
+     D_cyl = 1.0d0;h0 = 0.5d0*D_cyl  !! Cylinder diameter (unity)
+     S_cyl = 2.0d0*D_cyl             !! Cylinder spacing (multiples of D_cyl)
+     xl = 20.0d0*D_cyl              !! Channel length
+     yl = 1.0d0*S_cyl                      !! Channel width 
+     dx0 = D_cyl/50                  !! Baseline resolution
+     xbcond_L=0;xbcond_U=0;ybcond_L=3;ybcond_U=3
+     
+     nb_patches = 4
+     allocate(b_node(nb_patches,2),b_edge(nb_patches,2))
+     allocate(b_type(nb_patches))
+     b_type(:) = (/ 3, 2, 3, 1/)  
+     b_node(1,:) = (/ -5.0d0*D_cyl, -0.5d0*yl /)
+     b_node(2,:) = (/ -5.0d0*D_cyl + xl, -0.5d0*yl /)
+     b_node(3,:) = (/ -5.0d0*D_cyl + xl, 0.5d0*yl /)
+     b_node(4,:) = (/ -5.0d0*D_cyl, 0.5d0*yl /)
+     nb_blobs=2
+     open(unit=191,file="blob_fcoefs.in")
+     read(191,*) n_blob_coefs
+     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs))
+     do i=1,n_blob_coefs
+        read(191,*) blob_coeffs(1,i)
+     end do
+     close(191)
+     blob_coeffs(1,:)=0.0d0;blob_coeffs(1,1)=1.0d0
+     blob_coeffs(1,:) = blob_coeffs(1,:)*h0;blob_rotation(1)=-0.0d0*pi
+ 
+     blob_centre(1,:)=(/ 0.0d0, 0.5d0*S_cyl/) 
+     blob_centre(2,:)=(/ 0.0d0,-0.5d0*S_cyl/)
+
+     !! Multiple blobs, copy coefficients and orientations from blob 1
+     if(nb_blobs.gt.1)then
+        do i=2,nb_blobs
+           blob_coeffs(i,:) = blob_coeffs(1,:);blob_rotation(i)=blob_rotation(1)        
+        end do
+     end if
+
+
+     dxmin = dx0/2.0d0
+     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!         
      
 !! ------------------------------------------------------------------------------------------------     
 end select
@@ -724,7 +762,57 @@ end subroutine quicksort
            temp = exp(-(0.5d0*r_mag)**4.0d0)
            dxio = dx_out + (dx_in - dx_out)*(1.0d0-temp)
         endif    
+        
+     else if(itest.eq.9) then   
+        xhat = x - blob_centre(nb_blobs,1)
+        if(y.gt.0.0d0) then
+           yhat = y - blob_centre(1,2)
+        else
+           yhat = y - blob_centre(2,2)        
+        endif
+        !! Stretch high-res region downstream of flameholder(s). Note blob nb_blobs is furthest downstream...
+        if((x-blob_centre(nb_blobs,1)).gt.0.0d0) then
+     
+           r_mag = ((xb_max - x)/(xb_max - blob_centre(nb_blobs,1)))**1.0d0  !! Scale between blob and outlet (0=outlet)
+           temp = exp(-(0.5d0*yhat)**4.0d0) !! Blob-side spreading function
+           tmp2 = exp(-(yhat/3.0d0)**4.0d0) !! Outflow-side spreading function
+           temp = r_mag*temp + (1.0d0-r_mag)*tmp2 !! Linear variation between blob-side and outflow-side
+           
+           dxio = dx_out + (dx_in - dx_out)*(1.0d0-temp)
+!           dxio = dx_out*r_mag + (5.0d0/3.0d0)*dx_out*(1.0d0-r_mag)
+           dxio = dxio*(r_mag**0.5d0 + (4.0d0/3.0d0)*(1.0d0-r_mag**0.5d0))
+
+        else
+           tmp2 = ((blob_centre(1,1)-x)/(blob_centre(1,1)-xb_min))**2.0d0
+           d2b_local = d2b_local*(1.5d0*tmp2 + 1.0d0*(1.0d0-tmp2))
+           r_mag = sqrt(xhat**2.0d0 + yhat**2.0d0)
+           temp = exp(-(0.5d0*r_mag)**4.0d0)
+           dxio = dx_out + (dx_in - dx_out)*(1.0d0-temp)
+        endif           
               
+     else if(itest.eq.7) then   
+        xhat = x - blob_centre(nb_blobs,1)
+        yhat = y - blob_centre(1,2)        
+        !! Stretch high-res region downstream of flameholder(s). Note blob nb_blobs is furthest downstream...
+        if((x-blob_centre(nb_blobs,1)).gt.0.0d0) then
+     
+           r_mag = ((xb_max - x)/(xb_max - blob_centre(nb_blobs,1)))**1.0d0  !! Scale between blob and outlet (0=outlet)
+           temp = exp(-(0.5d0*yhat)**4.0d0) !! Blob-side spreading function
+           tmp2 = exp(-(yhat/3.0d0)**4.0d0) !! Outflow-side spreading function
+           temp = r_mag*temp + (1.0d0-r_mag)*tmp2 !! Linear variation between blob-side and outflow-side
+           
+           dxio = dx_out + (dx_in - dx_out)*(1.0d0-temp)
+!           dxio = dx_out*r_mag + (5.0d0/3.0d0)*dx_out*(1.0d0-r_mag)
+           dxio = dxio*(r_mag**0.5d0 + (4.0d0/3.0d0)*(1.0d0-r_mag**0.5d0))
+
+        else
+           tmp2 = ((blob_centre(1,1)-x)/(blob_centre(1,1)-xb_min))**2.0d0
+           d2b_local = d2b_local*(1.5d0*tmp2 + 1.0d0*(1.0d0-tmp2))
+           r_mag = sqrt(xhat**2.0d0 + yhat**2.0d0)
+           temp = exp(-(0.5d0*r_mag)**4.0d0)
+           dxio = dx_out + (dx_in - dx_out)*(1.0d0-temp)
+        endif           
+                            
      end if
         
      !! And what is the spacing, based on dist2bound?
@@ -771,8 +859,8 @@ end subroutine quicksort
                       
            a0 = blob_coeffs(ib,1)     
            x0 = blob_centre(ib,1);y0=blob_centre(ib,2)
-           th = 0.0d0 !! theta
-           do while(th.le.2.0d0*pi-0.25*dxlocal/a0)
+           th = 0.5d0*dxlocal/a0 !! Initial theta
+           do while(th.le.2.0d0*pi-0.0001*dxlocal/a0)
               !! Position node
               th_sh = th - blob_rotation(ib)
                 
