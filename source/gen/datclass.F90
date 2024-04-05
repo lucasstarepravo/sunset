@@ -194,7 +194,7 @@ case(6) !! Hong Im flameholder setup
 case(7) !! Half-plane with bump
 
      D_cyl = 1.0d0;h0 = 0.5d0*D_cyl  !! Cylinder diameter (unity)
-     S_cyl = 10.0d0*D_cyl             !! Cylinder spacing (multiples of D_cyl)
+     S_cyl = 1.0d0*D_cyl             !! Cylinder spacing (multiples of D_cyl)
      xl = 20.0d0*D_cyl              !! Channel length
      yl = 1.0d0*S_cyl                      !! Channel width 
      dx0 = D_cyl/50                  !! Baseline resolution
@@ -228,8 +228,8 @@ case(7) !! Half-plane with bump
         end do
      end if
 
-     dxmin = dx0/2.0d0
-     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
+     dxmin = dx0/1.0d0
+     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=2.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
 !! ------------------------------------------------------------------------------------------------
 case(8) !! Arrays of cylinders for lean H2 flame dynamics tests
 
@@ -237,7 +237,7 @@ case(8) !! Arrays of cylinders for lean H2 flame dynamics tests
      S_cyl = 2.0d0*D_cyl             !! Cylinder spacing (multiples of D_cyl)
      xl = 20.0d0*D_cyl              !! Channel length
      yl = 1.0d0*S_cyl                      !! Channel width 
-     dx0 = D_cyl/100                  !! Baseline resolution
+     dx0 = D_cyl/50                  !! Baseline resolution
      xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
      
      nb_patches = 4
@@ -278,9 +278,9 @@ case(8) !! Arrays of cylinders for lean H2 flame dynamics tests
      end if
 
 
-     dxmin = dx0/3.0d0
+     dxmin = dx0/2.0d0
      dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
-
+!! ------------------------------------------------------------------------------------------------
 case(9) !! Channel with wall bump
 
      D_cyl = 1.0d0;h0 = 0.5d0*D_cyl  !! Cylinder diameter (unity)
@@ -319,9 +319,8 @@ case(9) !! Channel with wall bump
         end do
      end if
 
-
      dxmin = dx0/2.0d0
-     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!         
+     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=3.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!         
      
 !! ------------------------------------------------------------------------------------------------     
 end select

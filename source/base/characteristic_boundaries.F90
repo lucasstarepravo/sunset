@@ -495,7 +495,7 @@ contains
      !! the inflow over a prescribed time
      integer(ikind) :: i,j
      real(rkind) :: y
-     real(rkind) :: u_inflow_mean
+     real(rkind) :: u_inflow_mean,u_scal_local
      
      !! If controlling the inflow
      if(flag_uinflow_control.eq.1) then
@@ -510,22 +510,14 @@ contains
         !! Only update u_inflow_local if it has changed (i.e. time<ramp_time)
         if(time.le.u_inflow_ramptime) then
            !! Loop over all boundary nodes
-           !$omp parallel do private(i,y)
+           !$omp parallel do private(i,y,u_scal_local)
            do j=1,nb
               i=boundary_list(j)
               if(node_type(i).eq.1) then !! Inflows only
-                 if(flag_base_flow_profile.eq.2) then !! Parabolic profile
-                    y = rp(i,2)/(ymax-ymin)                 
-                    u_inflow_local(j) = u_inflow_mean*six*(half-y)*(half+y)
-                    dudt_inflow_local(j) = ((u_inflow_end-u_inflow_start)/u_inflow_ramptime)*six*(half-y)*(half+y)
-                 else if(flag_base_flow_profile.le.1) then !! uniform profile
-                    u_inflow_local(j) = u_inflow_mean
-                    dudt_inflow_local(j) = ((u_inflow_end-u_inflow_start)/u_inflow_ramptime)
-                 else
-                    write(6,*) "Requested inflow profile not an option. Please change control.in"
-                    write(6,*) "Stopping"
-                    stop
-                 end if
+                 y = rp(i,2)/(ymax-ymin)               
+                 u_scal_local = uprof_a0 + uprof_a1*y + uprof_a2*y*y
+                 u_inflow_local(j) = u_inflow_mean*u_scal_local
+                 dudt_inflow_local(j) = ((u_inflow_end-u_inflow_start)/u_inflow_ramptime)*u_scal_local
               end if
            end do
            !$omp end parallel do

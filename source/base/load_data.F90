@@ -153,6 +153,19 @@ contains
      read(12,*)
      read(12,*) flag_base_flow_profile
      read(12,*)  
+     
+     !! Specify coefficients for base flow profile u=U*(a0 + a1*y + a2*y*y)
+     if(flag_base_flow_profile.eq.1) then  !! Uniform flow
+        uprof_a0=one;uprof_a1=zero;uprof_a2=zero
+     else if(flag_base_flow_profile.eq.2) then  !! Poiseuille
+        uprof_a0=1.5d0;uprof_a1=zero;uprof_a2=-six
+     else if(flag_base_flow_profile.eq.3) then  !! Half-Poiseuille
+        uprof_a0=zero;uprof_a1=zero;uprof_a2=1.5d0
+     else                                           !! Zero-flow
+        uprof_a0=zero;uprof_a1=zero;uprof_a2=zero        
+     end if
+     
+
 
      !! Read in initial condition type
      read(12,*)

@@ -37,6 +37,7 @@ module common_vars
   real(rkind) :: turb_lengthscale,turb_intensity
   real(rkind) :: fl_pos_x,fl_pos_y,fl_thck,T_hot,T_wall  
   real(rkind),dimension(:),allocatable :: Yspec_reactants,Yspec_products  
+  real(rkind) :: uprof_a0,uprof_a1,uprof_a2
   
   !! Evolved fluid quantities
   real(rkind), dimension(:), allocatable, target :: rou,rov,row,ro,roE

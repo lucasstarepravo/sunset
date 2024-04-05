@@ -10,7 +10,7 @@
 0.0d0 2.0d2
 
 !! Output period (in multiples of L_char/U_char), stats output period
-1.0d-2 1.0d-3
+1.0d-3 1.0d-3
 
 !! Gravity vector (grav)
 0.0d0 0.0d0 0.0d0
@@ -43,13 +43,13 @@
 0
 
 !! Inflow velocity control parameters (profile, temporal control?, Ustart,Uend,ramp-time <- all dimensionless)
-1 0.2d0 0.5d0 1.0d1
+1 0.2d0 0.5d0 0.5d0
 
 !! WALLS: adiabatic(0) or isothermal (1)
 0 1.0d3
 
 !! Initial base flow (0=zero, 1=uniform, 2=parabolic)
-1
+2
 
 !! Flow type (1=flame,2=gaussian hotspot,3=flame file)
 3

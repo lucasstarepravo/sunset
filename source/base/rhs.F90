@@ -725,7 +725,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
      integer(ikind) :: i,j,fla
      real(rkind) :: tmp_conv,tmp_visc,tmp_p,tmp_E
      real(rkind),dimension(:,:),allocatable :: grad2T
-     real(rkind) :: lapT_tmp,dutdt
+     real(rkind) :: lapT_tmp,dutdt,q01,q02
      real(rkind),dimension(:,:),allocatable :: gradlambda  
      real(rkind),dimension(2) :: gradulocal,gradvlocal,gradwlocal   
          
@@ -780,7 +780,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
      if(nb.ne.0)then
         allocate(grad2T(nb,3))
         call calc_grad2bound(T,grad2T)          
-        !$omp parallel do private(i,tmp_visc,lapT_tmp,gradulocal,gradvlocal,gradwlocal,xn,yn,fla)
+        !$omp parallel do private(i,tmp_visc,lapT_tmp,gradulocal,gradvlocal,gradwlocal,xn,yn,fla,q01,q02)
         do j=1,nb
            i=boundary_list(j)
               
@@ -812,6 +812,13 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
            if(znf_tdiff(j)) then
               lapT_tmp = grad2T(j,2) + grad2T(j,3)  !! No normal d2T/dn2
               gradlambda(i,1) = zero                  !! dlambda/dn=0
+              if(node_type(i).eq.0)then
+                 !! On adiabatic walls, we can "impose flux directly", by first evaluating fluxes at nodes
+                 !! i+1 and i+2, then using these to evaluate d2T/dn2
+                 q01 = (-25.0d0*T(i) + 48.0d0*T(i+1) - 36.0d0*T(i+2) + 16.0d0*T(i+3) - 3.0d0*T(i+4))/(12.0d0*s(i))
+                 q02 = (T(i) - 8.0d0*T(i+1) + 8.0d0*T(i+3) - T(i+4))/(12.0d0*s(i))              
+                 lapT_tmp = (lapT_tmp + 16.0d0*q01 - two*q02)/(12.0d0*s(i))                          
+              endif              
            else
               lapT_tmp = lapT(i)
            end if                    

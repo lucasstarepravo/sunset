@@ -46,7 +46,7 @@
 1 0.2d0 1.0d0 1.0d1
 
 !! WALLS: adiabatic(0) or isothermal (1)
-0
+0 1.0d3
 
 !! Initial base flow (0=zero, 1=uniform, 2=parabolic)
 1

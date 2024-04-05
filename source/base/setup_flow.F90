@@ -510,14 +510,8 @@ contains
         ro(i) = ro_inflow
         
         !! Velocity
-        if(flag_base_flow_profile.eq.0) then !! Zero flow
-           u(i) = zero
-        else if(flag_base_flow_profile.eq.1) then !! Uniform flow
-           u(i) = u_inflow_start
-        else if(flag_base_flow_profile.eq.2) then !! Parabolic flow
-           y=y/(ymax-ymin)
-           u(i) = u_inflow_start*six*(half-y)*(half+y)         
-        end if
+        y=y/(ymax-ymin)
+        u(i) = u_inflow_start*(uprof_a0 + uprof_a1*y + uprof_a2*y*y)
         v(i) = zero
         w(i) = zero
                         
