@@ -52,7 +52,6 @@ contains
   subroutine calc_all_rhs
      use statistics
      integer(ikind) :: i
-real(rkind) :: sumex,sumey,sumdx,sumdy
      !! Control routine for calculating right hand sides. Does thermodynamic evaluations, finds
      !! gradients, and then calls property-specific RHS routines
           
@@ -86,12 +85,8 @@ real(rkind) :: sumex,sumey,sumdx,sumdy
      !! Temperature gradient and Laplacian
      allocate(gradT(npfb,dims),lapT(npfb))
      call calc_gradient(T,gradT)        
-     call calc_laplacian_transverse_only_on_bound(T,lapT)   
-     
-     
-     
-#endif     
-     
+     call calc_laplacian_transverse_only_on_bound(T,lapT)                 
+#endif         
      
      !! Pressure gradient (method depends on whether isoT or not)
      allocate(gradp(npfb,dims));gradp=zero
