@@ -86,7 +86,9 @@ real(rkind) :: sumex,sumey,sumdx,sumdy
      !! Temperature gradient and Laplacian
      allocate(gradT(npfb,dims),lapT(npfb))
      call calc_gradient(T,gradT)        
-     call calc_laplacian(T,lapT)   
+     call calc_laplacian_transverse_only_on_bound(T,lapT)   
+     
+     
      
 #endif     
      
@@ -187,13 +189,14 @@ real(rkind) :: sumex,sumey,sumdx,sumdy
      real(rkind),dimension(:,:,:),allocatable :: gradYspec
      real(rkind),dimension(:,:),allocatable :: grad2Yspec
      integer(ikind) :: i,j,ispec
-     real(rkind),dimension(dims) :: roVY,gradroDY,body_force
-     real(rkind) :: tmp_scal,lapYspec_tmp,tmpY,divroVY,enthalpy,dcpdT,cpispec,tmpro,tmpT,roDY
+     real(rkind),dimension(dims) :: gradroDY,body_force
+     real(rkind) :: tmp_scal,tmpY,divroVY,enthalpy,dcpdT,cpispec,tmpro,tmpT,roDY
      real(rkind),dimension(:,:),allocatable :: speciessum_roVY,speciessum_hgradY
      real(rkind),dimension(:),allocatable :: speciessum_divroVY,speciessum_hY
      real(rkind),dimension(:,:),allocatable :: gradroMdiff
      real(rkind),dimension(:,:),allocatable :: mxav_store1,mxav_store2
      real(rkind),dimension(:),allocatable :: mxav_store3,mxav_store4     
+     real(rkind),dimension(:,:),allocatable :: roVY
 
      !! Allocate space for gradients and stores
      allocate(Y_thisspec(np));Y_thisspec = zero
@@ -207,6 +210,7 @@ real(rkind) :: sumex,sumey,sumdx,sumdy
      allocate(lapYspec(npfb));lapYspec=zero
      allocate(speciessum_divroVY(npfb));speciessum_divroVY = zero
      allocate(speciessum_roVY(npfb,dims));speciessum_roVY = zero
+     allocate(roVY(npfb,dims));roVY=zero
      allocate(speciessum_hY(npfb));speciessum_hY = zero
      allocate(speciessum_hgradY(npfb,dims));speciessum_hgradY = zero
      allocate(gradroMdiff(npfb,dims))
@@ -217,12 +221,13 @@ real(rkind) :: sumex,sumey,sumdx,sumdy
      if(flag_mix_av.eq.1) then
      
         !! Pre-populate stores 3 and 4 with density and pressure laplacians
-        call calc_laplacian(ro,mxav_store3)
-        call calc_laplacian(p-p_ref,mxav_store4)        
+        call calc_laplacian_transverse_only_on_bound(ro,mxav_store3)
+        call calc_laplacian_transverse_only_on_bound(p-p_ref,mxav_store4)        
         
    
-        !$omp parallel do private(tmpro,tmpT)
-        do i=1,npfb
+        !$omp parallel do private(tmpro,tmpT,i)
+        do j=1,npfb-nb
+           i=internal_list(j)
            !! Store inverse of density and temperature
            tmpro = one/ro(i)
            tmpT=one/T(i)        
@@ -243,10 +248,34 @@ real(rkind) :: sumex,sumey,sumdx,sumdy
 
         end do
         !$omp end parallel do 
+        
+        !! On boundary nodes, we neglect any normal terms
+        if(nb.ne.0) then              
+           !$omp parallel do private(i)
+           do j=1,nb
+              i=boundary_list(j)
+
+              !! grad(lnT) + grad(lnro)
+              mxav_store1(i,:) = tmpT*gradT(i,:) + tmpro*gradro(i,:)
+           
+              !! grad(p)/(ro*R0*T)
+              mxav_store2(i,:) = tmpro*tmpT*gradp(i,:)/Rgas_universal              
+                            
+              !! lap(T)/T - grad(lnT)**2 + lap(ro)/ro - grad(lnro).grad(lnro)
+              mxav_store3(i) = lapT(i)*tmpT - tmpT*tmpT*dot_product(gradT(i,2:3),gradT(i,2:3)) &
+                             + mxav_store3(i)*tmpro - tmpro*tmpro*dot_product(gradro(i,2:3),gradro(i,2:3))
+                          
+              !!(1/roR0T)*(lap(p) - gradp.(grad(lnT)+grad(lnro)))               
+              mxav_store4(i) = (tmpro*tmpT/Rgas_universal)*(mxav_store4(i) &
+                             - dot_product(gradp(i,2:3),mxav_store1(i,2:3)))            
+           end do
+           !$omp end parallel do
+        end if
+        
      else
         !! These terms are zero for constant Lewis number assumption
         mxav_store1=zero;mxav_store2=zero
-        mxav_store3=zero;mxav_store4=zero        
+        mxav_store3=zero;mxav_store4=zero
      end if
      
      !! Loop over all species
@@ -261,7 +290,7 @@ real(rkind) :: sumex,sumey,sumdx,sumdy
         
         !! Calculate gradient and Laplacian for Yspec for this species     
         call calc_gradient(Y_thisspec,gradYspec(:,:,ispec))
-        call calc_laplacian(Y_thisspec,lapYspec)
+        call calc_laplacian_transverse_only_on_bound(Y_thisspec,lapYspec)
 
 
         !! Diffusivity gradients
@@ -278,10 +307,13 @@ real(rkind) :: sumex,sumey,sumdx,sumdy
            gradroMdiff(:,:) = zero
 #endif           
         end if
+        
+        !! Zero diffusive flux
+        roVY = zero
 
 segment_tstart=omp_get_wtime()    
       
-        !$omp parallel do private(i,tmp_scal,tmpY,divroVY,roVY,enthalpy, &
+        !$omp parallel do private(i,tmp_scal,tmpY,divroVY,enthalpy, &
         !$omp dcpdT,cpispec,tmpro,gradroDY,roDY)
         do j=1,npfb-nb
            i=internal_list(j)
@@ -293,24 +325,24 @@ segment_tstart=omp_get_wtime()
                              w(i)*gradYspec(i,3,ispec) ) - Y_thisspec(i)*rhs_ro(i)             
          
            !! First part of molecular diffusion terms 
-           roVY = roMdiff(i,ispec)*gradYspec(i,:,ispec)                     
+           roVY(i,:) = roMdiff(i,ispec)*gradYspec(i,:,ispec)                     
            divroVY = roMdiff(i,ispec)*lapYspec(i) &
                       + dot_product(gradYspec(i,:,ispec),gradroMdiff(i,:))
            
            
            !! roDY and gradroDY - these are used for additional mixture averaged terms
            roDY = roMdiff(i,ispec)*Y_thisspec(i)
-           gradroDY = roVY + Y_thisspec(i)*gradroMdiff(i,:)
+           gradroDY = roVY(i,:) + Y_thisspec(i)*gradroMdiff(i,:)
                      
            !! Augment molecular diffusion terms to include mixture averaged driving forces 
-           roVY = roVY + roDY*(mxav_store1(i,:) + mxav_store2(i,:)*molar_mass(ispec))                      
+           roVY(i,:) = roVY(i,:) + roDY*(mxav_store1(i,:) + mxav_store2(i,:)*molar_mass(ispec))                      
            divroVY = divroVY + dot_product(gradroDY,mxav_store1(i,:)-mxav_store2(i,:)*molar_mass(ispec)) &
                              + roDY*(mxav_store3(i) + mxav_store4(i)*molar_mass(ispec))        
                       
            
            !! Sum roVY and div(roVY) over species
            speciessum_divroVY(i) = speciessum_divroVY(i) + divroVY
-           speciessum_roVY(i,:) = speciessum_roVY(i,:) + roVY
+           speciessum_roVY(i,:) = speciessum_roVY(i,:) + roVY(i,:)
 
 #ifndef isoT                                 
            !! Evaluate enthalpy, cp and dcp/dT for species ispec
@@ -320,7 +352,7 @@ segment_tstart=omp_get_wtime()
            store_diff_E(i) = store_diff_E(i) + divroVY*enthalpy   
                
            !! Add gradh.roVY for species ispec ( gradh = cp*gradT )
-           store_diff_E(i) = store_diff_E(i) + cpispec*dot_product(roVY,gradT(i,:))
+           store_diff_E(i) = store_diff_E(i) + cpispec*dot_product(roVY(i,:),gradT(i,:))
                                                
            !! Add this species contribution to the mixture enthalpy
            speciessum_hY(i) = speciessum_hY(i) + enthalpy*Y_thisspec(i) 
@@ -345,8 +377,9 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
         !! Make L5+ispec and boundary RHS
         if(nb.ne.0)then
            allocate(grad2Yspec(nb,dims));grad2Yspec=zero
-           call calc_grad2bound(Yspec(:,ispec),grad2Yspec)
-           !$omp parallel do private(i,xn,yn,un,ut,dutdt,lapYspec_tmp,tmpY,roVY &
+           call calc_grad2bound(Y_thisspec,grad2Yspec)      
+   
+           !$omp parallel do private(i,xn,yn,un,ut,dutdt,tmpY &
            !$omp ,divroVY,enthalpy,tmpro,cpispec,dcpdT,tmp_scal,roDY,gradroDY)
            do j=1,nb
               i=boundary_list(j)
@@ -358,48 +391,55 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
                                 w(i)*gradYspec(i,3,ispec) ) - Y_thisspec(i)*rhs_ro(i)
                                                                
               !! Molecular diffusion terms 
-              roVY(:) = roMdiff(i,ispec)*gradYspec(i,:,ispec)                              
-                           
+              roVY(i,:) = roMdiff(i,ispec)*gradYspec(i,:,ispec)                              
+
+              !! NOTE: In all boundary cases we start by constructing only transverse parts of divroVY
+              
+              !! divroVY for constant Lewis approximation
+              divroVY = roMdiff(i,ispec)*lapYspec(i) &
+                      + dot_product(gradYspec(i,2:3,ispec),gradroMdiff(i,2:3))  
+                                            
+              !! roDY and grad(roDY) used in mixture averaged formulation
+              roDY = roMdiff(i,ispec)*Y_thisspec(i)
+              gradroDY = roVY(i,:) + Y_thisspec(i)*gradroMdiff(i,:)
+              
+              
+              !! Augment to include mixture averaged driving forces
+              roVY(i,:) = roVY(i,:) + roDY*(mxav_store1(i,:) + mxav_store2(i,:)*molar_mass(ispec))
+              
+              !! Add  gradroDY*(grad(lnT)+grad(lnro)-WgradP/roRT) (NB. transverse terms only)
+              divroVY = divroVY + dot_product(gradroDY(2:3),mxav_store1(i,2:3)-mxav_store2(i,2:3)*molar_mass(ispec))
+
+              !! Add roDY*(grad(grad(lnT)+grad(lnro)-WgradP/roRT)) (NB. s3 and s4 contain transverse terms only)
+              divroVY = divroVY + roDY*(mxav_store3(i) + mxav_store4(i)*molar_mass(ispec))
+           
+                   
               !! zero normal components of flux if required
-              if(znf_mdiff(j)) then
-                 lapYspec_tmp = grad2Yspec(j,2) + grad2Yspec(j,3) !! Transverse terms only
-                 divroVY = roMdiff(i,ispec)*lapYspec_tmp &
-                            + dot_product(gradYspec(i,2:3,ispec),gradroMdiff(i,2:3))
-                 roVY(1) = zero !! zero normal contribution on walls                                         
+              if(node_type(i).eq.0) then  !! Wall, add modified normal flux derivative to enforce roVY.n=0
 
-                 !! roDY and gradroDY - these are used for additional mixture averaged terms
-                 roDY = roMdiff(i,ispec)*Y_thisspec(i)
-                 gradroDY = roVY + Y_thisspec(i)*gradroMdiff(i,:)
-                 gradroDY(1) = zero
+                 roVY(i,1) = zero
+                 divroVY = divroVY + (16.0d0*roVY(i+1,1) - two*roVY(i+2,1))/(12.0d0*s(i)) 
+              else if(node_type(i).eq.1.or.node_type(i).eq.2) then !! Inflow or outflow
+                 if(znf_mdiff(j)) then
 
-                 !! Augment molecular diffusion terms to include mixture averaged driving forces 
-                 !! N.B. the final term added to divroVY violates the znf BC, so we omit it with negligible
-                 !! consequence.                
-                 roVY(2:3) = roVY(2:3) + roDY*(mxav_store1(i,2:3) + mxav_store2(i,2:3)*molar_mass(ispec))                      
-                 divroVY = divroVY + dot_product(gradroDY,mxav_store1(i,:)-mxav_store2(i,:)*molar_mass(ispec))! &
-                                   !+ roDY*(mxav_store3(i) + mxav_store4(i)*molar_mass(ispec))  
-              else
-                 lapYspec_tmp = grad2Yspec(j,1) + grad2Yspec(j,2) + grad2Yspec(j,3)
-                 divroVY = roMdiff(i,ispec)*lapYspec_tmp &                            
-                            + dot_product(gradYspec(i,:,ispec),gradroMdiff(i,:))               
-
-                 !! roDY and gradroDY - these are used for additional mixture averaged terms
-                 roDY = roMdiff(i,ispec)*Y_thisspec(i)
-                 gradroDY = roVY + Y_thisspec(i)*gradroMdiff(i,:)
-
-                 !! Augment molecular diffusion terms to include mixture averaged driving forces 
-                 roVY = roVY + roDY*(mxav_store1(i,:) + mxav_store2(i,:)*molar_mass(ispec))                      
-                 divroVY = divroVY + dot_product(gradroDY,mxav_store1(i,:)-mxav_store2(i,:)*molar_mass(ispec)) &
-                                   + roDY*(mxav_store3(i) + mxav_store4(i)*molar_mass(ispec))                            
-                                             
-              endif
-                                          
+                    !! Setting d(roVY.n)/dn = zero (as in Sutherland & Kennedy and others)
+                    !! Set roVY to zero, and don't add any d(roVY.n)/dn term
+                    roVY(i,1) = zero                    
+                 else
+       
+                    !! Add d(roVY.n)/dn term
+                    divroVY = divroVY + (-25.0d0*roVY(i,1)+48.0d0*roVY(i+1,1)-36.0d0*roVY(i+2,1) &
+                                         +16.0d0*roVY(i+3,1)-three*roVY(i+4,1))/(12.0d0*s(i)) !&
+                                      !+ roVY(i,1)/boundary radius of curvature...
+                 end if
+              end if
+                                         
               
               !! Sum roVY and div(roVY) over species
               speciessum_divroVY(i) = speciessum_divroVY(i) + divroVY
 
               !! sum of species of roVY  
-              speciessum_roVY(i,:) = speciessum_roVY(i,:) + roVY(:)      
+              speciessum_roVY(i,:) = speciessum_roVY(i,:) + roVY(i,:)      
 
 #ifndef isoT
               !! Evaluate enthalpy, cp and dcp/dT for species ispec
@@ -409,7 +449,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
               store_diff_E(i) = store_diff_E(i) + divroVY*enthalpy
           
               !! Add gradh(ispec).roVY for species ispec (gradh = cp*gradT)
-              store_diff_E(i) = store_diff_E(i) + cpispec*dot_product(roVY,gradT(i,:))
+              store_diff_E(i) = store_diff_E(i) + cpispec*dot_product(roVY(i,:),gradT(i,:))
 
               !! Add this species contribution to the mixture enthalpy
               speciessum_hY(i) = speciessum_hY(i) + enthalpy*Y_thisspec(i)
@@ -441,7 +481,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
      !! Deallocate any stores no longer required    
      deallocate(lapYspec,Y_thisspec)
      deallocate(gradroMdiff)     
-      
+     deallocate(roVY)
      deallocate(mxav_store1,mxav_store2,mxav_store3,mxav_store4)
 
      !! Run through species again and finalise rhs
@@ -489,7 +529,6 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
 segment_tend = omp_get_wtime()
 segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
           
-
      return
   end subroutine calc_rhs_Yspec    
 !! ------------------------------------------------------------------------------------------------
@@ -809,23 +848,28 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
            store_diff_E(i) = store_diff_E(i) + visc(i)*tmp_visc           
 
            !! Evaluate temperature Laplacian and zero parts as required
-           if(znf_tdiff(j)) then
-              lapT_tmp = grad2T(j,2) + grad2T(j,3)  !! No normal d2T/dn2
-              gradlambda(i,1) = zero                  !! dlambda/dn=0
-              if(node_type(i).eq.0)then
-                 !! On adiabatic walls, we can "impose flux directly", by first evaluating fluxes at nodes
-                 !! i+1 and i+2, then using these to evaluate d2T/dn2
+           lapT_tmp = grad2T(j,2) + grad2T(j,3)
+           if(node_type(i).eq.0) then
+              if(flag_wall_type.eq.0) then !! Adiabatic wall
                  q01 = (-25.0d0*T(i) + 48.0d0*T(i+1) - 36.0d0*T(i+2) + 16.0d0*T(i+3) - 3.0d0*T(i+4))/(12.0d0*s(i))
                  q02 = (T(i) - 8.0d0*T(i+1) + 8.0d0*T(i+3) - T(i+4))/(12.0d0*s(i))              
-                 lapT_tmp = (lapT_tmp + 16.0d0*q01 - two*q02)/(12.0d0*s(i))                          
-              endif              
-           else
-              lapT_tmp = lapT(i)
-           end if                    
+                 lapT_tmp = lapT_tmp + (16.0d0*q01 - two*q02)/(12.0d0*s(i))                  
+                 gradlambda(i,1) = zero
+              else   !! Isothermal wall
+                 lapT_tmp = lapT_tmp + grad2T(j,1)
+              end if            
+           else  !! Inflow/outflow
+               if(znf_tdiff(j))then
+                  gradlambda(i,1) = zero
+                  !! Don't add normal term
+               else
+                  !! Add normal term
+                  lapT_tmp = lapT_tmp + grad2T(j,1) 
+               endif
+           end if                     
            
            !! Add thermal diffusion term: div.(lambda*gradT)              
-           store_diff_E(i) = store_diff_E(i) + lambda_th(i)*lapT_tmp + dot_product(gradlambda(i,:),gradT(i,:))               
-                     
+           store_diff_E(i) = store_diff_E(i) + lambda_th(i)*lapT_tmp + dot_product(gradlambda(i,:),gradT(i,:))
            !! RHS (visc + cond + transverse + source)
            if(node_type(i).eq.0) then          
               !! u,v,w=0 on wall, so velocity gradients are also zero along wall. Only diffusion terms.

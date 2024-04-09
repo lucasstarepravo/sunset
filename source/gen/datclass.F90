@@ -228,8 +228,8 @@ case(7) !! Half-plane with bump
         end do
      end if
 
-     dxmin = dx0/1.0d0
-     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=2.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
+     dxmin = dx0/2.0d0
+     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=3.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
 !! ------------------------------------------------------------------------------------------------
 case(8) !! Arrays of cylinders for lean H2 flame dynamics tests
 
