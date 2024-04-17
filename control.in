@@ -4,13 +4,13 @@
 0.001d0
 
 !! Characteristic velocity scale (U_char)
-1.00d0
+1.0d0
 
 !! Start and end time (in multiples of L_char/Uchar)
-0.0d0 2.0d1
+0.0d0 1.0d2
 
 !! Output period (in multiples of L_char/U_char), stats output period
-1.0d-1 1.0d-3
+1.0d-2 1.0d-4
 
 !! Gravity vector (grav)
 0.0d0 0.0d0 0.0d0
@@ -43,7 +43,7 @@
 0
 
 !! Inflow velocity control parameters (profile, temporal control?, Ustart,Uend,ramp-time <- all dimensionless)
-1 0.2d0 0.2d0 1.0d1
+1 0.1d0 0.5d0 1.0d0
 
 !! WALLS: adiabatic(0) or isothermal (1)
 0 1.0d3
@@ -55,7 +55,7 @@
 3
 
 !! Flame position (x,y), dimensional thickness, and T_hot
--0.05d0 0.0d0 4.0d-4 2.366d3
+-0.03d0 0.0d0 4.0d-4 2.366d3
 
 !! Turbulent initial velocity field (0=no, 1=yes), dimensional length scale and dimensionless intensity
 0 2.0d-4 5.0d0

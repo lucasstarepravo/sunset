@@ -49,8 +49,8 @@ program datgen
   write(*,*) '  case 4:  Rayleigh-Taylor'
   write(*,*) '  case 5:  Simple flame tube'  
   write(*,*) '  case 6:  Hong Im style bluff body'    
-  write(*,*) '  case 7:  Porous geometry with inflow/outflow'
-  write(*,*) '  case 8:  Isometric cylinder array'      
+  write(*,*) '  case 7:  Half-plane with bump'
+  write(*,*) '  case 8:  Cylinder'      
   write(*,*) '  '
   write(*,*) 'Input test case number: '
   read(*,*) itest
@@ -84,7 +84,7 @@ program datgen
 
      yl=2.0d0*pi
      xl=yl
-     dx0=xl/64.0d0
+     dx0=yl/128.0d0
      xbcond_L=1;xbcond_U=1;ybcond_L=1;ybcond_U=1
      
      nb_patches = 4
@@ -95,7 +95,12 @@ program datgen
      b_node(2,:) = (/0.5d0*xl, -0.5d0*yl /)
      b_node(3,:) = (/0.5d0*xl, 0.5d0*yl /)
      b_node(4,:) = (/-0.5d0*xl, 0.5d0*yl /)
-     nb_blobs = 0;n_blob_coefs=0
+     nb_blobs = 0;n_blob_coefs=6
+!     allocate(blob_centre(nb_blobs,2),blob_coeffs(nb_blobs,n_blob_coefs),blob_rotation(nb_blobs))
+!     blob_centre(1,:)=(/-1.d0,0.d0/); !! Central
+!     do i=1,nb_blobs
+!        blob_coeffs(i,:)=(/1.0d0,0.0d0,0.0d0,0.0d0,0.0d0,0.0d0/);blob_rotation(i)=0.4d0
+!     end do     
 
      dxmin = dx0/1.0d0
      dx_wall=dxmin;dx_in=1.0d0*dx0;dx_out=dx_in;dx_wallio=dx_in  !! dx for solids and in/outs.
@@ -195,7 +200,7 @@ case(7) !! Half-plane with bump
 
      D_cyl = 1.0d0;h0 = 0.5d0*D_cyl  !! Cylinder diameter (unity)
      S_cyl = 1.0d0*D_cyl             !! Cylinder spacing (multiples of D_cyl)
-     xl = 40.0d0*D_cyl              !! Channel length
+     xl = 10.0d0*D_cyl              !! Channel length
      yl = 1.0d0*S_cyl                      !! Channel width 
      dx0 = D_cyl/50                  !! Baseline resolution
      xbcond_L=0;xbcond_U=0;ybcond_L=2;ybcond_U=2
@@ -229,13 +234,13 @@ case(7) !! Half-plane with bump
      end if
 
      dxmin = dx0/2.0d0
-     dx_wall=dxmin;dx_in=2.0d0*dx0;dx_out=1.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
+     dx_wall=dxmin;dx_in=3.5d0*dx0;dx_out=2.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
 !! ------------------------------------------------------------------------------------------------
 case(8) !! Arrays of cylinders for lean H2 flame dynamics tests
 
      D_cyl = 1.0d0;h0 = 0.5d0*D_cyl  !! Cylinder diameter (unity)
      S_cyl = 2.0d0*D_cyl             !! Cylinder spacing (multiples of D_cyl)
-     xl = 20.0d0*D_cyl              !! Channel length
+     xl = 10.0d0*D_cyl              !! Channel length
      yl = 1.0d0*S_cyl                      !! Channel width 
      dx0 = D_cyl/50                  !! Baseline resolution
      xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
@@ -278,8 +283,8 @@ case(8) !! Arrays of cylinders for lean H2 flame dynamics tests
      end if
 
 
-     dxmin = dx0/2.0d0
-     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=1.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
+     dxmin = dx0/1.0d0
+     dx_wall=dxmin;dx_in=4.0d0*dx0;dx_out=2.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
 !! ------------------------------------------------------------------------------------------------
 case(9) !! Channel with wall bump
 

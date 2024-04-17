@@ -93,6 +93,8 @@ contains
 #ifndef isoT
      !! Evaluate pressure gradient directly (LABFM...)
      call calc_gradient(p-p_ref,gradp) 
+
+
 #else
      !! Evaluate the pressure gradient (from density gradient
      !$omp parallel do
@@ -172,7 +174,6 @@ contains
         end do
         !$omp end parallel do 
      end if       
-     
 
      return
   end subroutine calc_rhs_ro
@@ -186,6 +187,7 @@ contains
      integer(ikind) :: i,j,ispec
      real(rkind),dimension(dims) :: gradroDY,body_force
      real(rkind) :: tmp_scal,tmpY,divroVY,enthalpy,dcpdT,cpispec,tmpro,tmpT,roDY
+     real(rkind) :: q00,q01,q02,q03,q04
      real(rkind),dimension(:,:),allocatable :: speciessum_roVY,speciessum_hgradY
      real(rkind),dimension(:),allocatable :: speciessum_divroVY,speciessum_hY
      real(rkind),dimension(:,:),allocatable :: gradroMdiff
@@ -375,7 +377,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
            call calc_grad2bound(Y_thisspec,grad2Yspec)      
    
            !$omp parallel do private(i,xn,yn,un,ut,dutdt,tmpY &
-           !$omp ,divroVY,enthalpy,tmpro,cpispec,dcpdT,tmp_scal,roDY,gradroDY)
+           !$omp ,divroVY,enthalpy,tmpro,cpispec,dcpdT,tmp_scal,roDY,gradroDY,q00,q01,q02,q03,q04)
            do j=1,nb
               i=boundary_list(j)
               tmpro = one/ro(i)  !! tmpro contains 1/ro
@@ -408,12 +410,23 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
               !! Add roDY*(grad(grad(lnT)+grad(lnro)-WgradP/roRT)) (NB. s3 and s4 contain transverse terms only)
               divroVY = divroVY + roDY*(mxav_store3(i) + mxav_store4(i)*molar_mass(ispec))
            
+              !! Up to this point, divroVY only contains transverse terms
                    
               !! zero normal components of flux if required
               if(node_type(i).eq.0) then  !! Wall, add modified normal flux derivative to enforce roVY.n=0
 
+                 q00 = Y_thisspec(i)
+                 q01 = Y_thisspec(i+1)
+                 q02 = Y_thisspec(i+2)
+                 q03 = Y_thisspec(i+3)
+                 q04 = Y_thisspec(i+4)
+                 
                  roVY(i,1) = zero
-                 divroVY = divroVY + (16.0d0*roVY(i+1,1) - two*roVY(i+2,1))/(12.0d0*s(i)) 
+                 divroVY = divroVY + roMdiff(i,ispec)* &
+                                   (-170.0d0*q00 + 216.0d0*q01 - 54.0d0*q02 + 8.0d0*q03)/ &
+                                   (36.0d0*s(i)*s(i)*L_char*L_char)
+                                                                        
+!! DEBUG: how do we add in the mixture averaged parts??!?!
               else if(node_type(i).eq.1.or.node_type(i).eq.2) then !! Inflow or outflow
                  if(znf_mdiff(j)) then
 
@@ -424,7 +437,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
        
                     !! Add d(roVY.n)/dn term
                     divroVY = divroVY + (-25.0d0*roVY(i,1)+48.0d0*roVY(i+1,1)-36.0d0*roVY(i+2,1) &
-                                         +16.0d0*roVY(i+3,1)-three*roVY(i+4,1))/(12.0d0*s(i)) !&
+                                         +16.0d0*roVY(i+3,1)-three*roVY(i+4,1))/(12.0d0*s(i)*L_char) !&
                                       !+ roVY(i,1)/boundary radius of curvature...
                  end if
               end if
@@ -742,6 +755,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
         !$omp end parallel do 
         deallocate(grad2uvec,grad2ucross)         
      end if
+              
          
      !! Deallocate any stores no longer required
      deallocate(lapu,lapv,lapw)
@@ -846,9 +860,13 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
            lapT_tmp = grad2T(j,2) + grad2T(j,3)
            if(node_type(i).eq.0) then
               if(flag_wall_type.eq.0) then !! Adiabatic wall
-                 q01 = (-25.0d0*T(i) + 48.0d0*T(i+1) - 36.0d0*T(i+2) + 16.0d0*T(i+3) - 3.0d0*T(i+4))/(12.0d0*s(i))
-                 q02 = (T(i) - 8.0d0*T(i+1) + 8.0d0*T(i+3) - T(i+4))/(12.0d0*s(i))              
-                 lapT_tmp = lapT_tmp + (16.0d0*q01 - two*q02)/(12.0d0*s(i))                  
+!                 q01 = (-25.0d0*T(i) + 48.0d0*T(i+1) - 36.0d0*T(i+2) + 16.0d0*T(i+3) - 3.0d0*T(i+4))/(12.0d0*s(i)*L_char)
+!                 q02 = (T(i) - 8.0d0*T(i+1) + 8.0d0*T(i+3) - T(i+4))/(12.0d0*s(i)*L_char)              
+!                 lapT_tmp = lapT_tmp + (16.0d0*q01 - two*q02)/(12.0d0*s(i)*L_char)   
+
+                 q01 = (-170.0d0*T(i) + 216.0d0*T(i+1) - 54.0d0*T(i+2) + 8.0d0*T(i+3))/(36.0d0*s(i)*s(i)*L_char*L_char)
+                 lapT_tmp = lapT_tmp + q01 
+
                  gradlambda(i,1) = zero
               else   !! Isothermal wall
                  lapT_tmp = lapT_tmp + grad2T(j,1)
@@ -862,6 +880,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
                   lapT_tmp = lapT_tmp + grad2T(j,1) 
                endif
            end if                     
+
            
            !! Add thermal diffusion term: div.(lambda*gradT)              
            store_diff_E(i) = store_diff_E(i) + lambda_th(i)*lapT_tmp + dot_product(gradlambda(i,:),gradT(i,:))
@@ -880,8 +899,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
         deallocate(grad2T)
      end if
      deallocate(gradcp)
-     deallocate(gradlambda)
-               
+     deallocate(gradlambda)                    
 #else
      rhs_roE(1:npfb) = zero
 #endif
@@ -996,10 +1014,7 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
                
      !! Filter density
      call calc_filtered_var(ro)
-     
-     !! Evaluate lengthscales
-!     call get_flow_lengthscale
-     
+          
      !! Filter velocity components
      call calc_filtered_var(rou)
      call calc_filtered_var(rov)
