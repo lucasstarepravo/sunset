@@ -200,7 +200,7 @@ case(7) !! Half-plane with bump
 
      D_cyl = 1.0d0;h0 = 0.5d0*D_cyl  !! Cylinder diameter (unity)
      S_cyl = 1.0d0*D_cyl             !! Cylinder spacing (multiples of D_cyl)
-     xl = 10.0d0*D_cyl              !! Channel length
+     xl = 20.0d0*D_cyl              !! Channel length
      yl = 1.0d0*S_cyl                      !! Channel width 
      dx0 = D_cyl/50                  !! Baseline resolution
      xbcond_L=0;xbcond_U=0;ybcond_L=2;ybcond_U=2
@@ -234,7 +234,7 @@ case(7) !! Half-plane with bump
      end if
 
      dxmin = dx0/2.0d0
-     dx_wall=dxmin;dx_in=3.5d0*dx0;dx_out=2.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
+     dx_wall=dxmin;dx_in=3.5d0*dx0;dx_out=1.5d0*dx0;dx_wallio=dx_in  !! dx for solids and in/outs...!!     
 !! ------------------------------------------------------------------------------------------------
 case(8) !! Arrays of cylinders for lean H2 flame dynamics tests
 
