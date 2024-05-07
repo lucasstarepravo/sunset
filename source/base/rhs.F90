@@ -860,9 +860,6 @@ segment_time_local(7) = segment_time_local(7) + segment_tend - segment_tstart
            lapT_tmp = grad2T(j,2) + grad2T(j,3)
            if(node_type(i).eq.0) then
               if(flag_wall_type.eq.0) then !! Adiabatic wall
-!                 q01 = (-25.0d0*T(i) + 48.0d0*T(i+1) - 36.0d0*T(i+2) + 16.0d0*T(i+3) - 3.0d0*T(i+4))/(12.0d0*s(i)*L_char)
-!                 q02 = (T(i) - 8.0d0*T(i+1) + 8.0d0*T(i+3) - T(i+4))/(12.0d0*s(i)*L_char)              
-!                 lapT_tmp = lapT_tmp + (16.0d0*q01 - two*q02)/(12.0d0*s(i)*L_char)   
 
                  q01 = (-170.0d0*T(i) + 216.0d0*T(i+1) - 54.0d0*T(i+2) + 8.0d0*T(i+3))/(36.0d0*s(i)*s(i)*L_char*L_char)
                  lapT_tmp = lapT_tmp + q01 

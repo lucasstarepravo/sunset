@@ -151,7 +151,7 @@ contains
            end do
         end if     
 #endif        
- 
+
         !! Copy remaining LHSs
         amaty = amatx;amatxx=amatx;amatxy=amatx;amatyy=amatx 
      
@@ -214,7 +214,7 @@ contains
 
 
 #if order>=7
-        if(node_type(i).eq.998.or.node_type(i).lt.0)then !! for rows 3 & 4, drop to 6th order
+        if(node_type(i).eq.998.or.node_type(i).lt.0)then !! for 1,2,3,4, drop to 6th order
            bvechyp(:)=zero;bvechyp(21)=one;bvechyp(23)=3.0d0;bvechyp(25)=3.0d0;bvechyp(27)=one
            hyp_scal = one/hh/hh/hh/hh/hh/hh
            i1=0;i2=0;nsize=nsizeG 
@@ -264,7 +264,7 @@ contains
            ij_w_grad(1,k,i) = dot_product(bvecx,gvec)/hh
            ij_w_grad(2,k,i) = dot_product(bvecy,gvec)/hh
            ij_w_lap(k,i) = dot_product(bvecxx+bvecyy,gvec)/hh/hh
-           ij_w_hyp(k,i) = dot_product(bvechyp,gvec)*hyp_scal
+           ij_w_hyp(k,i) = dot_product(bvechyp,gvec) !! Note the filter isn't re-scaled, by (1/h)**m
            
         end do             
         
@@ -276,10 +276,7 @@ contains
      
      !! Calculate node volumes - used for evaluating integral quantities in statistics routines
      call calc_node_volumes
-     
-     !! Calculate interpolants for boundary phantom nodes if this processor has boundaries
-     if(nb.ne.0) call calc_interp
-    
+         
      write(6,*) "iproc",iproc,"LABFM weights calculated"
     
      return
@@ -428,7 +425,7 @@ contains
      allocate(ijlink_tmp(nplink))
      do jj=1,nb
         i=boundary_list(jj)
-        if(node_type(i).eq.1.or.node_type(i).eq.2)then
+        if(node_type(i).eq.1.or.node_type(i).eq.2.or.node_type(i).eq.0)then
            kk = node_type(i)  !! Type of node i
            nsize = ij_count(i)   !! Copy ij_count to temporary storage        
            ijlink_tmp(1:nsize) = ij_link(1:nsize,i)  !! Copy ij_link to temporary array
@@ -463,67 +460,34 @@ contains
         !! Zero the operators
         ij_w_grad(:,:,i) = zero;ij_wb_grad2(:,:,jj) = zero;ij_w_hyp(:,i)=zero
         
-        !! Build new FD operators
-#ifdef wn3        
-        if(node_type(i).eq.1.or.node_type(i).eq.2) then !! inflow/outflows, 5 point stencils
-#else        
-        if(.true.)then
-#endif        
-           do k=1,ij_count(i)
-              j=ij_link(k,i)       
-              if(j.gt.npfb) cycle !! Eliminate halos and ghosts from search (entire FD stencil in one processor)
-              if(fd_parent(j).eq.i) then !! Only look for nodes with i as the fd_parent   
-              !! Normal derivatives
-              if(j.eq.i)              ij_w_grad(1,k,i) =  zero         !! FIRST DERIV
-              if(node_type(j).eq.-1)  ij_w_grad(1,k,i) =  4.0d0/dx
-              if(node_type(j).eq.-2)  ij_w_grad(1,k,i) = -3.0d0/dx
-              if(node_type(j).eq.-3)  ij_w_grad(1,k,i) =  fourthirds/dx              
-              if(node_type(j).eq.-4)  ij_w_grad(1,k,i) = -0.25d0/dx
+        !! Build new FD operators 
+        do k=1,ij_count(i)
+           j=ij_link(k,i)       
+           if(j.gt.npfb) cycle !! Eliminate halos and ghosts from search (entire FD stencil in one processor)
+           if(fd_parent(j).eq.i) then !! Only look for nodes with i as the fd_parent   
+           !! Normal derivatives
+           if(j.eq.i)              ij_w_grad(1,k,i) =  zero         !! FIRST DERIV
+           if(node_type(j).eq.-1)  ij_w_grad(1,k,i) =  4.0d0/dx
+           if(node_type(j).eq.-2)  ij_w_grad(1,k,i) = -3.0d0/dx
+           if(node_type(j).eq.-3)  ij_w_grad(1,k,i) =  fourthirds/dx              
+           if(node_type(j).eq.-4)  ij_w_grad(1,k,i) = -0.25d0/dx
 
-              if(j.eq.i)              ij_wb_grad2(1,k,jj) =  zero                  !! SECOND DERIV
-              if(node_type(j).eq.-1)  ij_wb_grad2(1,k,jj) = -104.0d0/12.0d0/dx2
-              if(node_type(j).eq.-2)  ij_wb_grad2(1,k,jj) =  114.0d0/12.0d0/dx2
-              if(node_type(j).eq.-3)  ij_wb_grad2(1,k,jj) = -56.0d0/12.0d0/dx2              
-              if(node_type(j).eq.-4)  ij_wb_grad2(1,k,jj) =  11.0d0/12.0d0/dx2
+           if(j.eq.i)              ij_wb_grad2(1,k,jj) =  zero                  !! SECOND DERIV
+           if(node_type(j).eq.-1)  ij_wb_grad2(1,k,jj) = -104.0d0/12.0d0/dx2
+           if(node_type(j).eq.-2)  ij_wb_grad2(1,k,jj) =  114.0d0/12.0d0/dx2
+           if(node_type(j).eq.-3)  ij_wb_grad2(1,k,jj) = -56.0d0/12.0d0/dx2              
+           if(node_type(j).eq.-4)  ij_wb_grad2(1,k,jj) =  11.0d0/12.0d0/dx2
               
-              !! Filter in boundary normal direction, but only for outflows.
-              if(node_type(i).eq.2) then  
-!                 if(j.eq.i)              ij_w_hyp(k,i) = -zero   !! 4th DERIV
-!                 if(node_type(j).eq.-1)  ij_w_hyp(k,i) =  4.0d0/dx4
-!                 if(node_type(j).eq.-2)  ij_w_hyp(k,i) = -6.0d0/dx4
-!                 if(node_type(j).eq.-3)  ij_w_hyp(k,i) =  4.0d0/dx4
-!                 if(node_type(j).eq.-4)  ij_w_hyp(k,i) = -one/dx4     !! made negative (need coeff -1)...   
-              end if
-              end if
-           end do
-        else  !! Walls
-           do k=1,ij_count(i)
-              j=ij_link(k,i)       
-              if(j.gt.npfb) cycle !! Eliminate halos and ghosts from search (entire FD stencil in one processor)
-              if(fd_parent(j).eq.i) then !! Only look for nodes with i as the fd_parent   
-              !! Normal derivatives
-              if(j.eq.i)              ij_w_grad(1,k,i) =  zero         !! FIRST DERIV
-              if(node_type(j).eq.-1)  ij_w_grad(1,k,i) =  4.0d0/dx
-              if(node_type(j).eq.-2)  ij_w_grad(1,k,i) = -3.0d0/dx   
-              if(node_type(j).eq.-3)  ij_w_grad(1,k,i) =  fourthirds/dx                                       
-
-              if(j.eq.i)              ij_wb_grad2(1,k,jj) =  zero                  !! SECOND DERIV
-              if(node_type(j).eq.-1)  ij_wb_grad2(1,k,jj) = -104.0d0/12.0d0/dx2
-              if(node_type(j).eq.-2)  ij_wb_grad2(1,k,jj) =  114.0d0/12.0d0/dx2
-              if(node_type(j).eq.-3)  ij_wb_grad2(1,k,jj) = -56.0d0/12.0d0/dx2              
-              end if
-           end do        
-           do k=1,ij_count(i)  !! Another loop to add interpolated bits
-              j=ij_link(k,i)
-              
-              !! Modify first derivatives          
-              ij_w_grad(1,k,i) = ij_w_grad(1,k,i) - quarter*ij_w_interp(3,k,jj)/dx                  
-              !! Modify second derivative
-              ij_wb_grad2(1,k,jj) = ij_wb_grad2(1,k,jj) + (11.0d0/12.0d0)*ij_w_interp(3,k,jj)/dx2                       
-           end do        
-        
-        
-        end if
+           !! Filter in boundary normal direction, but only for outflows.
+           if(node_type(i).eq.2) then  
+!              if(j.eq.i)              ij_w_hyp(k,i) = -zero   !! 4th DERIV
+!              if(node_type(j).eq.-1)  ij_w_hyp(k,i) =  4.0d0/dx4
+!              if(node_type(j).eq.-2)  ij_w_hyp(k,i) = -6.0d0/dx4
+!              if(node_type(j).eq.-3)  ij_w_hyp(k,i) =  4.0d0/dx4
+!              if(node_type(j).eq.-4)  ij_w_hyp(k,i) = -one/dx4     !! made negative (need coeff -1)...   
+           end if
+           end if
+        end do
      end do
 
 
@@ -531,42 +495,32 @@ contains
      do jj=1,nb   !! inefficient at the moment: loop all nodes, cycle those not in correct row...
         i=boundary_list(jj)+1
         dx = s(i)     
-        ij_w_grad(:,:,i) = zero   
-#ifdef wn3        
-        if(node_type(fd_parent(i)).eq.1.or.node_type(fd_parent(i)).eq.2) then !! inflow/outflow boundaries
-#else        
-        if(.true.)then
-#endif        
-           do k=1,ij_count(i)
-              j=ij_link(k,i)   
-              if(j.gt.npfb) cycle !! Eliminate halos and ghosts from search (entire FD stencil in one processor)              
-              !! Normal derivatives
-              if(j.eq.fd_parent(i))                                   ij_w_grad(1,k,i) = -0.25d0/dx     !! FIRST DERIV
-              if(j.eq.i)                                              ij_w_grad(1,k,i) =  zero
-              if(node_type(j).eq.-2.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) =  1.5d0/dx
-              if(node_type(j).eq.-3.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) = -half/dx              
-              if(node_type(j).eq.-4.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) =  one/12.0d0/dx                 
-           end do
-        else !! Wall boundaries
-           do k=1,ij_count(i)
-              j=ij_link(k,i)   
-              if(j.gt.npfb) cycle !! Eliminate halos and ghosts from search (entire FD stencil in one processor)              
-              !! Normal derivatives
-              if(j.eq.fd_parent(i))                                   ij_w_grad(1,k,i) = -0.25d0/dx     !! FIRST DERIV
-              if(j.eq.i)                                              ij_w_grad(1,k,i) =  zero
-              if(node_type(j).eq.-2.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) =  1.5d0/dx   
-              if(node_type(j).eq.-3.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) = -half/dx                                       
-           end do
-           do k=1,ij_count(i)  !! Another loop to add interpolated bits
-              j=ij_link(k,i)           
-              !! Modify first derivatives          
-              ij_w_grad(1,k,i) = ij_w_grad(1,k,i) + (one/12.0d0)*ij_w_interp(6,k,jj)/dx
-           end do
-        endif     
-     end do       
+        ij_w_grad(:,:,i) = zero!;ij_w_lap(:,i) = zero!;ij_w_hyp(:,i)=zero      
+        do k=1,ij_count(i)
+           j=ij_link(k,i)   
+           if(j.gt.npfb) cycle !! Eliminate halos and ghosts from search (entire FD stencil in one processor)              
+ 
+           if(j.eq.fd_parent(i))                                   ij_w_grad(1,k,i) = -0.25d0/dx     !! FIRST DERIV
+           if(j.eq.i)                                              ij_w_grad(1,k,i) =  zero
+           if(node_type(j).eq.-2.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) =  1.5d0/dx
+           if(node_type(j).eq.-3.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) = -half/dx              
+           if(node_type(j).eq.-4.and.fd_parent(j).eq.fd_parent(i)) ij_w_grad(1,k,i) =  one/12.0d0/dx       
 
-     !! All interpolation from i2 to i3 & i4 is now complete. Deallocate
-     deallocate(ij_w_interp)
+!           if(j.eq.fd_parent(i))                                   ij_w_lap(k,i) =  11.0d0/12.0d0/dx2     !! SECON DERIV
+!           if(j.eq.i)                                              ij_w_lap(k,i) =  zero
+!           if(node_type(j).eq.-2.and.fd_parent(j).eq.fd_parent(i)) ij_w_lap(k,i) =  6.0d0/12.0d0/dx2
+!           if(node_type(j).eq.-3.and.fd_parent(j).eq.fd_parent(i)) ij_w_lap(k,i) =  four/12.0d0/dx2              
+!           if(node_type(j).eq.-4.and.fd_parent(j).eq.fd_parent(i)) ij_w_lap(k,i) = -one/12.0d0/dx2       
+          
+           
+!           if(j.eq.fd_parent(i))                                   ij_w_hyp(k,i) = -one   !! 4th DERIV
+!           if(j.eq.i)                                              ij_w_hyp(k,i) =  zero
+!           if(node_type(j).eq.-2.and.fd_parent(j).eq.fd_parent(i)) ij_w_hyp(k,i) = -6.0d0
+!           if(node_type(j).eq.-3.and.fd_parent(j).eq.fd_parent(i)) ij_w_hyp(k,i) =  4.0d0
+!           if(node_type(j).eq.-4.and.fd_parent(j).eq.fd_parent(i)) ij_w_hyp(k,i) = -one    
+                     
+        end do 
+     end do       
 
 
      !! PART 2: Transverse derivatives (in X-Y plane) (one-dimensional LABFM, 6th order)   
@@ -670,6 +624,8 @@ contains
            grads = -atan(grads)
                    
            amatt=zero;bvect=zero;xvec = zero;gvec = zero
+           amatthyp=zero;bvecthyp=zero     
+           amattt=zero;bvectt=zero
            xt=-rnorm(i,2);yt=rnorm(i,1)  !! unit tangent vector
            xn=rnorm(i,1);yn=rnorm(i,2)  !! unit normal vector
            
@@ -702,10 +658,19 @@ contains
                  end do            
               end if        
            end do
+           amattt = amatt;amatthyp = amatt
 
            !! Solve system for transverse deriv   
            bvect(:)=zero;bvect(1)=one;i1=0;i2=0;nsize=nsizeG
-           call svd_solve(amatt,nsize,bvect)                                
+           call svd_solve(amatt,nsize,bvect)  
+           
+           !! Solve system for transverse 2nd deriv   
+           bvectt(:)=zero;bvectt(2)=one;i1=0;i2=0;nsize=nsizeG
+           call svd_solve(amattt,nsize,bvectt)           
+           
+           !! Solve system for transverse hyperviscous filter
+           bvecthyp(:)=zero;bvecthyp(4)=-s(i)**four;i1=0;i2=0;nsize=nsizeG
+           call svd_solve(amatthyp,nsize,bvecthyp)                                         
 
            do k=1,ij_count(i)
               j=ij_link(k,i)                   
@@ -723,8 +688,10 @@ contains
            
                  gvec(1:nsizeG) = abfs1D(x,ff1)
               
-                 !! Gradients weights
+                 !! Gradient and hyperviscous weights
                  ij_w_grad(2,k,i) = dot_product(bvect,gvec)
+!                 ij_w_lap(k,i) = ij_w_lap(k,i) + dot_product(bvectt,gvec) 
+!                 ij_w_hyp(k,i) = ij_w_hyp(k,i) + dot_product(bvecthyp,gvec)                                          
               
               end if    
            
@@ -802,274 +769,6 @@ contains
      write(6,*) "finished boundary weights"
      return
   end subroutine calc_boundary_weights  
-!! ------------------------------------------------------------------------------------------------  
-  subroutine calc_interp
-     !! Temporary routine to calculate interpolants for boundary derivatives
-     integer(ikind) :: i,j,k,ii,iii,k2,j2
-     real(rkind) :: rad,qq,x,y,xx,yy,xs,ys
-     real(rkind),dimension(dims) :: rij
-
-     !! Linear system to find ABF coefficients
-     real(rkind),dimension(:,:),allocatable :: amati2,amati3,amati4
-     real(rkind),dimension(:),allocatable :: gvec,xvec
-     real(rkind),dimension(:),allocatable :: bveci2,bveci3,bveci4
-     real(rkind),dimension(:),allocatable :: xveci,gveci
-     integer(ikind) :: i1,i2,nsize,nsizeG
-     real(rkind) :: ff1,hh
-     logical :: keepgoing
-     integer(ikind) :: counttmp0,counttmp1
-     integer(ikind),dimension(:),allocatable :: linktmp0,linktmp1
-
-     !! Allocation
-     allocate(linktmp0(nplink),linktmp1(nplink));linktmp0=0;linktmp1=0
-
-#ifdef wn3
-     !! Add neighbours of i2 to neighbour list of i0 and i1 for walls only
-     do ii=1,nb
-        i=boundary_list(ii)
-        if(node_type(i).eq.0) then !! Only for walls
-        
-        i2=i+2
-        i1=i+1
-
-        !! Temporary store for i0 count and link, and i1 count and link
-        counttmp0 = ij_count(i)
-        linktmp0(1:counttmp0) = ij_link(1:counttmp0,i)
-        counttmp1 = ij_count(i1)
-        linktmp1(1:counttmp1) = ij_link(1:counttmp1,i1)
-        
-
-        !! Loop over link list for i2        
-        do k2=1,ij_count(i2)
-           j2=ij_link(k2,i2)
-           
-           !! Shall we add it to the link list for i0?
-           keepgoing = .true.
-           k=0
-           do while(keepgoing)
-              k=k+1              
-              if(k.gt.counttmp0) then !! Reached end of list, add it
-                 ij_count(i) = ij_count(i) + 1
-                 ij_link(ij_count(i),i) = j2
-                 keepgoing = .false.              
-              else
-                 j = linktmp0(k)
-                 if(j.eq.j2) then  !! Already in the list, don't add it
-                    keepgoing = .false.
-                 endif
-              endif
-           end do
-           
-           !! Shall we add it to the link list for i1?
-           keepgoing = .true.
-           k=0
-           do while(keepgoing)
-              k=k+1              
-              if(k.gt.counttmp1) then !! Reached end of list, add it
-                 ij_count(i1) = ij_count(i1) + 1
-                 ij_link(ij_count(i1),i1) = j2
-                 keepgoing = .false.              
-              else
-                 j = linktmp1(k)
-                 if(j.eq.j2) then  !! Already in the list, don't add it
-                    keepgoing = .false.
-                 endif
-              endif
-           end do           
-             
-        end do 
-        end if
-     end do
-#endif
-
-
-     !! Set desired order::
-#if order==2
-     k=2
-#elif order==3
-     k=3
-#elif order==4
-     k=4
-#elif order==5
-     k=5
-#elif order==6
-     k=6
-#elif order==7
-     k=7
-#elif order==8
-     k=8
-#elif order==9
-     k=9
-#elif order==10
-     k=10
-#elif order==12
-     k=12     
-#endif
-     nsizeG=(k*k+3*k)/2   !!  5,9,14,20,27,35,44... for k=2,3,4,5,6,7,8...
-     nsize_large = nsizeG
-     
-     !! Left hand sides and arrays for interparticle weights 
-     allocate(ij_w_interp(6,nplink,nb));ij_w_interp=zero
-     allocate(amati2(nsizeG+1,nsizeG+1),amati3(nsizeG+1,nsizeG+1),amati4(nsizeG+1,nsizeG+1))
-     amati2=zero;amati3=zero;amati4=zero
-     allocate(xveci(nsizeG+1),gveci(nsizeG+1))
-     allocate(bveci2(nsizeG+1),bveci3(nsizeG+1),bveci4(nsizeG+1))
-           
-     !! Right hand sides, vectors of monomials and ABFs
-     allocate(gvec(nsizeG),xvec(nsizeG));gvec=zero;xvec=zero
-
-     !$OMP PARALLEL DO PRIVATE(i,nsize,k,j,rij,rad,qq,x,y,xx,yy, &
-     !$OMP ff1,gvec,xvec,i1,i2,hh,amati2,amati3,amati4 &
-     !$OMP ,bveci2,bveci3,bveci4,xveci,gveci)
-     do ii=1,nb
-        i=boundary_list(ii)  !! Index of boundary node
-        nsize = nsizeG
-        amati2=zero;amati3=zero;amati4=zero
-        hh=h(i)
-        do k=1,ij_count(i)
-           j = ij_link(k,i) 
-           rij(:) = rp(i,:) - rp(j,:) + two*s(i)*rnorm(i,:)
-           x = -rij(1);y = -rij(2)
-           
-           !! Different types of ABF need different arguments (xx,yy)
-           !! to account for domain of orthogonality
-           rad = sqrt(x*x + y*y)/hh;qq=rad
-#if ABF==1   
-           ff1 = fac(qq)/hh
-           xx=x;yy=y        !! "Original"
-#elif ABF==2     
-           ff1 = Wab(qq)
-           xx=x/hh;yy=y/hh    !! Hermite   
-#elif ABF==3
-           ff1 = Wab(qq)
-           xx=x/hh/ss;yy=y/hh/ss  !! Legendre
-#endif    
-
-           !! Populate the ABF array
-           gvec(1:nsizeG) = abfs(rad,xx,yy,ff1)
-           
-           !! Populate the monomials array
-           xvec(1:nsizeG) = monomials(x/hh,y/hh)
-
-           !! Build the LHS - it is the same for all three operators
-           gveci(1) = ff1;gveci(2:nsizeG+1) = gvec(1:nsizeG)
-           xveci(1) = one;xveci(2:nsizeG+1) = xvec(1:nsizeG)
-           do i1=1,nsize+1
-              amati2(i1,:) = amati2(i1,:) + xveci(i1)*gveci(:)
-           end do        
-
-        end do   
-                  
-        !! Drop to 4th order
-#if order>=5              
-        do i1=1,nsizeG+1   !! 2nd gen interpolation
-           amati2(i1,16:nsizeG+1)=zero        
-        end do
-        do i1=16,nsizeG+1
-           amati2(i1,1:nsizeG+1)=zero
-           amati2(i1,i1)=one
-        end do
-#endif        
- 
-        !! Copy LHS 
-        amati3 = amati2
-        amati4 = amati2
-        
-        !! 2nd gen interpolation
-        bveci2=zero
-        bveci2(1) = one
-        bveci3=bveci2
-        x = rnorm(i,1)*s(i);y=rnorm(i,2)*s(i)
-        xx = x/hh;yy=y/hh
-        bveci3(2) = xx;bveci3(3)=yy
-        bveci3(4) = half*xx*xx;bveci3(5)=xx*yy;bveci3(6)=yy*yy
-        bveci3(7) = (one/6.0d0)*xx*xx*xx;bveci3(8)=half*xx*xx*yy;bveci3(9)=half*xx*yy*yy;bveci3(10)=(one/6.0d0)*yy*yy*yy
-        bveci3(11)=(one/24.0d0)*xx*xx*xx*xx;bveci3(12)=(one/6.0d0)*xx*xx*xx*yy;bveci3(13)=quarter*xx*xx*yy*yy
-        bveci3(14)=(one/6.0d0)*xx*yy*yy*yy;bveci3(15)=(one/24.0d0)*yy*yy*yy*yy
-        xx = two*xx;yy=two*yy
-        bveci4=bveci2
-        bveci4(2) = xx;bveci4(3)=yy
-        bveci4(4) = half*xx*xx;bveci4(5)=xx*yy;bveci4(6)=yy*yy
-        bveci4(7) = (one/6.0d0)*xx*xx*xx;bveci4(8)=half*xx*xx*yy;bveci4(9)=half*xx*yy*yy;bveci4(10)=(one/6.0d0)*yy*yy*yy
-        bveci4(11)=(one/24.0d0)*xx*xx*xx*xx;bveci4(12)=(one/6.0d0)*xx*xx*xx*yy;bveci4(13)=quarter*xx*xx*yy*yy
-        bveci4(14)=(one/6.0d0)*xx*yy*yy*yy;bveci4(15)=(one/24.0d0)*yy*yy*yy*yy 
-
-
-        i1=0;i2=0;nsize=nsizeG+1
-        call svd_solve(amati2,nsize,bveci2)        
- 
-        i1=0;i2=0;nsize=nsizeG+1
-        call svd_solve(amati3,nsize,bveci3)        
-
-        i1=0;i2=0;nsize=nsizeG+1
-        call svd_solve(amati4,nsize,bveci4)        
-
-        !! Another loop of neighbours to calculate interparticle weights for interpolation i0 to i3 and i4
-        do k=1,ij_count(i)  !! Note, we're looping over neighbours of i0
-           j = ij_link(k,i) 
-           rij(:) = rp(i,:) - rp(j,:) + two*s(i)*rnorm(i,:)
-           x=-rij(1);y=-rij(2)
-
-           !! Calculate arguments (diff ABFs need args over diff ranges)
-           !! N.B. args for ABFs are adjusted to be centred at stencil centre (not node i)
-           rad = sqrt(x*x + y*y)/hh;qq=rad
-#if ABF==1   
-           ff1 = fac(qq)/hh
-           xx=x;yy=y
-#elif ABF==2     
-           ff1 = Wab(qq)
-           xx=x/hh;yy=y/hh    !! Hermite   
-#elif ABF==3
-           ff1 = Wab(qq)
-           xx=x/hh/ss;yy=y/hh/ss  !! Legendre
-#endif           
-           !! Populate the ABF array        
-           gvec(1:nsizeG) = abfs(rad,xx,yy,ff1)
-
-           !! Weights for interpolation          
-           gveci(1) = ff1;gveci(2:nsizeG+1) = gvec(1:nsizeG)
-           ij_w_interp(1,k,ii) = dot_product(bveci2,gveci)
-           ij_w_interp(2,k,ii) = dot_product(bveci3,gveci)                      
-           ij_w_interp(3,k,ii) = dot_product(bveci4,gveci)                                                                  
-                   
-        end do          
-        !! Another loop of neighbours to calculate interparticle weights for interpolation i1 to i3 and i4
-        do k=1,ij_count(i+1) !! Note we're looping over neighbours of i1
-           j = ij_link(k,i+1) 
-           rij(:) = rp(i,:) - rp(j,:) + two*s(i)*rnorm(i,:)
-           x=-rij(1);y=-rij(2)
-
-           !! Calculate arguments (diff ABFs need args over diff ranges)
-           !! N.B. args for ABFs are adjusted to be centred at stencil centre (not node i)
-           rad = sqrt(x*x + y*y)/hh;qq=rad
-#if ABF==1   
-           ff1 = fac(qq)/hh
-           xx=x;yy=y
-#elif ABF==2     
-           ff1 = Wab(qq)
-           xx=x/hh;yy=y/hh    !! Hermite   
-#elif ABF==3
-           ff1 = Wab(qq)
-           xx=x/hh/ss;yy=y/hh/ss  !! Legendre
-#endif           
-           !! Populate the ABF array        
-           gvec(1:nsizeG) = abfs(rad,xx,yy,ff1)
-
-           !! Weights for interpolation
-           gveci(1) = ff1;gveci(2:nsizeG+1) = gvec(1:nsizeG)
-           ij_w_interp(4,k,ii) = dot_product(bveci2,gveci)
-           ij_w_interp(5,k,ii) = dot_product(bveci3,gveci)                      
-           ij_w_interp(6,k,ii) = dot_product(bveci4,gveci) 
-         
-        end do                   
-        
-     end do
-     !$OMP END PARALLEL DO
-     deallocate(gvec,xvec)   
-     deallocate(bveci2,bveci3,bveci4,gveci,xveci,amati2,amati3,amati4)
-
-     return
-  end subroutine calc_interp  
 !! ------------------------------------------------------------------------------------------------
   function monomials1D(z) result(cxvec)
      real(rkind),intent(in) :: z
@@ -1479,8 +1178,9 @@ write(6,*) i,i1,"stopping because of max reduction limit",ii
               if(node_type(i).eq.-3) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half
               if(node_type(i).eq.-4.or.node_type(i).eq.998) filter_coeff(i) = filter_coeff(i)*oosqrt2!*half 
            end if
-        end if
 
+        end if
+                
      end do
      !$omp end parallel do
 

@@ -61,7 +61,7 @@
 1         !! Number of products
 2 1.0d0   !! Identity of products, and molar stoichiometric coefficients
 2.7500d+07  0.0000d+00  1.0000d+08 !! The three coefficients which give the rate constant
-0         !! Include gibbs-based backwards rate (1) or not (0)
+0         !! Include Gibbs-based backwards rate (1) or not (0)
 0         !! Include Lindeman form (1) or not (0)
 0         !! Third bodies?
 

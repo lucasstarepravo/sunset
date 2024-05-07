@@ -165,28 +165,11 @@ contains
         h(ii) = dummy*hovs
         s(ii) = dummy
         node_type(ii) = jj
-        if(jj.eq.0) then !! If it is a wall boundary node
+        if(jj.eq.0.or.jj.eq.1.or.jj.eq.2) then !! If it is a wall boundary node
            h(ii) = s(ii)*hovs_bound        
            k = ii !! k is the index of the parent node
            nb = nb + 1           
-#ifdef wn3
-           do j=1,3
-#else
            do j=1,4  !! Make additional nodes  !!NEWBC
-#endif
-              ii = ii + 1
-              rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
-              rnorm(ii,:)=rnorm(k,:)          !! Copy normals
-              h(ii)=h(k);s(ii)=s(k)          !! length-scales
-              node_type(ii) = -j           !! and node type
-              fd_parent(ii) = k            !! and lineage
-              npfb = npfb + 1           
-           end do
-        else if(jj.eq.1.or.jj.eq.2) then !! If it is an io boundary node
-           h(ii) = s(ii)*hovs_bound        
-           k = ii !! k is the index of the parent node
-           nb = nb + 1           
-           do j=1,4  !! Make 4 additional nodes  !!NEWBC
               ii = ii + 1
               rp(ii,:) = rp(k,:) + rnorm(k,:)*dble(j)*s(k)   !! Moving along an FD stencil
               rnorm(ii,:)=rnorm(k,:)          !! Copy normals
@@ -196,7 +179,6 @@ contains
               npfb = npfb + 1           
            end do
         end if
-
 
      end do
 

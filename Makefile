@@ -12,7 +12,6 @@
 # flout      Output the flame structure (1) or don't (0)                               (default: 0)
 # allout     If 3D, output the entire domain (1) or just a slice (0)                   (default: 1)
 # morder     m (order) value = 4,6,8,10                                                (default: 8)
-# wn3        Smaller (w+3) stencils on wall boundaries (1) or not (0)                  (default: 0)
 # -------------------------------------------------------------------------------------------------
 #
 # EXAMPLE USAGE:
@@ -64,10 +63,6 @@ ifeq ($(thermo), 0)
 ifeq ($(react), 0)
 FFLAGS += -DisoT
 endif
-endif
-
-ifeq ($(wn3),1)
-FFLAGS += -Dwn3
 endif
 
 # Reacting? set react if so
