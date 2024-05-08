@@ -10,7 +10,7 @@
 0.0d0 1.0d0
 
 !! Output period (in multiples of L_char/U_char), stats output period
-1.0d-4 1.0d-4
+1.0d-3 1.0d-4
 
 !! Gravity vector (grav)
 0.0d0 0.0d0 0.0d0
@@ -55,7 +55,7 @@
 1
 
 !! Flame position (x,y), dimensional thickness, and T_hot
-10.02d0 0.0d0 1.0d-4 2.366d3
+0.0d0 0.0d0 4.0d-4 2.366d3
 
 !! Turbulent initial velocity field (0=no, 1=yes), dimensional length scale and dimensionless intensity
 0 2.0d-4 5.0d0

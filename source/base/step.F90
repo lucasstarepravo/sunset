@@ -30,6 +30,8 @@ module step
   !! Error norms for RK3(2)4S[2R+]C scheme
   real(rkind) :: enrm_ro,enrm_rou,enrm_rov,enrm_E,enrm_row
   real(rkind),dimension(nspec_max) :: enrm_Yspec
+  real(rkind), parameter :: outflow_error_scaling=1.0d0 !! Scaling factor for errors on in/out flows
+
 
 contains
 !! ------------------------------------------------------------------------------------------------  
@@ -221,7 +223,7 @@ contains
      !! Register 3 is rhs_ro,rhs_rou,rhs_rov (only used for RHS)
      !! Register 4 is e_acc_ro,e_acc_rou,e_acc_rov - error accumulator
      integer(ikind) :: i,k,ispec
-     real(rkind) :: time0,emax_Y,outflow_error_scaling
+     real(rkind) :: time0,emax_Y
      real(rkind),dimension(:),allocatable :: rou_reg1,rov_reg1,row_reg1,ro_reg1,roE_reg1
      real(rkind),dimension(:),allocatable :: e_acc_ro,e_acc_rou,e_acc_rov,e_acc_E,e_acc_row
      real(rkind),dimension(:,:),allocatable :: Yspec_reg1,e_acc_Yspec
@@ -231,9 +233,7 @@ contains
      !! Push the max error storage back one
      emax_nm1 = emax_n;emax_n=emax_np1
      
-     !! Scaling parameter for outflows
-     outflow_error_scaling=1.0d1
-     
+    
      !! Set RKa,RKb,RKbmbh with dt (avoids multiplying by dt on per-node basis)
      RKa(:) = dt*rk3_4s_2r_a(:)
      RKb(:) = dt*rk3_4s_2r_b(:)
@@ -488,8 +488,8 @@ contains
         
         !! Acoustic:: s/(u+c)
         !! Slightly reduce on outflows for stability
-        if(node_type(i).eq.2) then
-           dt_cfl = min(dt_cfl,0.8d0*s(i)/uplusc)
+        if(node_type(i).eq.2.or.node_type(i).eq.1) then
+           dt_cfl = min(dt_cfl,0.5d0*s(i)/uplusc)
         else
            dt_cfl = min(dt_cfl,s(i)/uplusc)
         endif

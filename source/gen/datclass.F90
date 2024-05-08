@@ -134,7 +134,7 @@ case(4) !! Rayleigh-Taylor geometry
 !! ------------------------------------------------------------------------------------------------
 case(5) !! Inflow/outflow tube for simple flames
 
-     yl=0.025d0!0.0125d0  ! channel width
+     yl=0.03d0!0.0125d0  ! channel width
      xl=1.0d0 ! channel length
      dx0=xl/500.0       !15
      xbcond_L=0;xbcond_U=0;ybcond_L=1;ybcond_U=1
