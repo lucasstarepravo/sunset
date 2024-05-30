@@ -85,7 +85,7 @@ contains
      !! Set the domain lengths
      L_domain_x = (xmax - xmin)*L_char
      L_domain_y = (ymax - ymin)*L_char
-     L_domain_z = L_domain_y/four
+     L_domain_z = L_domain_y!/four
 
      
      read(13,*) xbcond_L,xbcond_U,ybcond_L,ybcond_U

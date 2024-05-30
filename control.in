@@ -1,7 +1,7 @@
 !! This is the control file for sunset code
 
 !! Characteristic length-scale (L_char)
-0.005d0
+0.01d0
 
 !! Characteristic velocity scale (U_char)
 0.39d0
@@ -55,7 +55,7 @@
 1
 
 !! Flame position (x,y), dimensional thickness, and T_hot
-0.0d0 0.0d0 4.0d-4 2.366d3
+-0.0d0 0.0d0 4.0d-4 2.366d3
 
 !! Turbulent initial velocity field (0=no, 1=yes), dimensional length scale and dimensionless intensity
 0 2.0d-4 5.0d0
