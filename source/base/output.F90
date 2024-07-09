@@ -439,7 +439,7 @@ contains
 #ifdef dim3
          write(20,*) ro(i),u(i),v(i),w(i),tmpVort,tmpT,p(i)-p_ref,alpha_out(i),rateYspec(i,1:nspec)     
 #else
-         write(20,*) ro(i),u(i),v(i),tmpVort,tmpT,p(i)-p_ref,alpha_out(i),rateYspec(i,1:nspec)
+         write(20,*) tmpT,alpha_out(i),Yspec(i,1:nspec),rateYspec(i,1:nspec)
 #endif
       end do
 
