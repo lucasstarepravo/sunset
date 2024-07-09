@@ -327,6 +327,162 @@ contains
      return
   end subroutine output_layer
 !! ------------------------------------------------------------------------------------------------  
+  subroutine output_layer_lucas(n_out)
+   !! Little subroutine to write out field variables. 
+   !! Can be converted to vtk and read into paraview.
+   use derivatives
+   integer(ikind),intent(in) :: n_out
+   integer(ikind) :: i,j,k,np_out_local,dimsout,nspec_out,nprocsout,iflag,ispec
+   character(70) :: fname,tarcom
+   real(rkind),dimension(:),allocatable :: vort,testout
+   real(rkind),dimension(:,:),allocatable :: testoutv
+   real(rkind) :: tmpT,xn,yn,tmpro,tmpVort
+
+   !! Only output from the first sheet
+#ifdef allout
+   nprocsout = nprocsX*nprocsY*nprocsZ   
+#else
+   if(iprocZ.eq.0)then     
+      nprocsout = nprocsX*nprocsY
+#endif
+
+      !! Calculate the vorticity 
+      allocate(gradu(npfb,dims),gradv(npfb,dims),gradw(npfb,dims));gradw=zero
+      allocate(vort(npfb))
+
+      call calc_gradient(u,gradu)
+      call calc_gradient(v,gradv)
+#ifdef dim3
+      call calc_gradient(w,gradw)
+#endif     
+      !$omp parallel do 
+      do i=1,npfb
+#ifdef dim3
+         vort(i) = (gradw(i,2) - gradv(i,3))**two &
+                 + (gradu(i,3) - gradw(i,1))**two &
+                 + (gradv(i,1) - gradu(i,2))**two  !! Vorticity magnitude if 3D
+         vort(i) = sqrt(vort(i))
+#else     
+         vort(i) = gradv(i,1) - gradu(i,2)
+#endif        
+      end do
+      !$omp end parallel do
+    
+      if(nb.ne.0)then
+         do j=1,nb  !! On WALL boundaries, vorticity requires some rotation...
+            i=boundary_list(j)
+            if(node_type(i).eq.0)then
+               xn = rnorm(i,1);yn = rnorm(i,2)
+#ifdef dim3           
+               vort(i) = (gradw(i,2) - (xn*gradv(i,3)-yn*gradu(i,3)))**two &
+                       + ((xn*gradu(i,3)+yn*gradv(i,3)) - gradw(i,1))**two &
+                       + (xn*gradv(i,1)-yn*gradu(i,1)-xn*gradu(i,2)-yn*gradv(i,2))**two
+               vort(i) = sqrt(vort(i))                      
+#else
+               vort(i) = xn*(gradv(i,1)-gradu(i,2)) - yn*(gradu(i,1) + gradv(i,2))
+#endif
+            end if
+         end do
+      end if     
+      deallocate(gradu,gradv,gradw)     
+        
+      !! set the name of the file...
+      !! first number is processor number, second is dump number (allowed up to 9999 processors)
+#ifdef mp
+      k=10000+iproc
+#else
+      k=10000
+#endif     
+      if( n_out .lt. 10 ) then 
+         write(fname,'(A18,I5,A1,I1)') './lucas_f/source/fields_',k,'_',n_out        
+      else if( n_out .lt. 100 ) then 
+         write(fname,'(A18,I5,A1,I2)') './lucas_f/source/fields_',k,'_',n_out        
+      else if( n_out .lt. 1000 ) then
+         write(fname,'(A18,I5,A1,I3)') './lucas_f/source/fields_',k,'_',n_out        
+      else
+         write(fname,'(A18,I5,A1,I4)') './lucas_f/source/fields_',k,'_',n_out        
+      end if 
+   
+      !! Local number nodes output
+#ifdef allout        
+      np_out_local = npfb
+#else
+      np_out_local = npfb_layer
+#endif
+      
+      !! Number of species out
+!        nspec_out = 1
+      nspec_out = nspec          
+      
+      !! Write the main dump files and write a header
+      open(unit = 20,file=fname)  
+      write(20,*) "!! FIELDS FILE HEADER !!"
+      write(20,*) np_out_local
+      write(20,*) emax_np1,emax_n,emax_nm1,dt
+      write(20,*) eflow_nm1,sum_eflow,driving_force
+      write(20,*) "!! END HEADER !!"
+             
+      do i=1,np_out_local
+         tmpro = one/ro(i) !! Store inverse of density
+#ifndef isoT
+         tmpT = T(i)
+#else
+         tmpT = zero
+#endif           
+
+         !! Pass something to tmpVort (we use vorticity to output other things sometimes during debugging...)
+         tmpVort = vort(i)
+              
+         !! Pass heat release rate to alpha_out?
+         alpha_out(i) = hrr(i)
+
+#ifdef dim3
+         write(20,*) ro(i),u(i),v(i),w(i),tmpVort,tmpT,p(i)-p_ref,alpha_out(i),rateYspec(1,1)     
+#else
+         write(20,*) ro(i),u(i),v(i),tmpVort,tmpT,p(i)-p_ref,alpha_out(i),rateYspec(1,1)
+#endif
+      end do
+
+      flush(20)
+      close(20)
+      if(allocated(vort)) deallocate(vort)    
+             
+      !! Also output the nodes/discretisation if it is output #1
+      if(n_out.eq.1) call output_nodes(np_out_local)                       
+#ifndef allout                   
+   end if
+#endif     
+
+   !! Write the time,dump number and # nodes to file
+#ifdef dim3
+   dimsout = 3
+#else
+   dimsout = 2
+#endif    
+#ifdef mp  
+!     call MPI_ALLREDUCE(np_out_local,np_global,1,MPI_INT,MPI_SUM,MPI_COMM_WORLD,ierror)     
+   if(iproc.eq.0) then 
+      write(21,*) time,dimsout,npfb_global,n_out,nprocsout,nspec_out
+      flush(21)
+   end if
+#else
+   write(21,*) time,dimsout,npfb,n_out,1,nspec_out
+   flush(21)
+#endif     
+
+#ifdef tarout
+   !! Compress fields files
+   if(iproc.eq.0) then
+
+   end if
+#ifdef mp         
+   call MPI_BARRIER( MPI_COMM_WORLD, ierror)                            
+#endif       
+#endif 
+   
+   return
+end subroutine output_layer_lucas
+!! ------------------------------------------------------------------------------------------------  
   subroutine output_nodes(np_out_local)
      !! Little subroutine to write out discretisation variables
      !! Can be converted to vtk and read into paraview.

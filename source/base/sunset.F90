@@ -84,6 +84,7 @@ program sunset
 !     if(itime.eq.0.or.mod(itime,100).eq.0)then
         n_out = n_out + 1
         call output_layer(n_out)        
+        call output_layer_lucas(n_out)
         call output_laminar_flame_structure(n_out)
      end if     
 
