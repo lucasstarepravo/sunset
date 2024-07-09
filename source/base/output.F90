@@ -394,13 +394,13 @@ contains
       k=10000
 #endif     
       if( n_out .lt. 10 ) then 
-         write(fname,'(A18,I5,A1,I1)') './lucas_f/source/fields_',k,'_',n_out        
+         write(fname,'(A24,I5,A1,I1)') './lucas_f/source/fields_',k,'_',n_out        
       else if( n_out .lt. 100 ) then 
-         write(fname,'(A18,I5,A1,I2)') './lucas_f/source/fields_',k,'_',n_out        
+         write(fname,'(A24,I5,A1,I2)') './lucas_f/source/fields_',k,'_',n_out        
       else if( n_out .lt. 1000 ) then
-         write(fname,'(A18,I5,A1,I3)') './lucas_f/source/fields_',k,'_',n_out        
+         write(fname,'(A24,I5,A1,I3)') './lucas_f/source/fields_',k,'_',n_out        
       else
-         write(fname,'(A18,I5,A1,I4)') './lucas_f/source/fields_',k,'_',n_out        
+         write(fname,'(A24,I5,A1,I4)') './lucas_f/source/fields_',k,'_',n_out        
       end if 
    
       !! Local number nodes output
@@ -437,9 +437,9 @@ contains
          alpha_out(i) = hrr(i)
 
 #ifdef dim3
-         write(20,*) ro(i),u(i),v(i),w(i),tmpVort,tmpT,p(i)-p_ref,alpha_out(i),rateYspec(1,1)     
+         write(20,*) ro(i),u(i),v(i),w(i),tmpVort,tmpT,p(i)-p_ref,alpha_out(i),rateYspec(i,1:nspec)     
 #else
-         write(20,*) ro(i),u(i),v(i),tmpVort,tmpT,p(i)-p_ref,alpha_out(i),rateYspec(1,1)
+         write(20,*) ro(i),u(i),v(i),tmpVort,tmpT,p(i)-p_ref,alpha_out(i),rateYspec(i,1:nspec)
 #endif
       end do
 
