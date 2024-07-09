@@ -171,6 +171,6 @@ module common_vars
   integer(ikind),dimension(:),allocatable :: nhalo_FB,inhalo_FB
   integer(ikind),dimension(:),allocatable :: nrecstart  !! Indexing for halos
   
-  
+  real(rkind),dimension(:,:),allocatable :: rateYspec ! Lucas
           
 end module common_vars

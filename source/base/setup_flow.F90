@@ -35,7 +35,7 @@ contains
      
      !! Allocate arrays for properties - primary
      allocate(rou(np),rov(np),row(np),ro(np),roE(np),divvel(np))
-     allocate(Yspec(np,nspec))
+     allocate(Yspec(np,nspec));allocate(rateYspec(npfb,nspec))
      rou=zero;rov=zero;row=zero;ro=one;roE=one;Yspec=one;divvel=zero
 
      !! Secondary properties

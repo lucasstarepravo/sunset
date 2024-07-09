@@ -148,4 +148,5 @@ clean:
 	rm -vf ./data_out/statistics/*.out
 	rm -vf ./paraview_files/LAYER*
 	rm -vf ./data_out/*.tar.gz
+	rm -vf ./lucas_f/source/fields*
 

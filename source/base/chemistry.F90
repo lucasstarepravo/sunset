@@ -33,12 +33,12 @@ contains
      real(rkind) :: mass_production_rate,arrhenius_rate0,arrhenius_rate
      real(rkind) :: p_reduced,net_rate,logroYovW,enthalpy,heat_release
      real(rkind) :: delta_nu_local,nu_ddash_local
-     real(rkind),dimension(:,:),allocatable :: rateYspec,gibbs
+     real(rkind),dimension(:,:),allocatable :: gibbs
      real(rkind),dimension(:),allocatable :: rate,third_body_conc,backward_rate
          
      segment_tstart = omp_get_wtime()                  
      
-     allocate(rateYspec(npfb,nspec));rateYspec = zero
+     rateYspec = zero
      allocate(rate(npfb));rate=zero
      allocate(third_body_conc(npfb));third_body_conc=one
      allocate(backward_rate(npfb));backward_rate = zero        
@@ -272,7 +272,7 @@ contains
      
      !! De-allocation of arrays
      if(num_gibbs_species.ne.0) deallocate(gibbs)
-     deallocate(rateYspec,rate,backward_rate,third_body_conc)
+     deallocate(rate,backward_rate,third_body_conc)
   
      !! Profiling
      segment_tend = omp_get_wtime()
