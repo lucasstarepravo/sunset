@@ -438,8 +438,24 @@ contains
 
 #ifdef dim3
          write(20,*) ro(i),u(i),v(i),w(i),tmpVort,tmpT,p(i)-p_ref,alpha_out(i),rateYspec(i,1:nspec)     
+
 #else
-         write(20,*) tmpT,alpha_out(i),Yspec(i,1:nspec),rateYspec(i,1:nspec)
+         !write(20,*) ro(i),tmpT,alpha_out(i),Yspec(i,1:nspec),rateYspec(i,1:nspec)
+         write(20, *) "ro: ", ro(i)
+         write(20, *) "tmpT: ", tmpT
+         write(20, *) "alpha_out: ", alpha_out(i)
+         write(20, *) "Yspec: ", (Yspec(i,j), j=1, nspec)
+         write(20, *) "rateYspec: ", (rateYspec(i,j), j=1, nspec)
+   
+
+
+
+         !write(20, '(A, ES12.8, A, ES12.8, A, ES12.8)') &
+         !"ro: ", ro(i), " tmpT: ", tmpT, " alpha_out: ", alpha_out(i)
+         !write(20, '(A, *(ES12.8, ", "))') " Yspec: ", (Yspec(i,j), j=1, nspec)
+         !write(20, '(A, *(ES12.8, ", "))') " rateYspec: ", (rateYspec(i,j), j=1, nspec)
+
+
 #endif
       end do
 
