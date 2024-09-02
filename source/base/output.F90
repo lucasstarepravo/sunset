@@ -441,11 +441,14 @@ contains
 
 #else
          !write(20,*) ro(i),tmpT,alpha_out(i),Yspec(i,1:nspec),rateYspec(i,1:nspec)
+         write(20, *) "x:", rp(i,1)
+         write(20, *) "y:", rp(i,2)
          write(20, *) "ro: ", ro(i)
          write(20, *) "tmpT: ", tmpT
          write(20, *) "alpha_out: ", alpha_out(i)
          write(20, *) "Yspec: ", (Yspec(i,j), j=1, nspec)
          write(20, *) "rateYspec: ", (rateYspec(i,j), j=1, nspec)
+
    
 
 
